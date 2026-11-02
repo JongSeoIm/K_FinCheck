@@ -1,0 +1,10 @@
+# 비밀 값 (커밋 금지)
+.env
+.env.*
+!.env.example
+**/.kis-token.json
+
+# 빌드 결과
+backend/target/
+frontend/.next/
+frontend/node_modules/

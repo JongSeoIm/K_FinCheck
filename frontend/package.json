@@ -1,0 +1,23 @@
+{
+  "name": "stock-chat-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 8086",
+    "build": "next build",
+    "start": "next start -p 8086",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "lightweight-charts": "5.2.1",
+    "next": "16.2.12",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "^3.10.1",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "eslint": "^9",
+    "eslint-config-next": "16.2.12"
+  }
+}

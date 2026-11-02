@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.hk.stock.mapper.StockMapper">
+
+	<select id="getAllStocks" resultType="stockDto">
+		SELECT symbol, name, market
+		FROM stock_info
+		WHERE use_yn = 'Y'
+		ORDER BY symbol
+	</select>
+
+	<!-- 종목명 또는 종목코드로 검색 ("삼성", "005930") -->
+	<select id="searchStocks" parameterType="String" resultType="stockDto">
+		SELECT symbol, name, market
+		FROM stock_info
+		WHERE use_yn = 'Y'
+		  AND (name LIKE CONCAT('%', #{query}, '%')
+		       OR symbol LIKE CONCAT(#{query}, '%'))
+		ORDER BY symbol
+		LIMIT 20
+	</select>
+
+	<select id="getStock" parameterType="String" resultType="stockDto">
+		SELECT symbol, name, market
+		FROM stock_info
+		WHERE symbol = #{symbol}
+		  AND use_yn = 'Y'
+	</select>
+
+</mapper>
