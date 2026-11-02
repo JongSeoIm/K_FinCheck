@@ -3,12 +3,36 @@
 import useHydrated from '@/app/hooks/useHydrated'
 import useStockStore from '@/app/store/useStockStore'
 import { marketStocks } from '@/app/lib/market'
+import useStockData from '@/app/hooks/useStockData'
+import QuoteStatus from './QuoteStatus'
+import useAuthStore from '../store/useAuthStore'
 
-export default function WatchlistPanel({ activeSymbol, onSelectStock }) {
+function WatchlistRow({ stock, active, liveQuote, onSelect, onRemove }) {
+  const { data, error } = useStockData(stock.symbol, !liveQuote)
+  const quote = liveQuote || data
+  const price = Number.isFinite(quote?.price) ? quote.price : null
+  const rate = Number.isFinite(quote?.changeRate) ? quote.changeRate : null
+  const name = data?.stockName || stock.name
+  return <li className={active ? 'active' : ''}>
+    <button className='watchlist-select' type='button' onClick={() => onSelect(stock)}>
+      <span className='watch-name'><strong>{name}</strong><small>{stock.symbol}</small></span>
+      <span className='watch-price' title={error && !liveQuote ? error : undefined}>
+        <strong>{price == null ? '—' : `${price.toLocaleString('ko-KR')}원`}</strong>
+        <small className={rate > 0 ? 'positive' : rate < 0 ? 'negative' : ''}>
+          {rate == null ? '—' : `${rate > 0 ? '+' : ''}${rate.toFixed(2)}%`}
+        </small>
+      </span>
+    </button>
+    <button className='watchlist-remove' type='button' onClick={() => onRemove(stock.symbol)} aria-label={`${name} 관심 종목 삭제`}>삭제</button>
+  </li>
+}
+
+export default function WatchlistPanel({ activeSymbol, onSelectStock, trades = {} }) {
   const hydrated = useHydrated()
   const watchlist = useStockStore((state) => state.watchlist)
-  const prices = useStockStore((state) => state.prices)
   const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
+  const user = useAuthStore(state => state.user)
+  const error = useStockStore(state => state.watchlistError)
 
   return (
     <section className='panel watchlist-panel'>
@@ -23,42 +47,24 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock }) {
         </div>
       ) : watchlist.length === 0 ? (
         <div className='empty-state'>
-          <strong>아직 저장한 종목이 없습니다.</strong>
-          <p>종목 상단의 ‘관심 추가’를 누르면 여기에 보관됩니다.</p>
+          <strong>{user ? '아직 저장한 종목이 없습니다.' : '로그인 후 관심 종목을 저장해 보세요.'}</strong>
+          <p>{user ? '종목 상단의 ‘관심 추가’를 누르면 여기에 보관됩니다.' : '계정별로 관심 종목을 보관합니다.'}</p>
         </div>
       ) : (
         <ul className='watchlist'>
           {watchlist.map((symbol) => {
-            const stock = marketStocks.find((item) => item.symbol === symbol) || {
-              symbol,
-              name: symbol,
-              price: prices[symbol] || 0,
-              change: 0,
-            }
+            const stock = marketStocks.find((item) => item.symbol === symbol) || { symbol, name: symbol }
             return (
-              <li key={symbol} className={activeSymbol === symbol ? 'active' : ''}>
-                <button className='watchlist-select' type='button' onClick={() => onSelectStock(stock)}>
-                  <span>
-                    <strong>{symbol}</strong>
-                    <small>{stock.name}</small>
-                  </span>
-                  <span className='watch-price'>
-                    {prices[symbol] ? `₩${Number(prices[symbol]).toLocaleString('ko-KR')}원` : '선택해서 조회'}
-                  </span>
-                </button>
-                <button
-                  className='watchlist-remove'
-                  type='button'
-                  onClick={() => removeFromWatchlist(symbol)}
-                  aria-label={`${symbol} 관심 종목 삭제`}
-                >
-                  삭제
-                </button>
-              </li>
+              <WatchlistRow key={symbol} stock={stock} active={activeSymbol === symbol}
+                liveQuote={trades[symbol]} onSelect={onSelectStock} onRemove={removeFromWatchlist} />
             )
           })}
         </ul>
       )}
+      {error && <p className='financial-state' role='alert'>{error}</p>}
+      {hydrated && watchlist.length > 0 && <QuoteStatus quote={Object.values(trades)
+        .filter(quote => watchlist.includes(quote.stockCode) && quote.exchangeTime)
+        .sort((a, b) => Date.parse(b.exchangeTime) - Date.parse(a.exchangeTime))[0]} />}
     </section>
   )
 }

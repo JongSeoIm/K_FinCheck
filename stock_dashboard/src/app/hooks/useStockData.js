@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
 
-export default function useStockData(symbol) {
+export default function useStockData(symbol, enabled = true) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!symbol) return
+    if (!symbol || !enabled) return
 
     const controller = new AbortController()
 
@@ -25,7 +25,7 @@ export default function useStockData(symbol) {
         if (!response.ok) {
           throw new Error(result.error || '시세 조회에 실패했습니다.')
         }
-        setData(result)
+        if (!controller.signal.aborted) setData({ ...result, fetchedAt: new Date().toISOString() })
       } catch (requestError) {
         if (requestError.name !== 'AbortError') {
           setError(requestError.message)
@@ -39,7 +39,7 @@ export default function useStockData(symbol) {
 
     fetchStockData()
     return () => controller.abort()
-  }, [symbol])
+  }, [symbol, enabled])
 
   return { data, loading, error }
 }

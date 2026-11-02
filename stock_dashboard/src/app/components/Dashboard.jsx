@@ -9,6 +9,7 @@ import StockChatDrawer from './StockChatDrawer'
 import StockInfo from './StockInfo'
 import StockSearch from './StockSearch'
 import WatchlistPanel from './WatchlistPanel'
+import AuthNav from './AuthNav'
 import useRealtimeQuotes from '../hooks/useRealtimeQuotes'
 import { marketStocks } from '../lib/market'
 
@@ -36,6 +37,7 @@ export default function Dashboard({ initialStock }) {
     <main className='app-shell'>
       <header className='topbar'>
         <h1 className='sr-only'>주식 대시보드</h1>
+        <AuthNav symbol={selectedStock.symbol} />
         <StockSearch onSelectStock={handleSelectStock} />
       </header>
 
@@ -84,6 +86,7 @@ export default function Dashboard({ initialStock }) {
           <WatchlistPanel
             activeSymbol={selectedStock.symbol}
             onSelectStock={handleSelectStock}
+            trades={stream.trades}
           />
 
           <section className='panel compact-panel'>

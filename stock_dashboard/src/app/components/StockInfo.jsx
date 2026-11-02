@@ -4,6 +4,8 @@ import { FaRegStar, FaStar } from 'react-icons/fa'
 import useHydrated from '@/app/hooks/useHydrated'
 import useStockData from '@/app/hooks/useStockData'
 import useStockStore from '@/app/store/useStockStore'
+import QuoteStatus from './QuoteStatus'
+import useAuthStore from '../store/useAuthStore'
 
 function formatNumber(value, digits = 0) {
   if (value == null) return '—'
@@ -22,6 +24,8 @@ export default function StockInfo({ stock, liveQuote }) {
   const watchlist = useStockStore((state) => state.watchlist)
   const addToWatchlist = useStockStore((state) => state.addToWatchlist)
   const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
+  const saving = useStockStore((state) => state.saving)
+  const user = useAuthStore(state => state.user)
 
   const isSaved = hydrated && watchlist.includes(stock.symbol)
   const displayName = data?.stockName || stock.name || stock.symbol
@@ -37,7 +41,6 @@ export default function StockInfo({ stock, liveQuote }) {
     ['고가', data?.high != null ? `${formatNumber(data.high)}원` : null],
     ['저가', data?.low != null ? `${formatNumber(data.low)}원` : null],
     ['누적거래량', data?.volume != null ? `${formatNumber(data.volume)}주` : null],
-    ['데이터 출처', data?.source ? data.source === 'KIS WebSocket' ? 'KIS 실시간' : `${data.source} 시세` : '조회 대기'],
   ]
 
   return (
@@ -50,8 +53,12 @@ export default function StockInfo({ stock, liveQuote }) {
         <button
           className={`watch-toggle ${isSaved ? 'saved' : ''}`}
           type='button'
-          onClick={() => isSaved ? removeFromWatchlist(stock.symbol) : addToWatchlist(stock.symbol)}
-          disabled={!hydrated}
+          onClick={() => {
+            if (!user) { window.location.assign(`/login?next=${encodeURIComponent(`/?symbol=${stock.symbol}`)}`); return }
+            if (isSaved) removeFromWatchlist(stock.symbol)
+            else addToWatchlist(stock.symbol)
+          }}
+          disabled={!hydrated || saving}
         >
           {isSaved ? <FaStar aria-hidden='true' /> : <FaRegStar aria-hidden='true' />}
           {isSaved ? '관심 종목 해제' : '관심 종목 추가'}
@@ -82,6 +89,7 @@ export default function StockInfo({ stock, liveQuote }) {
           ))}
         </dl>
       </div>
+      <QuoteStatus quote={liveQuote} fetchedAt={restData?.fetchedAt} source={data?.source === 'KIS WebSocket' ? 'KIS 실시간' : data?.source ? `${data.source} 시세` : null} />
     </section>
   )
 }
