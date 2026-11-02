@@ -34,7 +34,7 @@ export default function MarketTicker({ stocks, activeSymbol, onSelect }) {
               {stock.name}
             </span>
             {/* key를 갱신 시각으로 두어 값이 바뀔 때마다 깜빡임 효과를 다시 실행 */}
-            <strong key={quote?.updatedAt} className={`ticker-price flash-${dir}`}>
+            <strong key={quote?.receivedAt} className={`ticker-price flash-${dir}`}>
               {quote ? formatNumber(quote.price) : '—'}
             </strong>
             <small className={dir}>{quote ? formatRate(quote.changeRate) : ''}</small>

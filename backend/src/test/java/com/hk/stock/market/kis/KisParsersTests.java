@@ -27,10 +27,10 @@ class KisParsersTests {
 				""";
 		QuoteDto q = KisParsers.quote("005930", objectMapper.readTree(json));
 		assertEquals(new BigDecimal("70500"), q.getPrice());
-		assertEquals(new BigDecimal("-500"), q.getChange());
+		assertEquals(new BigDecimal("-500"), q.getChangeAmount());
 		assertEquals(new BigDecimal("-0.70"), q.getChangeRate());
 		assertEquals(new BigDecimal("71000"), q.getPreviousClose());
-		assertEquals(1234567L, q.getVolume());
+		assertEquals(1234567L, q.getCumulativeVolume());
 	}
 
 	@Test
@@ -39,9 +39,9 @@ class KisParsersTests {
 		QuoteDto q = KisParsers.realtimeTick(data.split("\\^"), 0);
 		assertEquals("005930", q.getSymbol());
 		assertEquals(new BigDecimal("71500"), q.getPrice());
-		assertEquals(new BigDecimal("500"), q.getChange());
+		assertEquals(new BigDecimal("500"), q.getChangeAmount());
 		assertEquals(new BigDecimal("71000"), q.getPreviousClose());
-		assertEquals(2500000L, q.getVolume());
+		assertEquals(2500000L, q.getCumulativeVolume());
 	}
 
 	@Test

@@ -28,18 +28,19 @@ const useStockStore = create(
 
       setFeedMode: (feedMode) => set({ feedMode }),
 
-      // 늦게 도착한 과거 시세가 최신 시세를 덮어쓰지 않도록 서버 갱신 시각(updatedAt)을 비교한다
+      // 늦게 도착한 과거 시세가 최신 시세를 덮어쓰지 않도록 서버 수신 시각(receivedAt)을 비교한다
       setQuote: (quote) => {
         if (!quote?.symbol) return
+        const receivedMs = Date.parse(quote.receivedAt)
         const current = get().quotes[quote.symbol]
-        if (current && current.updatedAt >= quote.updatedAt) return
+        if (current && Date.parse(current.receivedAt) >= receivedMs) return
 
         set((state) => {
           const list = state.ticks[quote.symbol] || []
           const last = list[list.length - 1]
-          const nextTicks = last && last.time === quote.updatedAt
+          const nextTicks = last && last.time === receivedMs
             ? list
-            : [...list, { time: quote.updatedAt, price: Number(quote.price) }].slice(-MAX_TICKS)
+            : [...list, { time: receivedMs, price: Number(quote.price) }].slice(-MAX_TICKS)
           return {
             quotes: { ...state.quotes, [quote.symbol]: quote },
             ticks: { ...state.ticks, [quote.symbol]: nextTicks },

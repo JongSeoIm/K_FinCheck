@@ -30,28 +30,31 @@ export default function StockChart({ symbol, marketOpen }) {
   const [refreshKey, setRefreshKey] = useState(0)
   // 응답에 요청 키를 함께 저장 → 현재 요청 키와 다르면 아직 불러오는 중
   const [chart, setChart] = useState({ key: '', data: null, error: '' })
-  const requestKey = `${symbol}:${range}:${refreshKey}`
 
   const quote = useStockStore((state) => state.quotes[symbol])
   const ticks = useStockStore((state) => state.ticks[symbol])
 
   const candleAvailable = DAILY_RANGES.includes(range)
   const showCandle = candleAvailable && chartType === 'candle'
+  // 선 차트는 /history, 캔들은 /candles 에서 받는다
+  const source = showCandle ? 'candles' : 'history'
+  const requestKey = `${symbol}:${source}:${range}:${refreshKey}`
 
   // 기간별 차트 조회 (실시간 탭은 서버 조회 없이 누적 시세 사용)
   useEffect(() => {
     if (range === 'LIVE') return undefined
     const controller = new AbortController()
-    const key = `${symbol}:${range}:${refreshKey}`
+    const key = `${symbol}:${source}:${range}:${refreshKey}`
+    const request = source === 'candles' ? stockApi.getCandles : stockApi.getHistory
 
-    stockApi.getChart(symbol, range, { signal: controller.signal })
+    request(symbol, range, { signal: controller.signal })
       .then((data) => setChart({ key, data, error: '' }))
       .catch((error) => {
         if (error.name !== 'AbortError') setChart({ key, data: null, error: error.message })
       })
 
     return () => controller.abort()
-  }, [symbol, range, refreshKey])
+  }, [symbol, source, range, refreshKey])
 
   // 장중에는 1일(분봉) 차트를 1분마다 다시 조회
   useEffect(() => {

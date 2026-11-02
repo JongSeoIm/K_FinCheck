@@ -33,16 +33,34 @@ public class ChartService {
 
 	private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
-	public ChartDto getChart(String symbol, String range) {
+	//선 차트용 이력 (/history): 1D 분봉, 1W·1M·1Y 일봉
+	public ChartDto getHistory(String symbol, String range) {
 		stockService.getStock(symbol);	//지원 종목인지 확인
 		String r = range == null ? "1D" : range.toUpperCase();
-		return switch (r) {
-			case "1D" -> new ChartDto(symbol, r, "1m", provider.mode(), minutes(symbol));
-			case "1W" -> new ChartDto(symbol, r, "1d", provider.mode(), dailySince(symbol, LocalDate.now(MarketHours.KST).minusWeeks(1)));
-			case "1M" -> new ChartDto(symbol, r, "1d", provider.mode(), dailySince(symbol, LocalDate.now(MarketHours.KST).minusMonths(1)));
-			case "1Y" -> new ChartDto(symbol, r, "1d", provider.mode(), dailySince(symbol, LocalDate.now(MarketHours.KST).minusYears(1)));
-			default -> throw new IllegalArgumentException("지원하지 않는 기간입니다: " + range + " (1D, 1W, 1M, 1Y)");
+		if ("1D".equals(r)) return new ChartDto(symbol, r, "1m", provider.mode(), minutes(symbol));
+		return daily(symbol, r, "지원하지 않는 기간입니다: " + range + " (1D, 1W, 1M, 1Y)");
+	}
+
+	//캔들용 OHLC (/candles): 현재는 일봉(interval=1d)만, 기간 1W·1M·1Y
+	public ChartDto getCandles(String symbol, String interval, String range) {
+		stockService.getStock(symbol);	//지원 종목인지 확인
+		String i = interval == null ? "1d" : interval.toLowerCase();
+		if (!"1d".equals(i)) {
+			throw new IllegalArgumentException("지원하지 않는 캔들 간격입니다: " + interval + " (1d)");
+		}
+		String r = range == null ? "1M" : range.toUpperCase();
+		return daily(symbol, r, "캔들은 일봉이라 1W, 1M, 1Y 기간만 지원합니다: " + range);
+	}
+
+	private ChartDto daily(String symbol, String range, String errorMessage) {
+		LocalDate today = LocalDate.now(MarketHours.KST);
+		LocalDate from = switch (range) {
+			case "1W" -> today.minusWeeks(1);
+			case "1M" -> today.minusMonths(1);
+			case "1Y" -> today.minusYears(1);
+			default -> throw new IllegalArgumentException(errorMessage);
 		};
+		return new ChartDto(symbol, range, "1d", provider.mode(), dailySince(symbol, from));
 	}
 
 	private List<ChartPointDto> minutes(String symbol) {

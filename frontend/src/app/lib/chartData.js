@@ -13,9 +13,9 @@ const minuteStart = (ms) => Math.floor(ms / 60000) * 60000
  * - interval '1m': 같은 분이면 마지막 분봉 갱신, 다음 분이면 새 분봉 추가
  */
 export function mergeLiveQuote(points, interval, quote) {
-  if (!points?.length || !quote?.price || !quote.tradeTime) return points
+  if (!points?.length || !quote?.price || !quote.eventTime) return points
   const price = Number(quote.price)
-  const tradeMs = new Date(quote.tradeTime).getTime()
+  const tradeMs = new Date(quote.eventTime).getTime()
   if (!Number.isFinite(tradeMs)) return points
 
   const last = points[points.length - 1]
@@ -28,7 +28,7 @@ export function mergeLiveQuote(points, interval, quote) {
         high: Math.max(Number(last.high), Number(quote.high ?? price), price),
         low: Math.min(Number(last.low), Number(quote.low ?? price), price),
         close: price,
-        volume: quote.volume ?? last.volume,
+        volume: quote.cumulativeVolume ?? last.volume,
       }]
     }
     if (today > last.time) {
@@ -38,7 +38,7 @@ export function mergeLiveQuote(points, interval, quote) {
         high: Number(quote.high ?? price),
         low: Number(quote.low ?? price),
         close: price,
-        volume: quote.volume,
+        volume: quote.cumulativeVolume,
       }]
     }
     return points

@@ -36,9 +36,13 @@ export const stockApi = {
   getQuotes: (symbols, options) =>
     fetchWrapper(`/api/quotes?symbols=${symbols.join(',')}`, options).then((d) => d.list ?? []),
 
-  // 차트 (range: 1D | 1W | 1M | 1Y)
-  getChart: (symbol, range, options) =>
-    fetchWrapper(`/api/stocks/${symbol}/chart?range=${range}`, options).then((d) => d.chart),
+  // 선 차트용 이력 (range: 1D 분봉 | 1W·1M·1Y 일봉)
+  getHistory: (symbol, range, options) =>
+    fetchWrapper(`/api/stocks/${symbol}/history?range=${range}`, options).then((d) => d.history),
+
+  // 캔들 OHLC (일봉, range: 1W | 1M | 1Y)
+  getCandles: (symbol, range, options) =>
+    fetchWrapper(`/api/stocks/${symbol}/candles?interval=1d&range=${range}`, options).then((d) => d.candles),
 
   // 종목 관련 뉴스 (서버가 네이버 검색 API로 조회, 키는 서버에만 있음)
   getNews: (symbol, options) =>

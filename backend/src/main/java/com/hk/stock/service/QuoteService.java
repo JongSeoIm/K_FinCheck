@@ -1,8 +1,11 @@
 package com.hk.stock.service;
 
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +47,8 @@ public class QuoteService {
 
 	private final Map<String, QuoteDto> latest = new ConcurrentHashMap<>();
 	private final Map<String, String> names = new ConcurrentHashMap<>();
+	private final Map<String, String> markets = new ConcurrentHashMap<>();
+	private final AtomicLong eventSeq = new AtomicLong();
 	private final Map<String, Long> lastRestFetch = new ConcurrentHashMap<>();
 	private final Map<String, Long> lastRestFailure = new ConcurrentHashMap<>();
 	private volatile Long lastTickAt;
@@ -52,7 +57,10 @@ public class QuoteService {
 	@EventListener(ApplicationReadyEvent.class)
 	public void start() {
 		List<StockDto> stocks = stockService.getAllStocks();
-		stocks.forEach(stock -> names.put(stock.getSymbol(), stock.getName()));
+		stocks.forEach(stock -> {
+			names.put(stock.getSymbol(), stock.getName());
+			if (stock.getMarket() != null) markets.put(stock.getSymbol(), stock.getMarket());
+		});
 		for (StockDto stock : stocks) {
 			try {
 				refreshFromRest(stock.getSymbol());
@@ -72,7 +80,7 @@ public class QuoteService {
 	public QuoteDto getQuote(String symbol) {
 		stockService.getStock(symbol);	//지원 종목인지 확인
 		QuoteDto quote = latest.get(symbol);
-		boolean stale = quote == null || System.currentTimeMillis() - quote.getUpdatedAt() > STALE_MS;
+		boolean stale = quote == null || System.currentTimeMillis() - receivedMillis(quote) > STALE_MS;
 		if (stale) {
 			try {
 				quote = refreshFromRest(symbol);
@@ -136,13 +144,21 @@ public class QuoteService {
 		String symbol = incoming.getSymbol();
 		QuoteDto previous = latest.get(symbol);
 		QuoteDto merged = incoming.toBuilder()
+				.eventId(symbol + "-" + eventSeq.incrementAndGet())
 				.name(names.getOrDefault(symbol, symbol))
+				.market(markets.get(symbol))
 				.previousClose(incoming.getPreviousClose() != null ? incoming.getPreviousClose()
 						: previous != null ? previous.getPreviousClose() : null)
-				.updatedAt(System.currentTimeMillis())
+				.receivedAt(MarketHours.now().truncatedTo(ChronoUnit.MILLIS).toOffsetDateTime().toString())
+				.dataMode(provider.mode())
 				.build();
 		latest.put(symbol, merged);
 		publisher.publishEvent(new QuoteUpdatedEvent(merged));
 		return merged;
+	}
+
+	//receivedAt(ISO 시각)을 epoch ms 로 (오래된 시세 판단용)
+	private static long receivedMillis(QuoteDto quote) {
+		return OffsetDateTime.parse(quote.getReceivedAt()).toInstant().toEpochMilli();
 	}
 }

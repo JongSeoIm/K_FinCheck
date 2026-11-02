@@ -15,14 +15,14 @@ export default function StockInfo({ stock }) {
   const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
 
   const saved = hydrated && watchlist.some((w) => w.symbol === stock.symbol)
-  const dir = directionClass(quote?.change)
+  const dir = directionClass(quote?.changeAmount)
 
   const metrics = [
     ['시가', formatPrice(quote?.open)],
     ['고가', formatPrice(quote?.high)],
     ['저가', formatPrice(quote?.low)],
     ['전일 종가', formatPrice(quote?.previousClose)],
-    ['거래량', formatVolume(quote?.volume)],
+    ['거래량', formatVolume(quote?.cumulativeVolume)],
   ]
 
   return (
@@ -51,14 +51,14 @@ export default function StockInfo({ stock }) {
         <div className='quote-body'>
           <div className='headline'>
             <span className='label'>현재가</span>
-            <strong key={quote.updatedAt} className={`headline-price flash-${dir}`}>
+            <strong key={quote.receivedAt} className={`headline-price flash-${dir}`}>
               {formatPrice(quote.price)}
             </strong>
             <p className={dir}>
-              <span>{formatSignedPrice(quote.change)}</span>
+              <span>{formatSignedPrice(quote.changeAmount)}</span>
               <span>{formatRate(quote.changeRate)}</span>
             </p>
-            <small className='updated'>마지막 갱신 {formatClock(quote.updatedAt)}</small>
+            <small className='updated'>마지막 갱신 {formatClock(quote.receivedAt)}</small>
           </div>
 
           <dl className='metrics'>

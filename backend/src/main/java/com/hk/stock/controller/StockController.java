@@ -94,13 +94,24 @@ public class StockController {
 		return map;
 	}
 
-	//차트: /api/stocks/005930/chart?range=1D|1W|1M|1Y → {"chart":{...}}
-	@GetMapping("/stocks/{symbol}/chart")
-	public Map<String, ChartDto> getChart(
+	//선 차트용 이력: /api/stocks/005930/history?range=1D|1W|1M|1Y → {"history":{...}}
+	@GetMapping("/stocks/{symbol}/history")
+	public Map<String, ChartDto> getHistory(
 			@PathVariable @Pattern(regexp = SYMBOL_REGEX, message = SYMBOL_MESSAGE) String symbol,
 			@RequestParam(defaultValue = "1D") String range) {
 		Map<String, ChartDto> map = new HashMap<>();
-		map.put("chart", chartService.getChart(symbol, range));
+		map.put("history", chartService.getHistory(symbol, range));
+		return map;
+	}
+
+	//캔들 OHLC: /api/stocks/005930/candles?interval=1d&range=1W|1M|1Y → {"candles":{...}}
+	@GetMapping("/stocks/{symbol}/candles")
+	public Map<String, ChartDto> getCandles(
+			@PathVariable @Pattern(regexp = SYMBOL_REGEX, message = SYMBOL_MESSAGE) String symbol,
+			@RequestParam(defaultValue = "1d") String interval,
+			@RequestParam(defaultValue = "1M") String range) {
+		Map<String, ChartDto> map = new HashMap<>();
+		map.put("candles", chartService.getCandles(symbol, interval, range));
 		return map;
 	}
 

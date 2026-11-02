@@ -260,14 +260,14 @@ public class DemoMarketDataProvider implements MarketDataProvider {
 			return QuoteDto.builder()
 					.symbol(symbol)
 					.price(bd(price))
-					.change(change)
+					.changeAmount(change)
 					.changeRate(rate)
 					.open(bd(open))
 					.high(bd(high))
 					.low(bd(low))
 					.previousClose(bd(previousClose))
-					.volume(volume)
-					.tradeTime(MarketHours.now().withNano(0).toOffsetDateTime().toString())
+					.cumulativeVolume(volume)
+					.eventTime(MarketHours.now().withNano(0).toOffsetDateTime().toString())
 					.source("DEMO")
 					.build();
 		}
