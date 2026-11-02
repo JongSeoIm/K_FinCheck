@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
 
-export default function useStockCandles(symbol, period = 'D', days = 40) {
+export default function useStockCandles(symbol, period = 'D', days = 40, enabled = true) {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!symbol) return
+    if (!symbol || !enabled) return
 
     const controller = new AbortController()
 
@@ -40,7 +40,7 @@ export default function useStockCandles(symbol, period = 'D', days = 40) {
 
     fetchCandles()
     return () => controller.abort()
-  }, [symbol, period, days])
+  }, [symbol, period, days, enabled])
 
   return { data, loading, error }
 }

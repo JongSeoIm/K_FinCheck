@@ -60,6 +60,8 @@ export default function MarketTicker({ activeSymbol, onSelectStock, trades }) {
             : ''
 
         const displayPrice = livePrice != null ? Number(livePrice) : stock.price
+        const changeRate = trades[stock.symbol]?.changeRate
+        const displayChange = changeRate ?? null
 
         return (
           <button
@@ -76,8 +78,8 @@ export default function MarketTicker({ activeSymbol, onSelectStock, trades }) {
             ) : (
               <small>{stock.symbol}</small>
             )}
-            <small className={stock.change >= 0 ? 'positive' : 'negative'}>
-              {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%
+            <small className={displayChange == null ? '' : displayChange >= 0 ? 'positive' : 'negative'}>
+              {displayChange == null ? '—' : `${displayChange >= 0 ? '+' : ''}${displayChange.toFixed(2)}%`}
             </small>
           </button>
         )

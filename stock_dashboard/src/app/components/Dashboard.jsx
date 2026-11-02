@@ -1,6 +1,6 @@
 'use client'
 
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import EarningsPanel from './EarningsPanel'
 import MarketTicker from './MarketTicker'
 import RecommendationChart from './RecommendationChart'
@@ -9,18 +9,16 @@ import StockChatDrawer from './StockChatDrawer'
 import StockInfo from './StockInfo'
 import StockSearch from './StockSearch'
 import WatchlistPanel from './WatchlistPanel'
-import useFinnhubSocket from '../hooks/useFinnhubSocket'
+import useRealtimeQuotes from '../hooks/useRealtimeQuotes'
 import { marketStocks } from '../lib/market'
 
 const LazyNewsFeed = lazy(() => import('./NewsFeed'))
 
 export default function Dashboard({ initialStock }) {
   const [selectedStock, setSelectedStock] = useState(initialStock || marketStocks[0])
-  const streamSymbols = useMemo(() => [
-    ...marketStocks.map((stock) => stock.symbol),
-    selectedStock.symbol,
-  ], [selectedStock.symbol])
-  const stream = useFinnhubSocket(streamSymbols)
+  const [streamMode, setStreamMode] = useState('push')
+  const [intervalSeconds, setIntervalSeconds] = useState(1)
+  const stream = useRealtimeQuotes(intervalSeconds, streamMode)
 
   const handleSelectStock = (stock) => {
     const normalizedStock = {
@@ -49,18 +47,25 @@ export default function Dashboard({ initialStock }) {
 
       <div className='dashboard-layout'>
         <section className='primary-column' aria-label='선택 종목 정보'>
-          <StockInfo key={selectedStock.symbol} stock={selectedStock} />
+          <StockInfo key={selectedStock.symbol} stock={selectedStock} liveQuote={stream.trades[selectedStock.symbol]} />
 
           <section className='panel chart-panel'>
             <div className='panel-heading'>
               <h2>주가 차트</h2>
+              <div className='stream-mode' aria-label='시세 전달 방식'>
+                <button type='button' className={streamMode === 'push' ? 'active' : ''} onClick={() => setStreamMode('push')}>Push</button>
+                <span className='tab-separator' aria-hidden='true'>·</span>
+                <button type='button' className={streamMode === 'poll' ? 'active' : ''} onClick={() => setStreamMode('poll')}>Polling</button>
+              </div>
             </div>
             <StockChart
               symbol={selectedStock.symbol}
-              price={selectedStock.price}
-              socketStatus={stream.status}
-              stockHistory={stream.history[selectedStock.symbol] || []}
-              demoHistory={[]}
+              liveQuote={stream.trades[selectedStock.symbol]}
+              liveCandles={stream.candles?.[selectedStock.symbol]}
+              streamInterval={stream.intervalSeconds}
+              streamStatus={stream.status}
+              supported={stream.supportedSymbols.includes(selectedStock.symbol)}
+              onIntervalChange={setIntervalSeconds}
             />
           </section>
 

@@ -13,9 +13,12 @@ function formatNumber(value, digits = 0) {
   })
 }
 
-export default function StockInfo({ stock }) {
+export default function StockInfo({ stock, liveQuote }) {
   const hydrated = useHydrated()
-  const { data, loading, error } = useStockData(stock.symbol)
+  const { data: restData, loading: restLoading, error: restError } = useStockData(stock.symbol)
+  const data = liveQuote ? { ...restData, ...liveQuote, source: 'KIS WebSocket' } : restData
+  const loading = restLoading && !liveQuote
+  const error = liveQuote ? null : restError
   const watchlist = useStockStore((state) => state.watchlist)
   const addToWatchlist = useStockStore((state) => state.addToWatchlist)
   const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
@@ -34,7 +37,7 @@ export default function StockInfo({ stock }) {
     ['고가', data?.high != null ? `${formatNumber(data.high)}원` : null],
     ['저가', data?.low != null ? `${formatNumber(data.low)}원` : null],
     ['누적거래량', data?.volume != null ? `${formatNumber(data.volume)}주` : null],
-    ['데이터 출처', data?.source ? `${data.source} 실전시세` : '조회 대기'],
+    ['데이터 출처', data?.source ? data.source === 'KIS WebSocket' ? 'KIS 실시간' : `${data.source} 시세` : '조회 대기'],
   ]
 
   return (

@@ -83,7 +83,7 @@ function ChartTooltip({ active, payload }) {
   )
 }
 
-export default function StockChart({ symbol }) {
+export default function StockChart({ symbol, liveQuote, liveCandles, streamInterval, streamStatus, supported, onIntervalChange }) {
   const [chartType, setChartType] = useState('candle')
   const [selectedPeriod, setSelectedPeriod] = useState('일')
   const [selectedMinute, setSelectedMinute] = useState('1초')
@@ -99,7 +99,21 @@ export default function StockChart({ symbol }) {
     }
   }, [selectedPeriod])
 
-  const { data: candles, loading, error } = useStockCandles(symbol, periodCode, 45)
+  const isIntraday = selectedPeriod === '분'
+  const seconds = selectedMinute.endsWith('초') ? parseInt(selectedMinute, 10) : parseInt(selectedMinute, 10) * 60
+  const { data: historicalCandles, loading: historicalLoading, error: historicalError } = useStockCandles(symbol, periodCode, 45, !isIntraday)
+  const loading = !isIntraday && historicalLoading
+  const error = !isIntraday && historicalError
+  const candles = useMemo(() => {
+    if (isIntraday) return streamInterval === seconds ? (liveCandles || []) : []
+    if (periodCode !== 'D' || !liveQuote || !historicalCandles.length) return historicalCandles
+    const day = { date: liveQuote.businessDate, open: liveQuote.open, high: liveQuote.high,
+      low: liveQuote.low, close: liveQuote.price, volume: liveQuote.volume }
+    const last = historicalCandles.at(-1)
+    if (last.date === day.date) return [...historicalCandles.slice(0, -1), day]
+    if (last.date < day.date) return [...historicalCandles, day]
+    return historicalCandles
+  }, [isIntraday, streamInterval, seconds, liveCandles, periodCode, liveQuote, historicalCandles])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -149,6 +163,7 @@ export default function StockChart({ symbol }) {
 
   const handleSelectMinute = (m) => {
     setSelectedMinute(m)
+    onIntervalChange?.(parseInt(m, 10) * (m.endsWith('초') ? 1 : 60))
     setSelectedPeriod('분')
     setIsMinuteOpen(false)
   }
@@ -248,10 +263,10 @@ export default function StockChart({ symbol }) {
 
       <div className='stream-status'>
         <span>
-          {selectedPeriod === '분' ? `${selectedMinute} 시세 (실시간 준비 중)` : `${selectedPeriod}봉 시세 · KIS 실전 데이터`}
+          {isIntraday ? `${selectedMinute}봉 · 연결 후 수신분` : `${selectedPeriod}봉 시세 · KIS`}
         </span>
         <span>
-          {loading ? '시세 데이터 수신 중...' : error ? error : `${candles.length}개 봉 수신 완료`}
+          {loading ? '시세 데이터 수신 중...' : error || `${candles.length}개 봉 · ${supported ? streamStatus : '실시간 연결 종목 확인'}`}
         </span>
       </div>
 
@@ -286,6 +301,8 @@ export default function StockChart({ symbol }) {
       <div className='chart-area'>
         {loading && candles.length === 0 ? (
           <div className='skeleton-block' style={{ height: '100%' }} />
+        ) : candles.length === 0 ? (
+          <div className='empty-state' role='status'>{isIntraday ? (supported ? streamStatus : '실시간 구독 종목은 삼성전자·SK하이닉스입니다.') : (error || '차트 데이터가 없습니다.')}</div>
         ) : (
           <ResponsiveContainer width='100%' height='100%'>
             {chartType === 'candle' ? (
