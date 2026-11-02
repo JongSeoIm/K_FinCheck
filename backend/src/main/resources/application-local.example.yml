@@ -1,0 +1,9 @@
+# 로컬 개발 환경용 KIS 설정 예시
+# 이 파일을 application-local.yml로 복사한 후 실제 발급받은 키를 입력하세요.
+# application-local.yml 파일은 .gitignore에 등록되어 Git에 포함되지 않습니다.
+
+kis:
+  base-url: https://openapi.koreainvestment.com:9443
+  app-key: YOUR_KIS_APP_KEY_HERE
+  app-secret: YOUR_KIS_APP_SECRET_HERE
+

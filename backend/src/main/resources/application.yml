@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: k-fincheck-backend
+  config:
+    import:
+      - optional:application-local.yml
+
+kis:
+  base-url: https://openapi.koreainvestment.com:9443
+  app-key: YOUR_APP_KEY
+  app-secret: YOUR_APP_SECRET
+
