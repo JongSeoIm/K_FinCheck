@@ -7,3 +7,7 @@ kis:
   app-key: YOUR_KIS_APP_KEY_HERE
   app-secret: YOUR_KIS_APP_SECRET_HERE
 
+
+# OpenDART 인증키는 백엔드 로컬 설정에만 입력합니다.
+opendart:
+  api-key: YOUR_OPENDART_API_KEY_HERE

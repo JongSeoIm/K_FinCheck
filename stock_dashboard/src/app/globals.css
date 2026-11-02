@@ -558,3 +558,31 @@ a:focus-visible {
   color: #1769aa;
   font-weight: 700;
 }
+
+/* OpenDART 연간 실적: 기존 우측 패널 안에서만 표시한다. */
+.financial-panel { padding: 12px; }
+.financial-meta { color: var(--muted); font-size: 10px; margin-bottom: 9px; }
+.financial-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.financial-table th, .financial-table td { padding: 10px 0; border-bottom: 1px solid var(--line-light); text-align: right; font-variant-numeric: tabular-nums; }
+.financial-table th:first-child { width: 28%; text-align: left; font-weight: 500; }
+.financial-table th:nth-child(2) { width: 40%; }
+.financial-table thead th { color: var(--muted); font-size: 10px; font-weight: 400; }
+.financial-table td small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; }
+.financial-source { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: space-between; margin-top: 10px; color: var(--muted); font-size: 9px; }
+.financial-source a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.financial-state { padding: 16px 12px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.financial-state p { margin: 0 0 8px; }
+.financial-state button { border: 1px solid var(--line); background: transparent; color: inherit; padding: 4px 8px; cursor: pointer; }
+.financial-caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* 항목별 전년/당해 비교: 색은 증감률에만 사용한다. */
+.financial-table .financial-value-row > * { border-bottom: 0; padding-bottom: 7px; }
+.financial-table .financial-chart-row > td { padding: 0 0 12px; }
+.financial-growth { white-space: nowrap; font-size: 13px; font-weight: 700; }
+.financial-comparison { display: grid; gap: 5px; }
+.financial-bar-row { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 9px; text-align: left; }
+.financial-bar-track { position: relative; height: 5px; }
+.financial-bar, .financial-bar-baseline { display: block; position: absolute; top: 0; height: 100%; }
+.financial-bar-baseline { width: 1px; background: var(--line); }
+.financial-bar-previous { background: #cbd0d3; }
+.financial-bar-current { background: #555b5e; }
