@@ -12,6 +12,11 @@ kis:
 opendart:
   api-key: YOUR_OPENDART_API_KEY_HERE
 
+# NAVER API HUB 검색 서비스에서 발급한 인증 정보 (구 Developers 키와 다름)
+naver-news:
+  client-id: YOUR_CLIENT_ID
+  client-secret: YOUR_CLIENT_SECRET
+
 # 프로젝트 전용 DB 계정. 실제 비밀번호는 application-local.yml에만 입력합니다.
 spring:
   datasource:
