@@ -49,10 +49,14 @@ class FinancialServiceTest {
     @Test
     void checksScopeCachesSuccessfulReportsAndDoesNotCacheFailures() throws Exception {
         OpenDartClient client = mock(OpenDartClient.class);
-        FinancialService service = new FinancialService(client);
+        FinancialRepository repository = mock(FinancialRepository.class);
+        FinancialService service = new FinancialService(client, repository);
         int year = LocalDate.now(ZoneId.of("Asia/Seoul")).getYear() - 1;
         when(client.annualReport("00126380", year)).thenReturn(mapper.readTree("[]"));
-        assertThat(service.annual("005930", null)).isSameAs(service.annual("005930", year));
+        var saved = FinancialService.normalize("005930", "00126380", year, mapper.readTree("[]"));
+        when(repository.latest("005930", year)).thenReturn(null, saved);
+        assertThat(service.annual("005930", null)).isEqualTo(service.annual("005930", year));
+        verify(repository, times(1)).save(any());
         verify(client, times(1)).annualReport("00126380", year);
         assertThatThrownBy(() -> service.annual("035420", year)).isInstanceOf(FinancialException.class);
         assertThatThrownBy(() -> service.annual("005930", year + 1)).isInstanceOf(FinancialException.class);

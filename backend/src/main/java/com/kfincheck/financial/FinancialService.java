@@ -18,10 +18,12 @@ public class FinancialService {
     private static final Map<String, String> COMPANIES = Map.of(
             "005930", "00126380", "000660", "00164779");
     private final OpenDartClient client;
-    // 최초 두 기업만 지원한다. 동시 요청도 같은 공시를 중복 수집하지 않게 직렬화한다.
-    private final Map<String, FinancialReport> cache = new java.util.HashMap<>();
+    private final FinancialRepository repository;
 
-    public FinancialService(OpenDartClient client) { this.client = client; }
+    public FinancialService(OpenDartClient client, FinancialRepository repository) {
+        this.client = client;
+        this.repository = repository;
+    }
 
     public synchronized FinancialReport annual(String stockCode, Integer requestedYear) {
         String corp = COMPANIES.get(stockCode);
@@ -35,13 +37,16 @@ public class FinancialService {
             throw new FinancialException(HttpStatus.BAD_REQUEST, "INVALID_YEAR",
                     "사업연도는 2015년부터 전년도까지 선택할 수 있습니다.");
         }
-        String key = stockCode + ":" + year;
-        FinancialReport cached = cache.get(key);
-        if (cached != null && cached.fetchedAt().plusSeconds(3600).isAfter(Instant.now())) return cached;
-        FinancialReport report = normalize(stockCode, corp, year, client.annualReport(corp, year));
-        // 최대 두 기업 × 지원 연도 수만큼 보관하며 성공 응답만 한 시간 재사용한다.
-        cache.put(key, report);
-        return report;
+        try {
+            FinancialReport saved = repository.latest(stockCode, year);
+            if (saved != null && saved.fetchedAt().plusSeconds(3600).isAfter(Instant.now())) return saved;
+            FinancialReport report = normalize(stockCode, corp, year, client.annualReport(corp, year));
+            repository.save(report);
+            return repository.latest(stockCode, year);
+        } catch (org.springframework.dao.DataAccessException error) {
+            throw new FinancialException(HttpStatus.SERVICE_UNAVAILABLE, "FINANCIAL_DB_UNAVAILABLE",
+                    "실적 저장소에 연결하지 못했습니다. DB 설정을 확인해 주세요.");
+        }
     }
 
     static FinancialReport normalize(String stock, String corp, int year, JsonNode rows) {
@@ -81,28 +86,34 @@ public class FinancialService {
                 JsonNode row = matches.getFirst();
                 // 같은 계정 후보가 서로 다른 값이면 임의로 하나를 선택하지 않는다.
                 if (matches.stream().anyMatch(other -> !sameAmounts(row, other))) {
-                    return new FinancialReport.Metric(key, label, null, null, null, "UNAVAILABLE", "AMBIGUOUS");
+                    return new FinancialReport.Metric(key, label, null, null, null, "UNAVAILABLE", "AMBIGUOUS", null, null, "KRW");
                 }
                 if (!"KRW".equals(row.path("currency").asText())) {
-                    return new FinancialReport.Metric(key, label, null, null, null, "UNAVAILABLE", "UNSUPPORTED_CURRENCY");
+                    return new FinancialReport.Metric(key, label, null, null, null, "UNAVAILABLE", "UNSUPPORTED_CURRENCY", row.path("account_id").asText(), row.path("account_nm").asText(), row.path("currency").asText());
                 }
                 BigDecimal current = amount(row.path("thstrm_amount").asText());
                 BigDecimal previous = amount(row.path("frmtrm_amount").asText());
-                BigDecimal rate = current != null && previous != null && previous.signum() > 0
-                        ? current.subtract(previous).multiply(BigDecimal.valueOf(100))
-                                .divide(previous, 2, RoundingMode.HALF_UP) : null;
-                String comparison = rate != null ? "RATE" : "UNAVAILABLE";
-                if (current != null && previous != null) {
-                    if (current.signum() > 0 && previous.signum() < 0) comparison = "TURNAROUND";
-                    else if (current.signum() < 0 && previous.signum() >= 0) comparison = "TURNED_LOSS";
-                    else if (current.signum() < 0 && previous.signum() < 0) comparison = "CONTINUED_LOSS";
-                }
-                return new FinancialReport.Metric(key, label, current == null ? null : current.toPlainString(),
-                        previous == null ? null : previous.toPlainString(), rate, comparison,
-                        current == null ? "MISSING" : "AVAILABLE");
+                return metricValue(key, label, current, previous, current == null ? "MISSING" : "AVAILABLE",
+                        row.path("account_id").asText(), row.path("account_nm").asText(), "KRW");
             }
         }
-        return new FinancialReport.Metric(key, label, null, null, null, "UNAVAILABLE", "MISSING");
+        return new FinancialReport.Metric(key, label, null, null, null, "UNAVAILABLE", "MISSING", null, null, "KRW");
+    }
+
+    static FinancialReport.Metric metricValue(String key, String label, BigDecimal current, BigDecimal previous,
+            String status, String sourceId, String sourceName, String currency) {
+        BigDecimal rate = current != null && previous != null && previous.signum() > 0
+                ? current.subtract(previous).multiply(BigDecimal.valueOf(100))
+                        .divide(previous, 2, RoundingMode.HALF_UP) : null;
+        String comparison = rate != null ? "RATE" : "UNAVAILABLE";
+        if (current != null && previous != null) {
+            if (current.signum() > 0 && previous.signum() < 0) comparison = "TURNAROUND";
+            else if (current.signum() < 0 && previous.signum() >= 0) comparison = "TURNED_LOSS";
+            else if (current.signum() < 0 && previous.signum() < 0) comparison = "CONTINUED_LOSS";
+        }
+        return new FinancialReport.Metric(key, label, current == null ? null : current.stripTrailingZeros().toPlainString(),
+                previous == null ? null : previous.stripTrailingZeros().toPlainString(), rate, comparison, status,
+                sourceId, sourceName, currency);
     }
 
     private static boolean sameAmounts(JsonNode first, JsonNode second) {
