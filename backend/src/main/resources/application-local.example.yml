@@ -11,3 +11,9 @@ kis:
 # OpenDART 인증키는 백엔드 로컬 설정에만 입력합니다.
 opendart:
   api-key: YOUR_OPENDART_API_KEY_HERE
+
+# 프로젝트 전용 DB 계정. 실제 비밀번호는 application-local.yml에만 입력합니다.
+spring:
+  datasource:
+    username: k_fincheck_app
+    password: YOUR_DB_PASSWORD
