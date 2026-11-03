@@ -169,10 +169,16 @@ static List<Article> normalize(JsonNode items, String company) {
             inSummary.add(article);
         }
     }
-    // 제목에 종목명이 있는 기사를 먼저, 모자라면 요약에 있는 기사로 채웁니다.
-    List<Article> articles = new ArrayList<>(inTitle);
-    articles.addAll(inSummary);
-    return articles.size() > 10 ? new ArrayList<>(articles.subList(0, 10)) : articles;
+        // 제목에 종목명이 있는 기사를 먼저 뽑고, 모자라면 요약에 있는 기사로 10개까지 채운 뒤 최신순으로 정렬합니다.
+        List<Article> picked = new ArrayList<>(inTitle);
+        picked.addAll(inSummary);
+        if (picked.size() > 10) {
+            picked = new ArrayList<>(picked.subList(0, 10));
+        }
+        picked.sort(java.util.Comparator
+                .comparing((Article a) -> a.datetime() == null ? 0L : a.datetime())
+                .reversed());
+        return picked;
 
         }
 

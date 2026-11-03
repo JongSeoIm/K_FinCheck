@@ -68,6 +68,10 @@ export default function RecommendationChart({ symbol }) {
   const data = useMemo(() => (result.symbol === symbol ? result.data : []), [result, symbol])
   const target = result.symbol === symbol ? result.target : null
   const reports = result.symbol === symbol ? result.reports : []
+  // 기준일: 가장 최근 리포트의 날짜 (연도는 마지막 월 집계에서 가져옵니다)
+  const asOf = reports.length > 0
+    ? `${String(data.at(-1)?.period || '').slice(0, 4)}.${String(reports[0].date).replace('/', '.')}`
+    : ''
 
   // 최근 몇 달 전체를 합산해서 요약합니다. (한 달에 리포트가 1~2건뿐일 수 있어서)
   const latest = useMemo(() => {
@@ -166,6 +170,12 @@ export default function RecommendationChart({ symbol }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {reports.length > 0 && (
+        <small className='inline-warning'>
+          출처: 한국투자증권 Open API 증권사 리포트 · 기준일 {asOf}
+        </small>
+      )}
     </div>
   )
 }
