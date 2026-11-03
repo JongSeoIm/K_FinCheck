@@ -22,3 +22,7 @@ spring:
   datasource:
     username: k_fincheck_app
     password: YOUR_DB_PASSWORD
+
+# Python FastAPI 서버. 기본값을 사용할 때는 생략할 수 있습니다.
+ai-server:
+  base-url: http://127.0.0.1:8000

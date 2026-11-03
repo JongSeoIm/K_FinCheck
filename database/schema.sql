@@ -1,5 +1,7 @@
 -- K-FinCheck 프로젝트 테이블 구조. 실제 데이터·계정 비밀번호는 포함하지 않는다.
 -- k_fincheck DB를 먼저 생성한 후 실행한다. 기존 테이블은 변경하지 않는다.
+-- 대화 기록 테이블은 backend/src/main/resources/db/chat-history.sql을 함께 사용한다.
+-- Spring 시작 시 해당 스크립트의 CREATE TABLE IF NOT EXISTS도 적용한다.
 USE k_fincheck;
 
 CREATE TABLE IF NOT EXISTS `app_user` (

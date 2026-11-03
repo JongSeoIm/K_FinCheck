@@ -32,6 +32,11 @@ mybatis:
   configuration:
     default-statement-timeout: 5
 
+ai-server:
+  base-url: ${AI_SERVER_BASE_URL:http://127.0.0.1:8000}
+  connect-timeout: 2s
+  read-timeout: 30s
+
 kis:
   base-url: https://openapi.koreainvestment.com:9443
   app-key: YOUR_APP_KEY

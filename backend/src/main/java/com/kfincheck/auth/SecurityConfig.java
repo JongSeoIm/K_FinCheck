@@ -22,7 +22,9 @@ public class SecurityConfig {
                 .securityContext(config -> config.securityContextRepository(context))
                 .requestCache(cache -> cache.disable())
                 .formLogin(form -> form.disable()).httpBasic(basic -> basic.disable()).logout(logout -> logout.disable())
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/api/watchlist/**").authenticated().anyRequest().permitAll())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/watchlist/**", "/api/chat", "/api/chat/**").authenticated()
+                        .anyRequest().permitAll())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((req, res, error) -> {
                             res.setStatus(401); res.setContentType("application/json;charset=UTF-8");
