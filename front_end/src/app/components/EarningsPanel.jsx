@@ -1,64 +1,75 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-const fallbackEarnings = [
-  { period: '2026 Q2', actual: 1.42, estimate: 1.31, surprisePercent: 8.4 },
-  { period: '2026 Q1', actual: 1.28, estimate: 1.24, surprisePercent: 3.2 },
-  { period: '2025 Q4', actual: 1.19, estimate: 1.22, surprisePercent: -2.5 },
-  { period: '2025 Q3', actual: 1.11, estimate: 1.05, surprisePercent: 5.7 },
-]
+// 금액(원) → 조/억 단위 문자열
+function formatWon(value) {
+  if (value == null) return '—'
+  const abs = Math.abs(value)
+  const sign = value < 0 ? '-' : ''
+  if (abs >= 1e12) return `${sign}${(abs / 1e12).toFixed(1)}조`
+  return `${sign}${Math.round(abs / 1e8).toLocaleString('ko-KR')}억`
+}
 
-function formatValue(value) {
-  return value == null ? '—' : Number(value).toFixed(2)
+function formatGrowth(value) {
+  if (value == null) return { text: '—', className: '' }
+  const up = value >= 0
+  return {
+    text: `${up ? '▲' : '▼'} ${Math.abs(value).toFixed(1)}%`,
+    className: up ? 'positive' : 'negative',
+  }
 }
 
 export default function EarningsPanel({ symbol }) {
-  const [earnings, setEarnings] = useState([])
-  const [status, setStatus] = useState('loading')
+  const [result, setResult] = useState({ symbol: null, items: [], error: '' })
 
   useEffect(() => {
     const controller = new AbortController()
 
-    fetch(`/api/stock/${symbol}/earnings`, { signal: controller.signal })
+    fetch(`/api/kis/earnings/${encodeURIComponent(symbol)}`, { signal: controller.signal })
       .then(async (response) => {
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error)
-        setEarnings(data)
-        setStatus('ready')
+        const data = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(data?.error || '실적을 불러오지 못했습니다.')
+        setResult({ symbol, items: data, error: '' })
       })
       .catch((error) => {
         if (error.name !== 'AbortError') {
-          setEarnings(fallbackEarnings)
-          setStatus('fallback')
+          setResult({ symbol, items: [], error: error.message })
         }
       })
 
     return () => controller.abort()
   }, [symbol])
 
+  const status = result.symbol !== symbol ? 'loading' : result.error ? 'error' : 'ready'
+  const items = useMemo(() => (result.symbol === symbol ? result.items : []), [result, symbol])
+
   if (status === 'loading') {
     return <div className='skeleton-list'><span className='skeleton-row compact' /><span className='skeleton-row compact' /><span className='skeleton-row compact' /></div>
+  }
+  if (status === 'error') {
+    return <p className='empty-copy'>{result.error}</p>
+  }
+  if (items.length === 0) {
+    return <p className='empty-copy'>표시할 실적 공시가 없습니다.</p>
   }
 
   return (
     <div className='earnings-list'>
       <div className='earnings-header'>
-        <span>분기</span><span>실제 / 예상 EPS</span><span>결과</span>
+        <span>기간</span><span>매출 / 영업이익</span><span>영업이익 전년비</span>
       </div>
-      {earnings.slice(0, 4).map((item) => {
-        const surprise = Number(item.surprisePercent ?? 0)
+      {items.slice(0, 4).map((item) => {
+        const growth = formatGrowth(item.operatingYoy)
         return (
-          <div className='earnings-row' key={`${item.period}-${item.quarter || ''}`}>
+          <div className='earnings-row' key={item.period}>
             <strong>{item.period}</strong>
-            <span>{formatValue(item.actual)} / {formatValue(item.estimate)}</span>
-            <span className={`surprise-badge ${surprise >= 0 ? 'beat' : 'miss'}`}>
-              {surprise >= 0 ? '상회' : '하회'} {Math.abs(surprise).toFixed(1)}%
-            </span>
+            <span>{formatWon(item.revenue)} / {formatWon(item.operatingProfit)}</span>
+            <span className={growth.className}>{growth.text}</span>
           </div>
         )
       })}
-      {status === 'fallback' && <small className='inline-warning'>API 지연으로 예시 실적을 표시합니다.</small>}
+      <small className='inline-warning'>출처: OpenDART 공시 (연결 기준, 전년 동기 대비)</small>
     </div>
   )
 }

@@ -107,7 +107,7 @@ public class NewsService {
             String response = client.get()
                     .uri(uri -> uri.path("/search/v1/news")
                             .queryParam("query", company)
-                            .queryParam("display", 10)
+                            .queryParam("display", 50)
                             .queryParam("start", 1)
                             .queryParam("sort", "date")
                             .queryParam("format", "json")
@@ -135,38 +135,46 @@ public class NewsService {
         if (body == null || !body.path("items").isArray()) {
             throw new NewsException(HttpStatus.BAD_GATEWAY, "뉴스 응답 형식을 확인할 수 없습니다.");
         }
-        List<Article> articles = normalize(body.path("items"));
+        List<Article> articles = normalize(body.path("items"), company);
         cache.put(code, new Cached(Instant.now(), articles));
         return articles;
     }
 
-    static List<Article> normalize(JsonNode items) {
-        List<Article> articles = new ArrayList<>();
-        Set<String> links = new HashSet<>();
-        for (JsonNode item : items) {
-            String link = safeLink(item.path("originallink").asText(""));
-            if (link == null) {
-                link = safeLink(item.path("link").asText(""));
-            }
-            String title = plainText(item.path("title").asText(""));
-            if (link == null || title.isBlank() || !links.add(link)) {
-                continue;
-            }
-            Long datetime = null;
-            try {
-                datetime = ZonedDateTime.parse(item.path("pubDate").asText(""),
-                        DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().getEpochSecond();
-            } catch (RuntimeException ignored) {
-                // 날짜가 없으면 시각을 임의로 만들지 않습니다.
-            }
-            articles.add(new Article(link, title, plainText(item.path("description").asText("")),
-                    hostOf(link), datetime, link));
-            if (articles.size() >= 10) {
-                break;
-            }
+static List<Article> normalize(JsonNode items, String company) {
+    List<Article> inTitle = new ArrayList<>();
+    List<Article> inSummary = new ArrayList<>();
+    Set<String> links = new HashSet<>();
+    String keyword = company.toLowerCase();
+    for (JsonNode item : items) {
+        String link = safeLink(item.path("originallink").asText(""));
+        if (link == null) {
+            link = safeLink(item.path("link").asText(""));
         }
-        return articles;
+        String title = plainText(item.path("title").asText(""));
+        if (link == null || title.isBlank() || !links.add(link)) {
+            continue;
+        }
+        String summary = plainText(item.path("description").asText(""));
+        Long datetime = null;
+        try {
+            datetime = ZonedDateTime.parse(item.path("pubDate").asText(""),
+                    DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().getEpochSecond();
+        } catch (RuntimeException ignored) {
+            // 날짜가 없으면 시각을 임의로 만들지 않습니다.
+        }
+        Article article = new Article(link, title, summary, hostOf(link), datetime, link);
+        if (title.toLowerCase().contains(keyword)) {
+            inTitle.add(article);
+        } else if (summary.toLowerCase().contains(keyword)) {
+            inSummary.add(article);
+        }
     }
+    // 제목에 종목명이 있는 기사를 먼저, 모자라면 요약에 있는 기사로 채웁니다.
+    List<Article> articles = new ArrayList<>(inTitle);
+    articles.addAll(inSummary);
+    return articles.size() > 10 ? new ArrayList<>(articles.subList(0, 10)) : articles;
+
+        }
 
     static String plainText(String value) {
         return HtmlUtils.htmlUnescape(value.replaceAll("<[^>]*>", "")).replaceAll("\\s+", " ").trim();

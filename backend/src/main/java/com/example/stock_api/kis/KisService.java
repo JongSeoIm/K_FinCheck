@@ -366,4 +366,28 @@ public class KisService {
             return new ArrayList<>(store.values());
         }
     }
+        // 다른 시세 API(투자의견 등)에서 재사용하는 범용 GET
+    public Map<String, Object> get(String path, String trId, Map<String, String> params) {
+        Map<String, Object> response = rest.get()
+                .uri(u -> {
+                    UriBuilder builder = u.path(path);
+                    for (Map.Entry<String, String> e : params.entrySet()) {
+                        builder.queryParam(e.getKey(), e.getValue());
+                    }
+                    return builder.build();
+                })
+                .header("authorization", "Bearer " + token())
+                .header("appkey", appKey)
+                .header("appsecret", appSecret)
+                .header("tr_id", trId)
+                .header("custtype", "P")
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+
+        if (response == null || !"0".equals(String.valueOf(response.get("rt_cd")))) {
+            String msg = response == null ? "응답 없음" : String.valueOf(response.get("msg1"));
+            throw new IllegalStateException("KIS 조회 실패: " + msg);
+        }
+        return response;
+    }
 }

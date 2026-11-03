@@ -70,7 +70,7 @@ export default function Dashboard({ initialStock }) {
 
           <section className='panel news-panel'>
             <div className='panel-heading'>
-              <h2>{selectedStock.symbol} 관련 뉴스</h2>
+              <h2>{selectedStock.name || selectedSymbol} 관련 뉴스</h2>
             </div>
             <Suspense fallback={<NewsSkeleton />}>
               <LazyNewsFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />
