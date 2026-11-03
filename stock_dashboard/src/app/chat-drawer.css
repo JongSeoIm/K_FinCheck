@@ -1,5 +1,6 @@
-.stock-ai-launcher { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:52px; padding:14px 16px; border:1px solid #333; background:#292b2b; color:#fff; cursor:pointer; text-align:left; font-size:14px; font-weight:600; transition:background 160ms ease; }
-.stock-ai-launcher:hover { background:#414444; }
+.stock-ai-launcher { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:52px; padding:14px 16px; border:1px solid #d8d4ce; background:#f5f3ef; color:#3d3934; cursor:pointer; text-align:left; font-size:14px; font-weight:600; transition:background 160ms ease; }
+.stock-ai-launcher:hover { background:#ece9e3; }
+.stock-ai-launcher:focus-visible { outline:2px solid #777168; outline-offset:3px; }
 .stock-ai-launcher > span:last-child { font-size:20px; font-weight:400; }
 .stock-chat-drawer { position:fixed; inset:0 0 0 auto; margin:0; padding:0; width:440px; max-width:100%; height:100dvh; max-height:100dvh; border:0; border-left:1px solid #d3d6d5; background:#fff; color:#272b29; box-shadow:-12px 0 40px #15221b14; overflow:hidden; font-family:Arial,'Noto Sans KR',sans-serif; }
 .stock-chat-drawer[open] { animation:stock-chat-enter 240ms cubic-bezier(.2,.8,.2,1) both; }
@@ -12,19 +13,51 @@
 .stock-chat-close { display:grid; place-items:center; width:32px; height:32px; padding:0; background:transparent; border:0; cursor:pointer; flex-shrink:0; font-size:27px; color:#5c655f; }
 .stock-chat-close:hover { background:#f0f2f0; }
 .stock-chat-messages { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:24px; }
-.stock-chat-empty { display:flex; flex-direction:column; justify-content:center; min-height:calc(100% - 48px); gap:36px; padding:8px 0 16px; }
+.stock-chat-empty { display:flex; flex-direction:column; gap:24px; padding:clamp(32px,10vh,100px) 0 24px; }
+.stock-chat-empty p { margin:0; color:#333; font-size:16px; font-weight:500; line-height:1.7; overflow-wrap:anywhere; }
+.stock-chat-suggestions { display:flex; flex-direction:column; gap:4px; }
+.stock-chat-suggestions button { display:flex; justify-content:space-between; align-items:baseline; gap:16px; width:100%; border:0; background:none; padding:10px 0; font:inherit; font-size:14px; line-height:1.7; color:#666; text-align:left; cursor:pointer; }
+.stock-chat-suggestions button:hover { color:#222; text-decoration:underline; text-underline-offset:4px; }
+.stock-chat-suggestions button span:last-child { flex-shrink:0; }
 .stock-chat-thread { display:flex; flex-direction:column; gap:26px; padding-bottom:12px; }
 .stock-chat-message p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:14px; line-height:1.85; }
 .stock-chat-message.user { align-self:flex-end; max-width:90%; padding:12px 15px; border:1px solid #e3e7de; background:#f1f4ec; }
 .stock-chat-message.assistant { padding:0 0 6px; }
-.stock-chat-answer-label { display:block; margin-bottom:10px; color:#7d867e; font-size:10px; letter-spacing:.2px; }
+.stock-chat-message.assistant.error { color:#a13b35; }
+.stock-chat-message.pending { color:#7b817c; }
+.chat-quote, .chat-financial { margin-top:14px; border:1px solid #dedede; padding:16px; background:#fafafa; min-width:0; }
+.chat-quote { display:flex; flex-direction:column; gap:8px; }
+.chat-data-label { display:block; font-size:13px; line-height:1.6; color:#666; overflow-wrap:anywhere; }
+.chat-quote-price { font-size:30px; line-height:1.25; font-variant-numeric:tabular-nums; }
+.chat-quote-change { font-size:17px; font-weight:700; }
+.chat-quote .positive, .chat-financial .positive { color:#47725b; }
+.chat-quote .negative, .chat-financial .negative { color:#aa4540; }
+.chat-financial-table { width:100%; border-collapse:collapse; table-layout:fixed; margin-top:12px; font-size:13px; font-variant-numeric:tabular-nums; }
+.chat-financial-table th, .chat-financial-table td { padding:12px 4px; border-bottom:1px solid #dedede; text-align:right; overflow-wrap:anywhere; }
+.chat-financial-table th:first-child { text-align:left; width:28%; }
+.chat-financial-table thead th { color:#666; font-weight:400; }
+.chat-financial-table td:last-child { font-weight:700; }
+.chat-financial > .chat-data-label:last-child { margin-top:8px; }
+.chat-news { margin-top:14px; }
+.chat-news-list { list-style:none; margin:8px 0 0; padding:0; }
+.chat-news-list li { padding:14px 0; border-top:1px solid #dedede; }
+.chat-news-list a { color:inherit; font-size:14px; line-height:1.7; overflow-wrap:anywhere; text-decoration:none; }
+.chat-news-list a:hover { text-decoration:underline; text-underline-offset:3px; }
+.chat-news-list a:focus-visible { outline:2px solid #666; outline-offset:3px; }
+.chat-news-list .chat-data-label { margin-top:6px; }
+.chat-composite-notes { margin-top:14px; padding-top:12px; border-top:1px solid #dedede; }
+.stock-chat-sources { display:flex; flex-direction:column; gap:6px; margin:12px 0 0; padding:12px 0 0; border-top:1px solid #edf0ea; list-style:none; }
+.stock-chat-sources li { display:flex; flex-direction:column; gap:2px; font-size:12px; color:#626a64; }
+.stock-chat-sources a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.stock-chat-sources small { font-size:11px; color:#8a918c; }
+.stock-chat-answer-label { display:block; margin-bottom:10px; color:#7d867e; font-size: 11px; letter-spacing:.2px; }
 .stock-chat-footer { flex-shrink:0; padding:14px 24px 18px; border-top:1px solid #edf0ea; background:#fff; }
 .stock-chat-composer { border:1px solid #b9c1b5; background:#fff; transition:border-color 150ms; }
 .stock-chat-composer:focus-within { border-color:#525f50; }
 .stock-chat-composer textarea { display:block; resize:none; width:100%; max-height:140px; min-height:64px; padding:14px 13px 8px; border:0; background:transparent; font:inherit; color:inherit; font-size:13px; line-height:1.7; outline:none; }
 .stock-chat-composer textarea::placeholder { color:#92998e; }
 .stock-chat-composer-actions { display:flex; justify-content:space-between; align-items:center; padding:0 8px 8px 13px; }
-.stock-chat-composer-actions > span { color:#9ba197; font-size:10px; }
+.stock-chat-composer-actions > span { color:#9ba197; font-size: 11px; }
 .stock-chat-composer-actions button { display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; background:#333d31; color:#fff; font-size:20px; cursor:pointer; }
 .stock-chat-composer-actions button:disabled { background:#ecefe8; color:#aeb5a8; cursor:default; }
 .stock-chat-drawer button:focus-visible,.stock-chat-drawer textarea:focus-visible { outline:2px solid #687b60; outline-offset:3px; }
@@ -33,6 +66,15 @@
 @keyframes stock-chat-leave { from { transform:translateX(0); opacity:1; } to { transform:translateX(100%); opacity:.5; } }
 @keyframes stock-chat-backdrop { from { opacity:0; } to { opacity:1; } }
 @media(max-width:1000px) { .stock-ai-launcher { grid-column:1 / -1; } }
-.stock-chat-connection { font-size:11px; color:#7b817c; }
 .stock-chat-header { min-height:84px; }
+.stock-chat-actions { display:flex; gap:10px; padding:12px 24px; border-bottom:1px solid #e4e6e5; color:#888; }
+.stock-chat-actions button,.stock-chat-history button { border:0; background:none; color:#666; padding:0; cursor:pointer; font:inherit; font-size:13px; }
+.stock-chat-actions button:hover,.stock-chat-history button:hover { text-decoration:underline; text-underline-offset:3px; }
+.stock-chat-actions button:disabled,.stock-chat-history button:disabled { opacity:.45; cursor:default; }
+.stock-chat-history { max-height:35vh; overflow:auto; padding:0 24px; border-bottom:1px solid #ddd; }
+.stock-chat-history-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 0; border-bottom:1px solid #eee; }
+.stock-chat-history .stock-chat-room-title { flex:1; text-align:left; min-width:0; overflow-wrap:anywhere; line-height:1.6; }
+.stock-chat-room-title[aria-current=true] { font-weight:700; color:#222; }
+.stock-chat-delete-confirm { display:flex; flex-wrap:wrap; gap:8px; font-size:12px; }
+.stock-chat-notice { margin:0; padding:10px 24px; color:#6c514d; font-size:13px; line-height:1.6; }
 @media(max-width:520px) { .stock-chat-drawer { width:100%; } .stock-chat-header { padding:20px; } .stock-chat-messages { padding:22px 20px; } .stock-chat-footer { padding:12px 16px max(16px,env(safe-area-inset-bottom)); } }

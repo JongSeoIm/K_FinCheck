@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
+import { accountApi } from '../lib/accountApi'
+import useAuthStore from '../store/useAuthStore'
+import ChatAnswerData, { formatChatTime } from './ChatAnswerData'
 
 const subscribe = () => () => {}
 const clientSnapshot = () => true
@@ -12,15 +15,89 @@ export default function StockChatDrawer({ stock }) {
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const [context, setContext] = useState(stock)
-  const [conversations, setConversations] = useState({})
+  const [messages, setMessages] = useState([])
+  const [rooms, setRooms] = useState([])
+  const [activeRoom, setActiveRoom] = useState(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [deleteId, setDeleteId] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [notice, setNotice] = useState('')
   const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const { user, ready } = useAuthStore()
   const dialogRef = useRef(null)
   const inputRef = useRef(null)
   const endRef = useRef(null)
   const closeTimer = useRef(null)
-  const messages = conversations[context.symbol] || []
+  const conversationKey = user ? `${user.userId}:${context.symbol}` : `guest:${context.symbol}`
+  const storageKey = `kfc-chat-room-${conversationKey}`
+  const suggestions = ['현재가와 등락률 알려줘',
+    ...(['005930', '000660'].includes(context.symbol) ? ['최근 연간 실적 알려줘'] : []),
+    ...(['005930', '000660', '035420', '035720', '005380', '000270', '051910', '006400'].includes(context.symbol) ? ['관련 뉴스 요약해줘'] : []),
+  ]
 
   useEffect(() => () => clearTimeout(closeTimer.current), [])
+
+  useEffect(() => {
+    if (!open || !user) return
+    let cancelled = false
+    async function restore() {
+      try {
+        const list = await accountApi(`/api/chat/conversations?symbol=${context.symbol}`)
+        const saved = localStorage.getItem(storageKey)
+        const room = list.find(item => item.conversationId === saved) || list[0] || null
+        const records = room ? await accountApi(`/api/chat/conversations/${room.conversationId}/messages`) : []
+        if (cancelled) return
+        setRooms(list); setActiveRoom(room); setMessages(records.map(record => ({
+          role: record.role, text: record.text, sources: record.response?.sources || [], presentation: record.response?.presentation,
+        })))
+        setNotice('')
+      } catch (error) { if (!cancelled) setNotice(error.message) }
+      finally { if (!cancelled) setLoading(false) }
+    }
+    restore()
+    return () => { cancelled = true }
+  }, [open, user, context.symbol, storageKey])
+
+  async function selectRoom(room) {
+    setLoading(true); setNotice('')
+    try {
+      const records = await accountApi(`/api/chat/conversations/${room.conversationId}/messages`)
+      if (useAuthStore.getState().user?.userId !== user.userId) return
+      setActiveRoom(room); localStorage.setItem(storageKey, room.conversationId)
+      setMessages(records.map(record => ({ role: record.role, text: record.text,
+        sources: record.response?.sources || [], presentation: record.response?.presentation })))
+      setHistoryOpen(false); setDeleteId(null)
+    } catch (error) { setNotice(error.message) }
+    finally { setLoading(false) }
+  }
+
+  async function newRoom() {
+    setLoading(true); setNotice('')
+    try {
+      const room = await accountApi('/api/chat/conversations', { method: 'POST', body: JSON.stringify(context) })
+      if (useAuthStore.getState().user?.userId !== user.userId) return
+      setRooms(current => [room, ...current]); setActiveRoom(room); setMessages([])
+      setDraft(''); setHistoryOpen(false); setDeleteId(null)
+      localStorage.setItem(storageKey, room.conversationId)
+    } catch (error) { setNotice(error.message) }
+    finally { setLoading(false) }
+  }
+
+  async function deleteRoom(id) {
+    setLoading(true); setNotice('')
+    try {
+      await accountApi(`/api/chat/conversations/${id}`, { method: 'DELETE' })
+      if (useAuthStore.getState().user?.userId !== user.userId) return
+      const remaining = rooms.filter(room => room.conversationId !== id)
+      setRooms(remaining); setDeleteId(null)
+      if (activeRoom?.conversationId === id) {
+        localStorage.removeItem(storageKey); setActiveRoom(null); setMessages([])
+        if (remaining[0]) await selectRoom(remaining[0])
+      }
+    } catch (error) { setNotice(error.message) }
+    finally { setLoading(false) }
+  }
 
   useEffect(() => {
     if (!mounted || !open) return
@@ -37,8 +114,14 @@ export default function StockChatDrawer({ stock }) {
   }, [messages.length, open])
 
   function show() {
+    if (ready && !user) {
+      window.location.href = `/login?next=${encodeURIComponent(`/?symbol=${stock.symbol}`)}`
+      return
+    }
     clearTimeout(closeTimer.current)
     setContext(stock)
+    setMessages([]); setRooms([]); setActiveRoom(null); setLoading(true)
+    setHistoryOpen(false); setDeleteId(null); setNotice('')
     setDraft('')
     setClosing(false)
     setOpen(true)
@@ -55,27 +138,44 @@ export default function StockChatDrawer({ stock }) {
     }, duration)
   }
 
-  function send() {
+  async function send() {
     const question = draft.trim()
-    if (!question) return
-    const symbol = context.symbol
-    setConversations(current => ({ ...current, [symbol]: [
-      ...(current[symbol] || []),
-      { role: 'user', text: question },
-      { role: 'assistant', text: 'AI 연결 전입니다.' },
-    ] }))
-    setDraft('')
-    inputRef.current?.focus({ preventScroll: true })
+    if (!question || sending || loading || !user) return
+    setSending(true)
+    setNotice('')
+    try {
+      let room = activeRoom
+      if (!room) {
+        room = await accountApi('/api/chat/conversations', { method: 'POST', body: JSON.stringify(context) })
+        setActiveRoom(room); setRooms(current => [room, ...current])
+        localStorage.setItem(storageKey, room.conversationId)
+      }
+      const conversationId = room.conversationId
+      const response = await accountApi('/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({ conversationId, message: question, stock: context }),
+      })
+      if (useAuthStore.getState().user?.userId !== user.userId) return
+      setMessages(current => [...current, { role: 'user', text: question },
+        { role: 'assistant', text: response.answer, sources: response.sources || [], presentation: response.presentation }])
+      setDraft('')
+      setRooms(await accountApi(`/api/chat/conversations?symbol=${context.symbol}`))
+    } catch (error) {
+      setNotice(error.message)
+    } finally {
+      setSending(false)
+      inputRef.current?.focus({ preventScroll: true })
+    }
   }
 
   return (
     <>
       <button className='stock-ai-launcher' type='button' onClick={show} aria-haspopup='dialog'>
-        <span>AI에게 종목 질문하기</span><span aria-hidden='true'>↗</span>
+        <span>AI에게 질문하기</span><span aria-hidden='true'>↗</span>
       </button>
       {mounted && createPortal(
         <dialog ref={dialogRef} className={`stock-chat-drawer${closing ? ' is-closing' : ''}`}
-          aria-labelledby='stock-chat-title' aria-describedby='stock-chat-note'
+          aria-labelledby='stock-chat-title'
           onCancel={event => { event.preventDefault(); close() }}
           onClick={event => {
             if (event.target !== dialogRef.current) return
@@ -86,17 +186,54 @@ export default function StockChatDrawer({ stock }) {
             <header className='stock-chat-header'>
               <div>
                 <h2 id='stock-chat-title'>{context.name}<span>{context.symbol}</span></h2>
-                <span className='stock-chat-connection' id='stock-chat-note'>AI 미연결</span>
               </div>
               <button className='stock-chat-close' type='button' aria-label='대화 패널 닫기' onClick={close}>×</button>
             </header>
+            {user && <nav className='stock-chat-actions' aria-label='대화 관리'>
+              <button type='button' onClick={newRoom} disabled={sending || loading}>새 대화</button>
+              <span aria-hidden='true'>·</span>
+              <button type='button' onClick={() => setHistoryOpen(value => !value)} disabled={sending || loading} aria-expanded={historyOpen}>이전 대화</button>
+            </nav>}
+            {notice && <p className='stock-chat-notice' role='alert'>{notice}</p>}
+            {loading && <p className='stock-chat-notice' role='status'>대화를 불러오고 있습니다.</p>}
+            {historyOpen && user && <section className='stock-chat-history' aria-label='이전 대화 목록'>
+              {!rooms.length && <p>저장된 대화가 없습니다.</p>}
+              {rooms.map(room => <div className='stock-chat-history-row' key={room.conversationId}>
+                <button type='button' className='stock-chat-room-title' onClick={() => selectRoom(room)} disabled={sending || loading} aria-current={room.conversationId === activeRoom?.conversationId ? 'true' : undefined}>{room.title}</button>
+                {deleteId !== room.conversationId ? <button type='button' disabled={sending || loading} onClick={() => setDeleteId(room.conversationId)}>삭제</button> :
+                  <div className='stock-chat-delete-confirm'><span>이 대화와 메시지를 삭제할까요?</span>
+                    <button type='button' disabled={loading} onClick={() => deleteRoom(room.conversationId)}>삭제</button>
+                    <button type='button' disabled={loading} onClick={() => setDeleteId(null)}>취소</button>
+                  </div>}
+              </div>)}
+            </section>}
             <div className='stock-chat-messages' aria-label='대화 내용' aria-live='polite' aria-relevant='additions text'>
+              {user && !messages.length && !loading && !sending && !notice && !historyOpen &&
+                <div className='stock-chat-empty'>
+                  <p>{context.name}에 대해 무엇이 궁금한가요?</p>
+                  <div className='stock-chat-suggestions' aria-label='예시 질문'>
+                    {suggestions.map(question => <button type='button' key={question} onClick={() => {
+                      setDraft(`${context.name} ${question}`)
+                      inputRef.current?.focus({ preventScroll: true })
+                    }}><span>{question}</span><span aria-hidden='true'>↗</span></button>)}
+                  </div>
+                </div>}
               <div className='stock-chat-thread'>
-                {messages.map((message, index) => (
-                  <article key={`${context.symbol}-${index}`} className={`stock-chat-message ${message.role}`}>
+                {(user ? messages : []).map((message, index) => (
+                  <article key={`${conversationKey}-${index}`} className={`stock-chat-message ${message.role}${message.error ? ' error' : ''}`}>
                     <p>{message.text}</p>
+                    <ChatAnswerData presentation={message.presentation} />
+                    {message.sources?.length > 0 && <ul className='stock-chat-sources' aria-label='답변 출처'>
+                      {message.sources.map((source, sourceIndex) => <li key={`${source.provider}-${sourceIndex}`}>
+                        {source.url
+                          ? <a href={source.url} target='_blank' rel='noreferrer'>{source.provider} · {source.label}</a>
+                          : <span>{source.provider} · {source.label}</span>}
+                        {source.basisAt && <small>{formatChatTime(source.basisAt)}</small>}
+                      </li>)}
+                    </ul>}
                   </article>
                 ))}
+                {sending && <article className='stock-chat-message assistant pending' aria-label='답변 생성 중'><p>답변을 확인하고 있습니다.</p></article>}
               </div>
               <div ref={endRef} />
             </div>
@@ -104,6 +241,7 @@ export default function StockChatDrawer({ stock }) {
               <form className='stock-chat-composer' onSubmit={event => { event.preventDefault(); send() }}>
                 <label className='sr-only' htmlFor='stock-chat-input'>종목에 대해 질문 입력</label>
                 <textarea id='stock-chat-input' ref={inputRef} value={draft}
+                  readOnly={sending || loading}
                   onChange={event => setDraft(event.target.value)} maxLength={1500} rows={2}
                   placeholder='메시지 입력'
                   onKeyDown={event => {
@@ -114,7 +252,7 @@ export default function StockChatDrawer({ stock }) {
                   }} />
                 <div className='stock-chat-composer-actions'>
                   <span>Shift + Enter 줄바꿈</span>
-                  <button type='submit' disabled={!draft.trim()} aria-label='질문 전송'>↑</button>
+                  <button type='submit' disabled={!draft.trim() || sending || loading || !user} aria-label='질문 전송'>↑</button>
                 </div>
               </form>
             </footer>
