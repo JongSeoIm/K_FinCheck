@@ -18,10 +18,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriBuilder;
+
+import com.example.stock_api.common.ApiException;
 
 @Service
 public class KisService {
@@ -58,8 +61,38 @@ public class KisService {
         this.appSecret = appSecret;
     }
 
+    public boolean isConfigured() {
+        return appKey != null && !appKey.isBlank() && appSecret != null && !appSecret.isBlank();
+    }
+
+    private void requireConfigured() {
+        if (!isConfigured()) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "KIS_NOT_CONFIGURED",
+                    "KIS 앱키가 설정되지 않았습니다. application-local.properties 를 확인하세요.");
+        }
+    }
+
+    /** 실시간 웹소켓 접속키 발급 (/oauth2/Approval). 웹소켓을 새로 연결할 때마다 받습니다. */
+    public String approvalKey() {
+        requireConfigured();
+        Map<String, Object> res = rest.post()
+                .uri("/oauth2/Approval")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                        "grant_type", "client_credentials",
+                        "appkey", appKey,
+                        "secretkey", appSecret))
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        if (res == null || res.get("approval_key") == null) {
+            throw new IllegalStateException("KIS 웹소켓 접속키 발급 실패: " + res);
+        }
+        return String.valueOf(res.get("approval_key"));
+    }
+
     // 토큰: 메모리 -> 파일 -> 신규 발급 (KIS는 1분에 1회만 발급 가능)
     private synchronized String token() {
+        requireConfigured();
         if (token != null && Instant.now().isBefore(expiresAt)) {
             return token;
         }
@@ -109,6 +142,24 @@ public class KisService {
         return token;
     }
 
+    // KIS REST 는 초당 호출 수 제한이 있어 호출 사이를 최소 70ms 띄웁니다 (초당 약 14건).
+    private static final long MIN_GAP_MS = 70;
+    private long lastCallAt = 0;
+
+    private void throttle() {
+        synchronized (this) {
+            long wait = lastCallAt + MIN_GAP_MS - System.currentTimeMillis();
+            if (wait > 0) {
+                try {
+                    Thread.sleep(wait);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            lastCallAt = System.currentTimeMillis();
+        }
+    }
+
     private static long toLong(Object v) {
         if (v == null) return 0L;
         try {
@@ -129,17 +180,20 @@ public class KisService {
 
     // 현재가 조회
     public Map<String, Object> currentPrice(String stockCode) {
+        requireConfigured();
         Cached hit = cache.get(stockCode);
         if (hit != null && System.currentTimeMillis() - hit.at() < 2000) {
             return hit.data();
         }
 
+        String bearer = "Bearer " + token();
+        throttle();
         Map<String, Object> response = rest.get()
                 .uri(u -> u.path("/uapi/domestic-stock/v1/quotations/inquire-price")
                         .queryParam("FID_COND_MRKT_DIV_CODE", "J")
                         .queryParam("FID_INPUT_ISCD", stockCode)
                         .build())
-                .header("authorization", "Bearer " + token())
+                .header("authorization", bearer)
                 .header("appkey", appKey)
                 .header("appsecret", appSecret)
                 .header("tr_id", "FHKST01010100")
@@ -162,6 +216,8 @@ public class KisService {
         double rate = Math.abs(toDouble(output.get("prdy_ctrt")));
 
         Map<String, Object> result = new HashMap<>();
+        result.put("code", stockCode);
+        result.put("source", "rest");
         result.put("price", price);
         result.put("priceChange", down ? -diff : diff);
         result.put("change", down ? -rate : rate);
@@ -169,7 +225,10 @@ public class KisService {
         result.put("high", toLong(output.get("stck_hgpr")));
         result.put("low", toLong(output.get("stck_lwpr")));
         result.put("prevClose", toLong(output.get("stck_sdpr")));
-        result.put("marketCapitalization", price * shares);
+        // 시가총액 = 현재가 × 상장주수. 상장주수가 없으면 HTS 시가총액(억원) 사용
+        long marketCap = shares > 0 ? price * shares : toLong(output.get("hts_avls")) * 100_000_000L;
+        result.put("listedShares", shares > 0 ? shares : null);
+        result.put("marketCapitalization", marketCap > 0 ? marketCap : null);
         result.put("updatedAt", Instant.now().toString());
 
         cache.put(stockCode, new Cached(System.currentTimeMillis(), result));
@@ -192,6 +251,8 @@ public class KisService {
 
     // KIS GET 공통 호출 (rt_cd 확인 포함)
     private Map<String, Object> kisGet(String path, String trId, Map<String, String> params) {
+        String bearer = "Bearer " + token();
+        throttle();
         Map<String, Object> response = rest.get()
                 .uri(u -> {
                     UriBuilder b = u.path(path);
@@ -200,7 +261,7 @@ public class KisService {
                     }
                     return b.build();
                 })
-                .header("authorization", "Bearer " + token())
+                .header("authorization", bearer)
                 .header("appkey", appKey)
                 .header("appsecret", appSecret)
                 .header("tr_id", trId)
@@ -365,5 +426,97 @@ public class KisService {
             minuteValidUntil.put(code, System.currentTimeMillis() + (live ? 5_000L : 600_000L));
             return new ArrayList<>(store.values());
         }
+    }
+
+    // ───────────── 뉴스 · 투자의견 ─────────────
+
+    private record CachedAny(long at, Object data) {}
+    private final Map<String, CachedAny> extraCache = new ConcurrentHashMap<>();
+
+    @SuppressWarnings("unchecked")
+    private <T> T cached(String key, long ttlMs, java.util.function.Supplier<T> loader) {
+        CachedAny hit = extraCache.get(key);
+        if (hit != null && System.currentTimeMillis() - hit.at() < ttlMs) {
+            return (T) hit.data();
+        }
+        T data = loader.get();
+        extraCache.put(key, new CachedAny(System.currentTimeMillis(), data));
+        return data;
+    }
+
+    private static List<?> outputList(Map<String, Object> res) {
+        for (String key : List.of("output", "output1", "output2")) {
+            if (res.get(key) instanceof List<?> rows) return rows;
+        }
+        return List.of();
+    }
+
+    /** 종목 관련 뉴스 제목 (KIS 종합 시황/공시 제목, FHKST01011800). 5분 캐시. */
+    public List<Map<String, Object>> news(String code) {
+        return cached("news:" + code, 300_000, () -> {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("FID_NEWS_OFER_ENTP_CODE", "");
+            params.put("FID_COND_MRKT_CLS_CODE", "");
+            params.put("FID_INPUT_ISCD", code);
+            params.put("FID_TITL_CNTT", "");
+            params.put("FID_INPUT_DATE_1", "");
+            params.put("FID_INPUT_HOUR_1", "");
+            params.put("FID_RANK_SORT_CLS_CODE", "");
+            params.put("FID_INPUT_SRNO", "");
+            Map<String, Object> res = kisGet(
+                    "/uapi/domestic-stock/v1/quotations/news-title", "FHKST01011800", params);
+
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Object o : outputList(res)) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                String title = str(m.get("hts_pbnt_titl_cntt"));
+                if (title.isEmpty()) continue;
+                String d = str(m.get("data_dt"));
+                String t = str(m.get("data_tm"));
+                Map<String, Object> n = new LinkedHashMap<>();
+                n.put("id", str(m.get("cntt_usiq_srno")).isEmpty() ? d + t + out.size() : str(m.get("cntt_usiq_srno")));
+                n.put("title", title);
+                n.put("source", str(m.get("dorg")));
+                n.put("datetime", d.length() == 8 && t.length() >= 4
+                        ? d.substring(0, 4) + "-" + d.substring(4, 6) + "-" + d.substring(6, 8)
+                          + "T" + t.substring(0, 2) + ":" + t.substring(2, 4) + ":00+09:00"
+                        : null);
+                out.add(n);
+                if (out.size() >= 30) break;
+            }
+            return out;
+        });
+    }
+
+    /** 증권사 투자의견 (KIS 국내주식 종목투자의견, FHKST663300C0). 최근 6개월, 1시간 캐시. */
+    public List<Map<String, Object>> investOpinion(String code) {
+        return cached("opinion:" + code, 3_600_000, () -> {
+            LocalDate today = LocalDate.now(KST);
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("FID_COND_MRKT_DIV_CODE", "J");
+            params.put("FID_COND_SCR_DIV_CODE", "16633");
+            params.put("FID_INPUT_ISCD", code);
+            params.put("FID_INPUT_DATE_1", today.minusMonths(6).format(YMD));
+            params.put("FID_INPUT_DATE_2", today.format(YMD));
+            Map<String, Object> res = kisGet(
+                    "/uapi/domestic-stock/v1/quotations/invest-opinion", "FHKST663300C0", params);
+
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Object o : outputList(res)) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                String d = str(m.get("stck_bsop_date"));
+                if (d.length() != 8) continue;
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("date", d.substring(0, 4) + "-" + d.substring(4, 6) + "-" + d.substring(6, 8));
+                row.put("firm", str(m.get("mbcr_name")));
+                row.put("opinion", str(m.get("invt_opnn")));
+                row.put("previousOpinion", str(m.get("rgbf_invt_opnn")));
+                long target = toLong(m.get("hts_goal_prc"));
+                row.put("targetPrice", target > 0 ? target : null);
+                out.add(row);
+            }
+            out.sort((a, b) -> ((String) b.get("date")).compareTo((String) a.get("date")));
+            return out;
+        });
     }
 }

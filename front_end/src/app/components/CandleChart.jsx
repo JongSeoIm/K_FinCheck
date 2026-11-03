@@ -21,7 +21,9 @@ export default function CandleChart({ bars }) {
             layout: { background: { color: 'transparent' }, textColor: '#666', fontSize: 11 },
             grid: { vertLines: { color: '#eeeeee' }, horzLines: { color: '#eeeeee' } },
             rightPriceScale: { borderColor: '#cccccc' },
-            timeScale: { borderColor: '#cccccc' },
+            // 데이터 범위 밖으로 끌고 가면 빈 화면만 보이던 문제: 양 끝에서 멈추게 합니다
+            timeScale: { borderColor: '#cccccc', fixLeftEdge: true, fixRightEdge: true },
+            handleScale: { axisPressedMouseMove: { time: true, price: false } },
             localization: { priceFormatter: (price) => Math.round(price).toLocaleString('ko-KR') },
         })
 

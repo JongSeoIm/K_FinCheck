@@ -10,6 +10,9 @@
   --blue: #1769aa;
   --red: #c43b3b;
   --green: #257a4c;
+  /* 국내 증시 관례: 상승 빨강 · 하락 파랑 */
+  --up: #d6453d;
+  --down: #2f6fdb;
 }
 
 * { box-sizing: border-box; }
@@ -53,8 +56,10 @@ a:focus-visible {
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 0 16px;
   border-bottom: 2px solid #333;
 }
@@ -133,8 +138,8 @@ a:focus-visible {
 .ticker-item:hover, .ticker-item.active { background: #e8eef4; }
 .ticker-item span, .ticker-item strong { font-size: 13px; }
 .ticker-item small { font-size: 11px; }
-.positive { color: var(--green) !important; }
-.negative { color: var(--red) !important; }
+.positive { color: var(--up) !important; }
+.negative { color: var(--down) !important; }
 
 @keyframes ticker-scroll {
   from { transform: translateX(0); }
@@ -143,13 +148,13 @@ a:focus-visible {
 
 @keyframes ticker-flash-up {
   0% { background: #fff; }
-  35% { background: #d8f1df; }
+  35% { background: #f9dcda; }
   100% { background: #fff; }
 }
 
 @keyframes ticker-flash-down {
   0% { background: #fff; }
-  35% { background: #f7dada; }
+  35% { background: #dbe6fa; }
   100% { background: #fff; }
 }
 
@@ -445,6 +450,7 @@ a:focus-visible {
 .news-list li:last-child { border-bottom: 0; }
 .news-index, .news-copy small { color: var(--muted); font-size: 10px; }
 .news-copy a { font-weight: 700; text-decoration: none; }
+.news-copy small { display: block; margin-top: 4px; }
 .news-copy a:hover { text-decoration: underline; }
 .news-copy p { margin: 4px 0; color: var(--muted); font-size: 11px; }
 .news-link-label { color: var(--blue); font-size: 10px; }
@@ -479,3 +485,73 @@ a:focus-visible {
   .news-list li { grid-template-columns: 22px minmax(0, 1fr); }
   .news-link-label { display: none; }
 }
+
+/* ───── 연결 상태 · 오류 ───── */
+.connection-status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; }
+.connection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid currentColor;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.connection-badge i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.connection-badge.ok { color: #1f7a45; }
+.connection-badge.ok i { animation: live-pulse 1.6s ease-in-out infinite; }
+.connection-badge.warn { color: #9a6400; }
+.connection-badge.error { color: #b3261e; }
+.connection-badge.pending { color: var(--muted); }
+.market-closed { padding: 3px 6px; background: #e6e6e6; color: #555; }
+.last-updated { color: var(--muted); font-variant-numeric: tabular-nums; }
+@keyframes live-pulse { 50% { opacity: .3; } }
+
+.global-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #e3b4b0;
+  background: #fbeceb;
+  color: #8c1d18;
+}
+.global-error small { display: block; margin-top: 4px; color: #8c1d18; opacity: .8; }
+.ticker-empty { margin: 0; padding: 15px 14px; color: var(--muted); }
+.update-time { margin-top: 6px; color: #888; font-size: 12px; }
+
+/* ───── 관심 종목 추가 ───── */
+.watchlist-form { display: flex; gap: 6px; padding: 8px 12px 0; }
+.watchlist-form input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #ccc; font-size: 13px; }
+.watchlist-form button { padding: 6px 12px; border: 1px solid #333; background: #333; color: #fff; cursor: pointer; font-size: 13px; }
+.watchlist-form button:disabled { opacity: .6; cursor: wait; }
+.form-message { display: block; padding: 4px 12px 0; color: #b3261e; font-size: 12px; }
+.form-hint { display: block; padding: 4px 12px 0; color: var(--muted); font-size: 11px; }
+
+/* ───── 패널 공통 상태 ───── */
+.panel-state { display: grid; gap: 6px; padding: 14px; color: var(--muted); font-size: 12px; }
+.panel-state strong { color: var(--text); font-size: 13px; }
+.panel-state button { justify-self: start; padding: 4px 10px; border: 1px solid #888; background: #fff; cursor: pointer; }
+.panel-source { display: block; padding: 0 13px 10px; color: var(--muted); font-size: 10px; }
+
+/* ───── 투자의견 ───── */
+.opinion-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 12px 13px 0; background: var(--line-light); }
+.opinion-summary div { padding: 8px; background: #fff; }
+.opinion-summary span { display: block; color: var(--muted); font-size: 10px; }
+.opinion-summary strong { display: block; margin-top: 4px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.opinion-list { margin: 10px 0 0; padding: 0 13px 6px; list-style: none; }
+.opinion-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line-light);
+  font-size: 11px;
+}
+.opinion-list small { color: var(--muted); font-size: 10px; }
+.opinion-list .target { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ───── 최근 실적 ───── */
+.financial-table { width: calc(100% - 24px); margin: 8px 12px 4px; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.financial-table th, .financial-table td { padding: 7px 4px; border-top: 1px solid var(--line-light); text-align: right; }
+.financial-table th:first-child, .financial-table td:first-child { text-align: left; }
+.financial-table thead th { border-top: 0; color: var(--muted); font-size: 10px; font-weight: 400; }
+.financial-table small { display: block; font-size: 9px; }

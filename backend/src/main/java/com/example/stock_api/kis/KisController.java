@@ -4,118 +4,147 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClientResponseException;
 
+import com.example.stock_api.common.ApiException;
+import com.example.stock_api.dart.DartService;
+import com.example.stock_api.news.NaverNewsService;
+import com.example.stock_api.realtime.QuoteHub;
+import com.example.stock_api.stock.Stock;
+import com.example.stock_api.stock.StockService;
+
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+/**
+ * 프런트엔드가 쓰는 모든 REST API. 브라우저는 Next.js(3000)의 /api/kis/* 로 요청하고 rewrites 로 여기(8080)에 전달됩니다.
+ * 오류 응답은 {"code": "...", "error": "..."} (ApiExceptionHandler).
+ */
+@Validated
 @RestController
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/kis")
 public class KisController {
 
+    private static final String CODE = "\\d{6}";
+
     private final KisService kis;
+    private final StockService stocks;
+    private final DartService dart;
+    private final NaverNewsService naver;
+    private final QuoteHub hub;
 
-    public KisService getKis() {
-        return kis;
-    }
-
-    public KisController(KisService kis) {
+    public KisController(KisService kis, StockService stocks, DartService dart,
+                         NaverNewsService naver, QuoteHub hub) {
         this.kis = kis;
+        this.stocks = stocks;
+        this.dart = dart;
+        this.naver = naver;
+        this.hub = hub;
     }
 
-    @GetMapping("/api/kis/price/{code}")
-    public ResponseEntity<?> price(@PathVariable String code) {
-        try {
-            return ResponseEntity.ok(kis.currentPrice(code));
-        } catch (RestClientResponseException e) {
-            return ResponseEntity.status(e.getStatusCode())
-                    .body(Map.of("error", e.getResponseBodyAsString()));
-        } catch (Exception e) {
-            return ResponseEntity.status(502).body(Map.of("error", String.valueOf(e.getMessage())));
-        }
+    // ───── 지원 종목 (DB) ─────
+
+    @GetMapping("/stocks")
+    public List<Stock> stocks() {
+        return stocks.all();
     }
 
-    // 여러 종목 한 번에 조회 (상단 티커용): /api/kis/prices?codes=005930,000660
-    @GetMapping("/api/kis/prices")
-    public ResponseEntity<?> prices(@RequestParam List<String> codes) {
+    @GetMapping("/stocks/search")
+    public List<Stock> search(@RequestParam(defaultValue = "") @Size(max = 30) String q) {
+        return stocks.search(q);
+    }
+
+    @GetMapping("/stocks/{code}")
+    public Stock stock(@PathVariable @Pattern(regexp = CODE) String code) {
+        return supported(code);
+    }
+
+    // ───── 시세 · 차트 (KIS) ─────
+
+    @GetMapping("/price/{code}")
+    public Map<String, Object> price(@PathVariable @Pattern(regexp = CODE) String code) {
+        supported(code);
+        return kis.currentPrice(code);
+    }
+
+    /** 여러 종목 한 번에 (WebSocket 이 끊겼을 때 polling 용): /api/kis/prices?codes=005930,000660 */
+    @GetMapping("/prices")
+    public Map<String, Object> prices(@RequestParam List<@Pattern(regexp = CODE) String> codes) {
         Map<String, Object> result = new LinkedHashMap<>();
-        for (String code : codes) {
+        for (String code : codes.stream().distinct().limit(40).toList()) {
             try {
+                supported(code);
                 result.put(code, kis.currentPrice(code));
-            } catch (Exception e) {
-                result.put(code, Map.of("error", String.valueOf(e.getMessage())));
+            } catch (ApiException e) {
+                result.put(code, Map.of("code", e.getCode(), "error", e.getMessage()));
+            } catch (RuntimeException e) {
+                result.put(code, Map.of("code", "UPSTREAM_ERROR", "error", String.valueOf(e.getMessage())));
             }
         }
-        return ResponseEntity.ok(result);
+        return result;
     }
 
-    // 차트 데이터: /api/kis/candles/005930?range=1D|1W|1M|1Y
-    @GetMapping("/api/kis/candles/{code}")
-    public ResponseEntity<?> candles(@PathVariable String code,
-                                     @RequestParam(defaultValue = "1D") String range) {
-        try {
-            return ResponseEntity.ok("1D".equals(range)
-                    ? kis.minuteCandles(code)
-                    : kis.dailyCandles(code, range));
-        } catch (Exception e) {
-            return ResponseEntity.status(502).body(Map.of("error", String.valueOf(e.getMessage())));
-        }
+    /** 1D = 당일 1분봉, 1W·1M·1Y = 일봉 OHLC */
+    @GetMapping("/candles/{code}")
+    public List<Map<String, Object>> candles(@PathVariable @Pattern(regexp = CODE) String code,
+                                             @RequestParam(defaultValue = "1D") @Pattern(regexp = "1D|1W|1M|1Y") String range) {
+        supported(code);
+        return "1D".equals(range) ? kis.minuteCandles(code) : kis.dailyCandles(code, range);
     }
 
-    // 종목별 프로필 및 실시간 시가총액 API
-    @GetMapping({"/api/stock/{symbol}/profile", "/api/kis/profile/{symbol}"})
-    public ResponseEntity<?> profile(@PathVariable String symbol) {
+    /** 종목 이름·업종(DB) + 시가총액(KIS) */
+    @GetMapping("/profile/{code}")
+    public Map<String, Object> profile(@PathVariable @Pattern(regexp = CODE) String code) {
+        Stock s = supported(code);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("code", s.getCode());
+        result.put("name", s.getName());
+        result.put("exchange", s.getMarket());
+        result.put("industry", s.getIndustry());
         try {
-            // KisService를 통해 실시간 시세 및 계산된 시가총액 가져오기
-            Map<String, Object> liveData = kis.currentPrice(symbol);
-            Object marketCap = liveData.get("marketCapitalization");
-
-            String name = symbol;
-            String industry = "국내주식";
-
-            // 종목 코드별 이름 및 업종 매핑
-            if ("005930".equals(symbol)) {
-                name = "삼성전자";
-                industry = "전기·전자";
-            } else if ("005380".equals(symbol)) {
-                name = "현대차";
-                industry = "자동차";
-            } else if ("000660".equals(symbol)) {
-                name = "SK하이닉스";
-                industry = "전기·전자";
-            } else if ("035420".equals(symbol)) {
-                name = "NAVER";
-                industry = "서비스업";
-            } else if ("035720".equals(symbol)) {
-                name = "카카오";
-                industry = "서비스업";
-            } else if ("000270".equals(symbol)) {
-                name = "기아";
-                industry = "자동차";
-            } else if ("051910".equals(symbol)) {
-                name = "LG화학";
-                industry = "화학";
-            } else if ("006400".equals(symbol)) {
-                name = "삼성SDI";
-                industry = "전기·전자";
-            }
-
-            return ResponseEntity.ok(Map.of(
-                "name", name,
-                "exchange", "KRX",
-                "industry", industry,
-                "marketCapitalization", marketCap != null ? marketCap : 0L
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.ok(Map.of(
-                "name", symbol,
-                "exchange", "KRX",
-                "industry", "국내주식",
-                "marketCapitalization", 0L
-            ));
+            result.put("marketCapitalization", kis.currentPrice(code).get("marketCapitalization"));
+        } catch (RuntimeException e) {
+            result.put("marketCapitalization", null);
         }
+        return result;
+    }
+
+    // ───── 뉴스 (네이버) · 투자의견 (KIS) · 실적 (OpenDART) ─────
+
+    /** 관련 기사: 네이버 뉴스 검색 (기업명, 최신순 최대 10개) */
+    @GetMapping("/news/{code}")
+    public List<Map<String, Object>> news(@PathVariable @Pattern(regexp = CODE) String code) {
+        return naver.search(supported(code).getName());
+    }
+
+    @GetMapping("/opinion/{code}")
+    public List<Map<String, Object>> opinion(@PathVariable @Pattern(regexp = CODE) String code) {
+        supported(code);
+        return kis.investOpinion(code);
+    }
+
+    @GetMapping("/financials/{code}")
+    public Map<String, Object> financials(@PathVariable @Pattern(regexp = CODE) String code) {
+        return dart.annualFinancials(supported(code).getDartCorpCode());
+    }
+
+    // ───── 상태 ─────
+
+    @GetMapping("/status")
+    public Map<String, Object> status() {
+        Map<String, Object> s = new LinkedHashMap<>(hub.status());
+        s.put("db", stocks.dbAlive() ? "ok" : "error");
+        s.put("dartConfigured", dart.isConfigured());
+        s.put("naverConfigured", naver.isConfigured());
+        return s;
+    }
+
+    private Stock supported(String code) {
+        return stocks.find(code).orElseThrow(() -> ApiException.notSupported(code));
     }
 }

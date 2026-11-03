@@ -67,7 +67,7 @@ function Message({ children }) {
   )
 }
 
-export default function StockChart({ symbol }) {
+export default function StockChart({ code }) {
   const [range, setRange] = useState('1D')
   const [bars, setBars] = useState([])
   const [status, setStatus] = useState('loading') // loading | ready | error
@@ -83,8 +83,7 @@ export default function StockChart({ symbol }) {
 
     const load = async (first) => {
       try {
-        if (first) setStatus('loading')
-        const response = await fetch(`/api/kis/candles/${symbol}?range=${range}`, {
+        const response = await fetch(`/api/kis/candles/${code}?range=${range}`, {
           signal: controller.signal,
           cache: 'no-store',
         })
@@ -102,8 +101,6 @@ export default function StockChart({ symbol }) {
       }
     }
 
-    setBars([])
-    setLivePoints({})
     load(true)
     if (range === '1D') timer = setInterval(() => load(false), 30000)
 
@@ -111,17 +108,46 @@ export default function StockChart({ symbol }) {
       controller.abort()
       clearInterval(timer)
     }
-  }, [symbol, range, reloadKey])
+  }, [code, range, reloadKey])
 
-  // 2) 현재가는 StockInfo가 5초마다 받아 둔 값을 같이 씁니다 (두 화면 값이 항상 같도록)
-  const live = useStockStore((state) => state.prices[symbol])
+  // 기간을 바꾸거나 다시 시도하면 이전 데이터를 비우고 새로 불러옵니다
+  const changeRange = (value) => {
+    if (value === range) return
+    setBars([])
+    setLivePoints({})
+    setStatus('loading')
+    setRange(value)
+  }
+  const retry = () => {
+    setStatus('loading')
+    setReloadKey((key) => key + 1)
+  }
+
+  // 서버 연결이 끊기면 차트 대신 빈 상태 안내를 보여 주고, 다시 연결되면 차트를 새로 불러옵니다
+  const offline = useStockStore((state) => state.connection.state === 'disconnected')
+  useEffect(() => useStockStore.subscribe((state, previous) => {
+    if (previous.connection.state === 'disconnected' && state.connection.state !== 'disconnected') {
+      setStatus('loading')
+      setReloadKey((key) => key + 1)
+    }
+  }), [])
+
+  // 2) 실시간 시세(WebSocket push)를 1일 차트에 분 단위로 누적합니다. 종목 정보와 같은 값을 씁니다.
+  const live = useStockStore((state) => state.quotes[code])
 
   useEffect(() => {
-    if (range !== '1D' || !live?.price) return
-    const key = nowMinute()
-    if (key < '09:00' || key > '15:30') return // 장 시간 밖은 누적하지 않음
-    setLivePoints((current) => ({ ...current, [key]: Number(live.price) }))
-  }, [live, range])
+    if (range !== '1D') return undefined
+    const accumulate = (quote) => {
+      if (!quote?.price) return
+      // 체결 시각이 있으면 그 시각, 없으면 받은 시각 기준
+      const key = quote.tradeTime ? quote.tradeTime.slice(0, 5) : nowMinute()
+      if (key < '09:00' || key > '15:30') return // 장 시간 밖은 누적하지 않음
+      setLivePoints((current) => (current[key] === Number(quote.price) ? current : { ...current, [key]: Number(quote.price) }))
+    }
+    return useStockStore.subscribe((state, previous) => {
+      if (state.quotes[code] !== previous.quotes[code]) accumulate(state.quotes[code])
+    })
+  }, [code, range])
 
   // 일봉(1주·1개월·1년): 기준 날짜부터, 오늘 봉은 현재가로 맞춤
   const dailyBars = useMemo(() => {
@@ -211,7 +237,7 @@ export default function StockChart({ symbol }) {
                 type='button'
                 className={range === item.value ? 'active' : ''}
                 aria-pressed={range === item.value}
-                onClick={() => setRange(item.value)}
+                onClick={() => changeRange(item.value)}
               >
                 {item.label}
               </button>
@@ -226,30 +252,37 @@ export default function StockChart({ symbol }) {
           {status === 'error'
             ? '연결 오류'
             : range === '1D'
-              ? liveCount > 0 ? '실시간 체결 반영 중 · 5초마다 갱신' : '장 마감 또는 체결 대기'
+              ? liveCount > 0 ? `실시간 체결 누적 중 · ${liveCount}분` : '장 마감 또는 체결 대기'
               : showCandle ? '일봉 캔들 (시가·고가·저가·종가)' : '일봉 종가'}
           {status === 'ready' && errorMessage ? ' · 갱신 지연' : ''}
         </span>
       </div>
 
-      {status === 'loading' && <Message>차트를 불러오는 중…</Message>}
-
-      {status === 'error' && (
+      {offline && (
         <Message>
-          <strong>차트를 불러오지 못했습니다.</strong>
-          <small>{errorMessage}</small>
-          <button type='button' onClick={() => setReloadKey((key) => key + 1)}>다시 시도</button>
+          <strong>서버에 연결할 수 없어 차트를 표시할 수 없습니다.</strong>
+          <small>연결이 돌아오면 자동으로 다시 불러옵니다.</small>
         </Message>
       )}
 
-      {status === 'ready' && points.length === 0 && (
+      {!offline && status === 'loading' && <Message>차트를 불러오는 중…</Message>}
+
+      {!offline && status === 'error' && (
+        <Message>
+          <strong>차트를 불러오지 못했습니다.</strong>
+          <small>{errorMessage}</small>
+          <button type='button' onClick={retry}>다시 시도</button>
+        </Message>
+      )}
+
+      {!offline && status === 'ready' && points.length === 0 && (
         <Message>
           <strong>표시할 데이터가 없습니다.</strong>
           <small>{range === '1D' ? '장 시작 전이거나 오늘 체결 내역이 없습니다.' : '해당 기간의 일봉이 없습니다.'}</small>
         </Message>
       )}
 
-      {status === 'ready' && points.length > 0 && (
+      {!offline && status === 'ready' && points.length > 0 && (
         <>
           <div className='chart-summary'>
             <strong>{won(lastPrice)}</strong>
@@ -285,7 +318,7 @@ export default function StockChart({ symbol }) {
                   <Line
                     type='monotone'
                     dataKey='price'
-                    stroke={rising ? '#1769aa' : '#c43b3b'}
+                    stroke={rising ? '#d6453d' : '#2f6fdb'}
                     strokeWidth={2}
                     dot={false}
                     activeDot={{ r: 4 }}

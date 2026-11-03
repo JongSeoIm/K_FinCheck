@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import useHydrated from '../hooks/useHydrated'
 
 const suggestions = ['영업이익률은 어떻게 읽어?', '매출과 이익은 어떻게 달라?', '부채비율이 높다는 건 무슨 뜻이야?']
 
@@ -13,7 +14,7 @@ function exampleAnswer(question) {
 }
 
 export default function StockChatDrawer({ stock }) {
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHydrated()
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const [context, setContext] = useState(stock)
@@ -28,7 +29,6 @@ export default function StockChatDrawer({ stock }) {
   const messages = conversations[context.symbol] || []
 
   useEffect(() => {
-    setMounted(true)
     return () => {
       clearTimeout(responseTimer.current)
       clearTimeout(closeTimer.current)

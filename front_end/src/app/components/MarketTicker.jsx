@@ -3,91 +3,59 @@
 import { useEffect, useRef, useState } from 'react'
 import { FaStar } from 'react-icons/fa'
 import useHydrated from '../hooks/useHydrated'
-import { marketStocks } from '../lib/market'
 import useStockStore from '../store/useStockStore'
-
-// 티커에 보여 줄 종목 (KIS 호출 부담을 줄이려면 숫자를 줄이세요)
-const tickerStocks = marketStocks.slice(0, 8)
-const TICKER_CODES = tickerStocks.map((stock) => stock.symbol).join(',')
-const REFRESH_MS = 10000
 
 const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
-export default function MarketTicker({ activeSymbol, onSelectStock }) {
+// 상단 티커: 서버 DB 의 지원 종목 전체를 실제 시세로 표시 (WebSocket 으로 갱신, 가격이 바뀌면 깜빡임)
+export default function MarketTicker({ activeCode, onSelectStock }) {
   const hydrated = useHydrated()
   const watchlist = useStockStore((state) => state.watchlist)
-  const [prices, setPrices] = useState({})
-  const [failed, setFailed] = useState(false)
+  const stocks = useStockStore((state) => state.stocks)
+  const quotes = useStockStore((state) => state.quotes)
+  const connectionState = useStockStore((state) => state.connection.state)
   const [priceFlashes, setPriceFlashes] = useState({})
   const previousPricesRef = useRef({})
   const flashTimersRef = useRef({})
 
-  // Spring에서 여러 종목 시세를 10초마다 받아 옵니다.
   useEffect(() => {
-    const controller = new AbortController()
-
-    const load = async () => {
-      try {
-        const response = await fetch(`/api/kis/prices?codes=${TICKER_CODES}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        })
-        if (!response.ok) throw new Error('ticker error')
-        setPrices(await response.json())
-        setFailed(false)
-      } catch (requestError) {
-        if (requestError.name !== 'AbortError') setFailed(true)
-      }
-    }
-
-    load()
-    const timer = setInterval(load, REFRESH_MS)
-    return () => {
-      controller.abort()
-      clearInterval(timer)
-    }
-  }, [])
-
-  // 가격이 바뀌면 잠깐 깜빡이는 효과
-  useEffect(() => {
-    tickerStocks.forEach((stock) => {
-      const symbol = stock.symbol
-      const nextPrice = Number(prices[symbol]?.price)
+    stocks.forEach(({ code }) => {
+      const nextPrice = Number(quotes[code]?.price)
       if (!Number.isFinite(nextPrice) || nextPrice === 0) return
 
-      const previousPrice = previousPricesRef.current[symbol]
-      previousPricesRef.current[symbol] = nextPrice
+      const previousPrice = previousPricesRef.current[code]
+      previousPricesRef.current[code] = nextPrice
       if (previousPrice === undefined || previousPrice === nextPrice) return
 
       const direction = nextPrice > previousPrice ? 'up' : 'down'
-      setPriceFlashes((current) => ({ ...current, [symbol]: direction }))
-
-      clearTimeout(flashTimersRef.current[symbol])
-      flashTimersRef.current[symbol] = setTimeout(() => {
+      setPriceFlashes((current) => ({ ...current, [code]: direction }))
+      clearTimeout(flashTimersRef.current[code])
+      flashTimersRef.current[code] = setTimeout(() => {
         setPriceFlashes((current) => {
           const next = { ...current }
-          delete next[symbol]
+          delete next[code]
           return next
         })
       }, 650)
     })
-  }, [prices])
+  }, [quotes, stocks])
 
   useEffect(() => () => {
     Object.values(flashTimersRef.current).forEach(clearTimeout)
   }, [])
 
+  // 종목이 적으면 흐르지 않게 고정 표시
+  const scrolling = stocks.length > 4
+  const disconnected = connectionState === 'disconnected' || connectionState === 'not-configured'
+
   const renderTickerGroup = (copyIndex) => (
-    <div
-      className='ticker-group'
-      aria-hidden={copyIndex === 1 ? 'true' : undefined}
-    >
-      {tickerStocks.map((stock) => {
-        const quote = prices[stock.symbol]
-        const hasQuote = quote && !quote.error && Number(quote.price) > 0
+    <div className='ticker-group' aria-hidden={copyIndex === 1 ? 'true' : undefined}>
+      {stocks.map((stock) => {
+        const quote = quotes[stock.code]
+        const hasQuote = quote && Number(quote.price) > 0
         const change = hasQuote ? Number(quote.change) : 0
-        const isSaved = hydrated && watchlist.includes(stock.symbol)
-        const flashDirection = priceFlashes[stock.symbol]
+        const isSaved = hydrated && watchlist.includes(stock.code)
+        const flashDirection = priceFlashes[stock.code]
         const flashClass = flashDirection === 'up'
           ? 'animate-[ticker-flash-up_650ms_ease-out]'
           : flashDirection === 'down'
@@ -96,17 +64,17 @@ export default function MarketTicker({ activeSymbol, onSelectStock }) {
 
         return (
           <button
-            key={`${copyIndex}-${stock.symbol}`}
+            key={`${copyIndex}-${stock.code}`}
             type='button'
             tabIndex={copyIndex === 1 ? -1 : 0}
-            className={`ticker-item ${activeSymbol === stock.symbol ? 'active' : ''} ${flashClass}`}
-            onClick={() => onSelectStock(stock)}
+            className={`ticker-item ${activeCode === stock.code ? 'active' : ''} ${flashClass}`}
+            onClick={() => onSelectStock(stock.code)}
           >
             {isSaved && <FaStar className='ticker-star' aria-label='관심 종목' />}
             <span>{stock.name}</span>
             <strong>{hasQuote ? won(quote.price) : '—'}</strong>
-            <small className={change >= 0 ? 'positive' : 'negative'}>
-              {hasQuote ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : failed ? '연결 지연' : '…'}
+            <small className={!hasQuote ? '' : change > 0 ? 'positive' : change < 0 ? 'negative' : ''}>
+              {hasQuote ? `${change > 0 ? '+' : ''}${change.toFixed(2)}%` : disconnected ? '연결 끊김' : '조회 중…'}
             </small>
           </button>
         )
@@ -115,11 +83,15 @@ export default function MarketTicker({ activeSymbol, onSelectStock }) {
   )
 
   return (
-    <section className='ticker-bar' aria-label='주요 종목 시세'>
-      <div className='ticker-track animate-[ticker-scroll_36s_linear_infinite]'>
-        {renderTickerGroup(0)}
-        {renderTickerGroup(1)}
-      </div>
+    <section className='ticker-bar' aria-label='지원 종목 시세'>
+      {stocks.length === 0 ? (
+        <p className='ticker-empty'>{disconnected ? '서버에 연결되지 않아 시세를 표시할 수 없습니다.' : '종목 목록을 불러오는 중…'}</p>
+      ) : (
+        <div className={`ticker-track ${scrolling ? 'animate-[ticker-scroll_36s_linear_infinite]' : ''}`}>
+          {renderTickerGroup(0)}
+          {scrolling && renderTickerGroup(1)}
+        </div>
+      )}
     </section>
   )
 }

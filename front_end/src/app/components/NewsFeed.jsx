@@ -1,61 +1,50 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
-
-const fallbackNews = [
-  { id: 'fallback-1', headline: '미국 증시, 기술주 중심으로 장중 흐름 점검', source: 'Market Brief', datetime: Date.now() / 1000, summary: '실시간 API 응답을 기다리는 동안 표시되는 예시 뉴스입니다.', url: 'https://finnhub.io/' },
-  { id: 'fallback-2', headline: '주요 기업 실적과 금리 전망에 투자자 관심', source: 'Daily Market', datetime: Date.now() / 1000 - 3600, summary: '기업 뉴스 API 연결 후 선택 종목의 최신 기사로 교체됩니다.', url: 'https://finnhub.io/' },
-]
+import { Fragment, useMemo, useState } from 'react'
+import useApi from '../hooks/useApi'
+import { PanelEmpty, PanelError, PanelLoading } from './PanelState'
 
 const categories = [
   { label: '전체', words: [] },
-  { label: '실적', words: ['earnings', 'revenue', 'profit', 'sales', 'guidance', '실적', '매출', '이익'] },
-  { label: '제품·기술', words: ['product', 'technology', 'launch', 'cloud', 'chip', 'iphone', 'ai ', '제품', '기술', '출시'] },
-  { label: '시장·투자', words: ['stock', 'market', 'investor', 'analyst', 'shares', 'buy', 'sell', '주가', '시장', '투자'] },
+  { label: '실적', words: ['실적', '매출', '영업이익', '순이익', '분기', '어닝'] },
+  { label: '공시', words: ['공시', '주주', '배당', '자사주', '유상', '무상', '합병'] },
+  { label: '시장·투자', words: ['주가', '시장', '투자', '목표가', '외국인', '기관', '코스피'] },
 ]
 
-export default function NewsFeed({ symbol }) {
-  const [news, setNews] = useState([])
-  const [status, setStatus] = useState('loading')
+function formatTime(iso) {
+  if (!iso) return ''
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// 관련 기사: 네이버 뉴스 검색(기업명, 최신순 최대 10개). 제목을 누르면 원문이 새 탭으로 열립니다.
+// 설명은 네이버 검색 결과의 요약 문구이며 기사 전문이나 AI 요약이 아닙니다.
+export default function NewsFeed({ code }) {
+  const { status, data, error, reload } = useApi(`/api/kis/news/${code}`)
   const [category, setCategory] = useState('전체')
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    fetch(`/api/news?symbol=${encodeURIComponent(symbol)}`, { signal: controller.signal })
-      .then(async (response) => {
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error)
-        setNews(data)
-        setStatus('ready')
-      })
-      .catch((error) => {
-        if (error.name !== 'AbortError') {
-          setNews(fallbackNews)
-          setStatus('fallback')
-        }
-      })
-
-    return () => controller.abort()
-  }, [symbol])
+  const news = useMemo(() => (Array.isArray(data) ? data : []), [data])
 
   const visibleNews = useMemo(() => {
     const selected = categories.find((item) => item.label === category)
     if (!selected || selected.words.length === 0) return news
-    return news.filter((item) => {
-      const text = `${item.headline || ''} ${item.summary || ''}`.toLowerCase()
-      return selected.words.some((word) => text.includes(word))
-    })
+    return news.filter((item) => selected.words.some((word) => `${item.title} ${item.description}`.includes(word)))
   }, [category, news])
 
-  if (status === 'loading') {
-    return <div className='skeleton-list'>{[1, 2, 3].map((item) => <span key={item} className='skeleton-row' />)}</div>
+  if (status === 'loading') return <PanelLoading />
+  if (status === 'error') {
+    if (error?.code === 'NAVER_NOT_CONFIGURED') {
+      return <PanelEmpty title='네이버 API 키가 설정되지 않았습니다.'>백엔드 application-local.properties 에 naver.client-id 와 naver.client-secret 을 넣어 주세요.</PanelEmpty>
+    }
+    return <PanelError error={error} onRetry={reload} />
   }
+  if (news.length === 0) return <PanelEmpty title='검색된 관련 기사가 없습니다.' />
 
   return (
     <>
       <div className='news-toolbar'>
-        <div className='news-categories' aria-label='뉴스 카테고리'>
+        <div className='news-categories' aria-label='뉴스 분류'>
           {categories.map((item, index) => (
             <Fragment key={item.label}>
               {index > 0 && <span className='news-separator' aria-hidden='true'>·</span>}
@@ -78,20 +67,20 @@ export default function NewsFeed({ symbol }) {
         ) : (
           <ul className='news-list'>
             {visibleNews.map((item, index) => (
-              <li key={item.id || `${item.url}-${index}`}>
+              <li key={item.id || index}>
                 <div className='news-index'>{String(index + 1).padStart(2, '0')}</div>
                 <div className='news-copy'>
-                  <a href={item.url} target='_blank' rel='noreferrer'>{item.headline}</a>
-                  <p>{item.summary || '기사 요약 정보가 없습니다.'}</p>
-                  <small>{item.source} · {new Date(item.datetime * 1000).toLocaleDateString('ko-KR')}</small>
+                  <a href={item.url} target='_blank' rel='noreferrer'>{item.title}</a>
+                  {item.description && <p>{item.description}</p>}
+                  <small>{[item.source, formatTime(item.datetime)].filter(Boolean).join(' · ')}</small>
                 </div>
                 <span className='news-link-label' aria-hidden='true'>원문</span>
               </li>
             ))}
-            {status === 'fallback' && <li className='inline-warning'>API 지연으로 예시 뉴스를 표시합니다.</li>}
           </ul>
         )}
       </div>
+      <small className='panel-source'>출처: 네이버 뉴스 검색 · 설명은 검색 결과 요약이며 기사 전문이 아닙니다</small>
     </>
   )
 }

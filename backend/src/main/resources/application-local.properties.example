@@ -1,0 +1,6 @@
+# 이 파일을 application-local.properties 로 복사해 값을 채우세요 (깃 제외 파일)
+kis.app-key=
+kis.app-secret=
+dart.api-key=
+spring.datasource.username=root
+spring.datasource.password=

@@ -1,14 +1,10 @@
 import Dashboard from './components/Dashboard'
-import { marketStocks } from './lib/market'
 
 export default async function Home({ searchParams }) {
   const params = await searchParams
-  const requestedSymbol = params?.symbol?.toUpperCase()
+  const requested = params?.symbol
+  // 6자리 코드만 받고, 지원 종목인지는 Dashboard 가 서버 목록으로 확인합니다 (기본: 삼성전자)
+  const initialCode = /^\d{6}$/.test(requested || '') ? requested : '005930'
 
-  // 요청된 종목이 있으면 찾고, 없으면 삼성전자('005930')를 기본값으로 설정
-  const initialStock = marketStocks.find(
-    (stock) => stock.symbol === requestedSymbol
-  ) || marketStocks.find((stock) => stock.symbol === '005930') || marketStocks[0]
-
-  return <Dashboard initialStock={initialStock} />
+  return <Dashboard initialCode={initialCode} />
 }

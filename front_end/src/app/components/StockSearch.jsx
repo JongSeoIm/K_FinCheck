@@ -3,39 +3,37 @@
 import { useEffect, useRef, useState } from 'react'
 import useDebounce from '../hooks/useDebounce'
 
+async function searchStocks(keyword, signal) {
+  const response = await fetch(`/api/kis/stocks/search?q=${encodeURIComponent(keyword)}`, { signal })
+  const data = await response.json()
+  if (!response.ok || !Array.isArray(data)) throw new Error(data.error || '검색 요청에 실패했습니다.')
+  return data
+}
+
+// 지원 종목 검색 (서버 DB). "삼성전자" 또는 "005930" 입력 후 Enter 로 바로 선택
 export default function StockSearch({ onSelectStock }) {
   const [keyword, setKeyword] = useState('')
   const [results, setResults] = useState([])
   const [message, setMessage] = useState('')
   const searchAreaRef = useRef(null)
-  const debouncedKeyword = useDebounce(keyword, 350)
+  const debouncedKeyword = useDebounce(keyword, 250)
 
   useEffect(() => {
-    if (!debouncedKeyword.trim()) return
-
+    if (!debouncedKeyword.trim()) return undefined
     const controller = new AbortController()
 
-    const fetchStocks = async () => {
-      try {
-        setMessage('검색 중...')
-        const response = await fetch(
-          `/api/search?q=${encodeURIComponent(debouncedKeyword)}`,
-          { signal: controller.signal }
-        )
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error || '검색 요청에 실패했습니다.')
-
+    searchStocks(debouncedKeyword.trim(), controller.signal)
+      .then((data) => {
         setResults(data)
-        setMessage(data.length === 0 ? '일치하는 종목이 없습니다.' : '')
-      } catch (error) {
+        setMessage(data.length === 0 ? '일치하는 지원 종목이 없습니다.' : '')
+      })
+      .catch((error) => {
         if (error.name !== 'AbortError') {
           setResults([])
           setMessage(error.message)
         }
-      }
-    }
+      })
 
-    fetchStocks()
     return () => controller.abort()
   }, [debouncedKeyword])
 
@@ -51,16 +49,27 @@ export default function StockSearch({ onSelectStock }) {
   }, [])
 
   const handleSelect = (stock) => {
-    onSelectStock(stock)
+    onSelectStock(stock.code)
     setKeyword('')
     setResults([])
     setMessage('')
   }
 
-  const handleSubmit = (event) => {
+  // Enter: 디바운스를 기다리지 않고 바로 검색해서 첫 번째 결과를 선택
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    if (results[0]) handleSelect(results[0])
-    else if (keyword.trim()) setMessage('검색 결과에서 종목을 선택해 주세요.')
+    const value = keyword.trim()
+    if (!value) return
+    try {
+      const data = await searchStocks(value)
+      if (data[0]) handleSelect(data[0])
+      else {
+        setResults([])
+        setMessage('일치하는 지원 종목이 없습니다.')
+      }
+    } catch (error) {
+      setMessage(error.message)
+    }
   }
 
   return (
@@ -78,7 +87,7 @@ export default function StockSearch({ onSelectStock }) {
               setMessage('')
             }
           }}
-          placeholder='기업명 또는 티커 검색 (예: Apple, AAPL)'
+          placeholder='종목명 또는 코드 (예: 삼성전자, 005930)'
           autoComplete='off'
         />
         <button type='submit'>검색</button>
@@ -90,11 +99,11 @@ export default function StockSearch({ onSelectStock }) {
           {results.length > 0 && (
             <ul className='search-results'>
               {results.map((stock) => (
-                <li key={`${stock.symbol}-${stock.name}`}>
+                <li key={stock.code}>
                   <button type='button' onClick={() => handleSelect(stock)}>
-                    <span className='result-symbol'>{stock.symbol}</span>
+                    <span className='result-symbol'>{stock.code}</span>
                     <span className='result-name'>{stock.name}</span>
-                    <span className='result-type'>{stock.type || 'US Equity'}</span>
+                    <span className='result-type'>{stock.market}</span>
                   </button>
                 </li>
               ))}
