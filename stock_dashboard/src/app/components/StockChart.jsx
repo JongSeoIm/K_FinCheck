@@ -377,15 +377,15 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
                 <XAxis
                   {...(timeAxis || { dataKey: 'date', minTickGap: 28 })}
                   tickFormatter={formatTimeTick}
-                  tick={{ fill: '#666', fontSize: 11 }}
+                  tick={{ fill: '#666', fontSize: 12 }}
                 />
                 <YAxis
                   orientation='right'
                   domain={[minPrice, maxPrice]}
                   allowDataOverflow
                   tickFormatter={(val) => Number(val).toLocaleString('ko-KR')}
-                  tick={{ fill: '#666', fontSize: 11 }}
-                  width={68}
+                  tick={{ fill: '#666', fontSize: 12 }}
+                  width={76}
                 />
                 <Tooltip content={<ChartTooltip />} />
                 <ReferenceLine y={visibleCandles[0]?.close} stroke='#888' strokeDasharray='4 4' />
@@ -401,15 +401,15 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
                 <XAxis
                   {...(timeAxis || { dataKey: 'date', minTickGap: 28 })}
                   tickFormatter={formatTimeTick}
-                  tick={{ fill: '#666', fontSize: 11 }}
+                  tick={{ fill: '#666', fontSize: 12 }}
                 />
                 <YAxis
                   orientation='right'
                   domain={[minPrice, maxPrice]}
                   allowDataOverflow
                   tickFormatter={(val) => Number(val).toLocaleString('ko-KR')}
-                  tick={{ fill: '#666', fontSize: 11 }}
-                  width={68}
+                  tick={{ fill: '#666', fontSize: 12 }}
+                  width={76}
                 />
                 <Tooltip content={<ChartTooltip />} />
                 <ReferenceLine y={visibleCandles[0]?.close} stroke='#888' strokeDasharray='4 4' />

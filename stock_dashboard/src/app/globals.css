@@ -140,10 +140,10 @@ a:focus-visible {
   cursor: pointer;
   font-variant-numeric: tabular-nums;
 }
-.ticker-star { flex: 0 0 auto; color: #b27b00; font-size: 11px; }
+.ticker-star { flex: 0 0 auto; color: #b27b00; font-size: 12px; }
 .ticker-item:hover, .ticker-item.active { background: #e8eef4; }
 .ticker-item span, .ticker-item strong { font-size: 13px; }
-.ticker-item small { font-size: 11px; }
+.ticker-item small { font-size: 12px; }
 .positive { color: var(--green) !important; }
 .negative { color: var(--red) !important; }
 
@@ -258,7 +258,7 @@ a:focus-visible {
   margin-top: 6px;
   background: #ddd;
 }
-.inline-warning { display: block; margin-top: 7px; color: #8a5e18; font-size: 10px; }
+.inline-warning { display: block; margin-top: 7px; color: #8a5e18; font-size: 11px; }
 
 .chart-container { padding: 12px 14px 14px; }
 .chart-controls {
@@ -283,13 +283,13 @@ a:focus-visible {
   color: #1769aa;
   font-weight: 700;
 }
-.tab-separator { color: #888; font-size: 11px; line-height: 1; }
+.tab-separator { color: #888; font-size: 12px; line-height: 1; }
 .stream-status {
   display: flex;
   gap: 16px;
   margin: 11px 0 5px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .chart-summary {
   display: flex;
@@ -307,7 +307,7 @@ a:focus-visible {
 }
 .chart-stats div { padding: 7px 9px; border-right: 1px solid var(--line-light); }
 .chart-stats div:last-child { border-right: 0; }
-.chart-stats span { display: block; color: var(--muted); font-size: 9px; }
+.chart-stats span { display: block; color: var(--muted); font-size: 11px; }
 .chart-stats strong { display: block; margin-top: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .chart-area { width: 100%; height: 360px; }
 .chart-tooltip {
@@ -316,13 +316,13 @@ a:focus-visible {
   padding: 8px 10px;
   border: 1px solid #777;
   background: #fff;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .count-badge { font-weight: 700; }
 .empty-state { padding: 14px; }
 .empty-state strong { font-size: 13px; }
-.empty-state p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+.empty-state p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
 .watchlist { margin: 0; padding: 0; list-style: none; }
 .watchlist li {
   display: grid;
@@ -344,7 +344,7 @@ a:focus-visible {
   cursor: pointer;
 }
 .watchlist-select > span:first-child { display: grid; gap: 2px; }
-.watchlist-select small, .watch-price { color: var(--muted); font-size: 10px; }
+.watchlist-select small, .watch-price { color: var(--muted); font-size: 11px; }
 .watchlist-remove {
   padding: 0 10px;
   border: 0;
@@ -352,15 +352,15 @@ a:focus-visible {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .recommendation-summary { padding: 13px; }
-.recommendation-caption { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.recommendation-caption { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
 .consensus-score { display: flex; align-items: end; justify-content: space-between; }
 .consensus-score div { display: flex; align-items: baseline; }
 .consensus-score strong { font-size: 28px; }
-.consensus-score span, .consensus-score p { color: var(--muted); font-size: 11px; }
+.consensus-score span, .consensus-score p { color: var(--muted); font-size: 12px; }
 .consensus-score p { margin: 0 0 4px; }
 .sentiment-stack { display: flex; height: 8px; margin: 12px 0; background: #ddd; }
 .sentiment-stack span { min-width: 2px; }
@@ -377,14 +377,14 @@ a:focus-visible {
   padding: 0;
   list-style: none;
 }
-.sentiment-list li { display: flex; justify-content: space-between; font-size: 11px; }
+.sentiment-list li { display: flex; justify-content: space-between; font-size: 12px; }
 .sentiment-list li span { display: flex; align-items: center; gap: 5px; color: var(--muted); }
 .sentiment-list i { width: 7px; height: 7px; }
 .trend-heading {
   margin: 14px -13px 0;
   padding: 9px 13px 6px;
   border-top: 1px solid var(--line-light);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .recommendation-chart { width: 100%; height: 175px; }
@@ -394,7 +394,7 @@ a:focus-visible {
   padding: 8px;
   border: 1px solid #777;
   background: #fff;
-  font-size: 10px;
+  font-size: 11px;
 }
 .recommendation-tooltip span { display: flex; align-items: center; gap: 5px; }
 .recommendation-tooltip i { width: 7px; height: 7px; }
@@ -406,12 +406,12 @@ a:focus-visible {
   align-items: center;
   gap: 8px;
 }
-.earnings-header { padding: 8px 0; color: var(--muted); font-size: 9px; }
-.earnings-row { min-height: 39px; border-top: 1px solid var(--line-light); font-size: 11px; }
+.earnings-header { padding: 8px 0; color: var(--muted); font-size: 11px; }
+.earnings-row { min-height: 39px; border-top: 1px solid var(--line-light); font-size: 12px; }
 .earnings-header span:nth-child(2),
 .earnings-row > span:nth-child(2) { text-align: center; font-variant-numeric: tabular-nums; }
 .earnings-header span:last-child { text-align: right; }
-.surprise-badge { justify-self: end; padding: 3px 5px; font-size: 9px; font-weight: 700; }
+.surprise-badge { justify-self: end; padding: 3px 5px; font-size: 11px; font-weight: 700; }
 .surprise-badge.beat { color: var(--green); }
 .surprise-badge.miss { color: var(--red); }
 
@@ -423,14 +423,14 @@ a:focus-visible {
   padding: 9px 14px;
   border-bottom: 1px solid var(--line);
 }
-.news-toolbar > span { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.news-toolbar > span { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .news-categories { display: flex; flex-wrap: wrap; }
 .news-categories button {
   padding: 2px 3px;
   border: 0;
   background: transparent;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
 }
 .news-categories button:hover { text-decoration: underline; }
 .news-categories button.active { color: var(--blue); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
@@ -449,11 +449,11 @@ a:focus-visible {
   border-bottom: 1px solid var(--line-light);
 }
 .news-list li:last-child { border-bottom: 0; }
-.news-index, .news-copy small { color: var(--muted); font-size: 10px; }
+.news-index, .news-copy small { color: var(--muted); font-size: 11px; }
 .news-copy a { font-weight: 700; text-decoration: none; }
 .news-copy a:hover { text-decoration: underline; }
-.news-copy p { margin: 4px 0; color: var(--muted); font-size: 11px; }
-.news-link-label { color: var(--blue); font-size: 10px; }
+.news-copy p { line-height: 1.6; margin: 4px 0; color: var(--muted); font-size: 12px; }
+.news-link-label { color: var(--blue); font-size: 11px; }
 .news-list > li.inline-warning { display: block; padding: 8px 0; border: 0; }
 
 .skeleton-list { display: grid; gap: 8px; padding: 12px; }
@@ -561,16 +561,16 @@ a:focus-visible {
 
 /* OpenDART 연간 실적: 기존 우측 패널 안에서만 표시한다. */
 .financial-panel { padding: 12px; }
-.financial-meta { color: var(--muted); font-size: 10px; margin-bottom: 9px; }
-.financial-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.financial-meta { line-height: 1.5; color: var(--muted); font-size: 11px; margin-bottom: 9px; }
+.financial-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
 .financial-table th, .financial-table td { padding: 10px 0; border-bottom: 1px solid var(--line-light); text-align: right; font-variant-numeric: tabular-nums; }
 .financial-table th:first-child { width: 28%; text-align: left; font-weight: 500; }
 .financial-table th:nth-child(2) { width: 40%; }
-.financial-table thead th { color: var(--muted); font-size: 10px; font-weight: 400; }
-.financial-table td small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; }
-.financial-source { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: space-between; margin-top: 10px; color: var(--muted); font-size: 9px; }
+.financial-table thead th { color: var(--muted); font-size: 11px; font-weight: 400; }
+.financial-table td small { line-height: 1.5; display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+.financial-source { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: space-between; margin-top: 10px; color: var(--muted); font-size: 11px; }
 .financial-source a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-.financial-state { padding: 16px 12px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.financial-state { padding: 16px 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .financial-state p { margin: 0 0 8px; }
 .financial-state button { border: 1px solid var(--line); background: transparent; color: inherit; padding: 4px 8px; cursor: pointer; }
 .financial-caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -580,7 +580,7 @@ a:focus-visible {
 .financial-table .financial-chart-row > td { padding: 0 0 12px; }
 .financial-growth { white-space: nowrap; font-size: 13px; font-weight: 700; }
 .financial-comparison { display: grid; gap: 5px; }
-.financial-bar-row { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 9px; text-align: left; }
+.financial-bar-row { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 11px; text-align: left; }
 .financial-bar-track { position: relative; height: 5px; }
 .financial-bar, .financial-bar-baseline { display: block; position: absolute; top: 0; height: 100%; }
 .financial-bar-baseline { width: 1px; background: var(--line); }
@@ -592,11 +592,11 @@ a:focus-visible {
 .watch-name strong { font-size: 13px; overflow-wrap: anywhere; }
 .watch-price { display: grid; gap: 3px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .watch-price strong { color: var(--text); font-size: 12px; font-weight: 600; }
-.watch-price small { font-size: 11px; font-weight: 700; }
-.quote-status { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; padding: 9px 12px; border-top: 1px solid var(--line-light); color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.watch-price small { font-size: 12px; font-weight: 700; }
+.quote-status { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; padding: 9px 12px; border-top: 1px solid var(--line-light); color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .quote-status > span { min-width: 0; }
-.quote-status small { margin-left: 7px; font-size: 9px; }
-.watchlist-panel .quote-status { font-size: 9px; }
+.quote-status small { margin-left: 7px; font-size: 11px; }
+.watchlist-panel .quote-status { font-size: 11px; }
 .watchlist-panel .quote-status small { display: none; }
 .quote-overview > .quote-status { padding: 6px 12px; }
 
@@ -616,7 +616,7 @@ a:focus-visible {
 .auth-field label { font-size: 12px; font-weight: 600; }
 .auth-field input { width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid #c8c8c8; border-radius: 0; background: #fff; color: var(--text); font-size: 13px; }
 .auth-field input::placeholder { color: #999; }
-.auth-field small { color: var(--muted); font-size: 10px; }
+.auth-field small { color: var(--muted); font-size: 11px; }
 .auth-submit { width: 100%; min-height: 44px; margin-top: 6px; border: 1px solid #2b2d2c; border-radius: 0; background: #2b2d2c; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
 .auth-submit:disabled, .account-nav button:disabled { opacity: .55; cursor: wait; }
 .auth-error, .auth-success { margin: 0 0 16px; font-size: 12px; line-height: 1.6; }
