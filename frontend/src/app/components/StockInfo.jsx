@@ -6,6 +6,15 @@ import {
   directionClass, formatClock, formatPrice, formatRate, formatSignedPrice, formatVolume,
 } from '@/app/lib/format'
 
+// 목업의 별 아이콘(react-icons FaStar·FaRegStar)과 같은 모양을 SVG로 그린다
+function StarIcon({ filled }) {
+  return (
+    <svg viewBox='0 0 24 24' aria-hidden='true' fill={filled ? 'currentColor' : 'none'} stroke='currentColor' strokeWidth='2' strokeLinejoin='round'>
+      <path d='M12 2.8l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.6l-5.8 3.1 1.1-6.5-4.7-4.6 6.5-.9z' />
+    </svg>
+  )
+}
+
 // 선택 종목의 현재가·등락·시가·고가·저가·전일 종가
 export default function StockInfo({ stock }) {
   const hydrated = useHydrated()
@@ -29,7 +38,7 @@ export default function StockInfo({ stock }) {
     <section className='panel quote-panel'>
       <div className='quote-heading'>
         <div>
-          <h1>{stock.name}</h1>
+          <h2>{stock.name}</h2>
           <p>
             {stock.symbol} · {stock.market || '국내 주식'}
             {quote?.source === 'DEMO' && <span className='badge demo'>모의 데이터</span>}
@@ -43,7 +52,8 @@ export default function StockInfo({ stock }) {
           aria-pressed={saved}
           onClick={() => (saved ? removeFromWatchlist(stock.symbol) : addToWatchlist(stock))}
         >
-          {saved ? '★ 관심 종목 해제' : '☆ 관심 종목 추가'}
+          <StarIcon filled={saved} />
+          {saved ? '관심 종목 해제' : '관심 종목 추가'}
         </button>
       </div>
 

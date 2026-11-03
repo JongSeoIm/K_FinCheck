@@ -66,10 +66,8 @@ export default function Dashboard({ initialSymbol }) {
   return (
     <main className='app-shell'>
       <header className='topbar'>
-        <div className='brand'>
-          <strong>국내 주식 실시간 시세</strong>
-          <span>1차 개발 · 시세·차트</span>
-        </div>
+        <span className='prototype-label'>국내 주식 실시간 시세 · 한국투자증권 데이터</span>
+        <h1 className='sr-only'>국내 주식 대시보드</h1>
         <StockSearch onSelect={handleSelect} />
       </header>
 
@@ -109,7 +107,7 @@ export default function Dashboard({ initialSymbol }) {
               )}
             </section>
 
-            <aside className='side-column' aria-label='AI 대화·관심 종목·투자의견·실적'>
+            <aside className='insight-column' aria-label='AI 대화·관심 종목·투자의견·실적'>
               {selected && <StockChatDrawer stock={selected} />}
               <WatchlistPanel activeSymbol={selected?.symbol} onSelect={handleSelect} />
               {selected && (
