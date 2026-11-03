@@ -72,14 +72,18 @@ public class KisController {
         return kis.currentPrice(code);
     }
 
-    /** 여러 종목 한 번에 (WebSocket 이 끊겼을 때 polling 용): /api/kis/prices?codes=005930,000660 */
+    /**
+     * 여러 종목 한 번에 (Polling 용): /api/kis/prices?codes=005930,000660
+     * 서버가 실시간·주기 조회로 이미 받아 둔 시세를 돌려주고, 아직 없는 종목만 KIS 를 호출합니다.
+     */
     @GetMapping("/prices")
     public Map<String, Object> prices(@RequestParam List<@Pattern(regexp = CODE) String> codes) {
         Map<String, Object> result = new LinkedHashMap<>();
         for (String code : codes.stream().distinct().limit(40).toList()) {
             try {
                 supported(code);
-                result.put(code, kis.currentPrice(code));
+                Map<String, Object> cached = hub.latest(code);
+                result.put(code, cached != null ? cached : kis.currentPrice(code));
             } catch (ApiException e) {
                 result.put(code, Map.of("code", e.getCode(), "error", e.getMessage()));
             } catch (RuntimeException e) {

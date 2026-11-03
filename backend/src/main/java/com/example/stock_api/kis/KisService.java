@@ -225,6 +225,7 @@ public class KisService {
         result.put("high", toLong(output.get("stck_hgpr")));
         result.put("low", toLong(output.get("stck_lwpr")));
         result.put("prevClose", toLong(output.get("stck_sdpr")));
+        result.put("volume", toLong(output.get("acml_vol"))); // 누적거래량
         // 시가총액 = 현재가 × 상장주수. 상장주수가 없으면 HTS 시가총액(억원) 사용
         long marketCap = shares > 0 ? price * shares : toLong(output.get("hts_avls")) * 100_000_000L;
         result.put("listedShares", shares > 0 ? shares : null);

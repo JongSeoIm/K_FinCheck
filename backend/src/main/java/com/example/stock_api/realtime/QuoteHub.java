@@ -5,7 +5,11 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,14 +23,19 @@ import com.example.stock_api.kis.KisService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+
 /**
  * 브라우저 WebSocket 세션과 종목별 최신 시세를 관리합니다.
  * 메시지: {"type":"quote","data":{...}} · {"type":"status",...}(15초 하트비트)
+ * 시세는 0.5초마다 모아서 보냅니다. 그 사이에 바뀐 종목만, 종목별 가장 최신 값 1건씩 보냅니다.
  */
 @Component
 public class QuoteHub {
 
     private static final Logger log = LoggerFactory.getLogger(QuoteHub.class);
+    private static final long PUSH_INTERVAL_MS = 500;
 
     private final ObjectMapper json;
     private final KisService kis;
@@ -39,6 +48,38 @@ public class QuoteHub {
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, Map<String, Object>> latest = new ConcurrentHashMap<>();
     private final Map<String, Long> lastRealtimeAt = new ConcurrentHashMap<>();
+    private final Set<String> changed = ConcurrentHashMap.newKeySet(); // 마지막 전송 후 시세가 바뀐 종목
+
+    // 0.5초 전송 전용 스레드 (KIS 조회 같은 다른 예약 작업이 오래 걸려도 전송이 밀리지 않게 따로 둡니다)
+    private final ScheduledExecutorService pusher = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "quote-push");
+        t.setDaemon(true);
+        return t;
+    });
+
+    @PostConstruct
+    void startPush() {
+        pusher.scheduleAtFixedRate(this::flush, PUSH_INTERVAL_MS, PUSH_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    }
+
+    @PreDestroy
+    void stopPush() {
+        pusher.shutdownNow();
+    }
+
+    /** 0.5초마다: 바뀐 종목의 최신 시세를 브라우저에 보냅니다 */
+    private void flush() {
+        try {
+            if (changed.isEmpty()) return;
+            for (String code : Set.copyOf(changed)) {
+                changed.remove(code);
+                Map<String, Object> q = latest.get(code);
+                if (q != null && hasSessions()) broadcast(quoteMessage(q));
+            }
+        } catch (RuntimeException e) {
+            log.warn("시세 전송 실패: {}", e.getMessage()); // 예외가 나도 다음 0.5초 전송은 계속
+        }
+    }
 
     private volatile boolean realtimeConnected = false;
 
@@ -73,6 +114,7 @@ public class QuoteHub {
         q.put("low", t.low());
         q.put("prevClose", t.prevClose());
         q.put("tradeTime", t.timeText());
+        if (t.volume() > 0) q.put("volume", t.volume()); // 누적거래량
         // 상장주수를 알고 있으면 시가총액도 체결가로 다시 계산
         if (q.get("listedShares") instanceof Number shares && shares.longValue() > 0) {
             q.put("marketCapitalization", t.price() * shares.longValue());
@@ -96,8 +138,14 @@ public class QuoteHub {
     }
 
     private void publish(Map<String, Object> q) {
-        latest.put(q.get("code").toString(), q);
-        broadcast(quoteMessage(q));
+        String code = q.get("code").toString();
+        latest.put(code, q);
+        changed.add(code); // 바로 보내지 않고 0.5초 전송 때 모아서 보냄
+    }
+
+    /** Polling 응답용: 서버가 이미 받아 둔 최신 시세 (없으면 null). Polling 마다 KIS 를 부르지 않기 위해 씁니다. */
+    public Map<String, Object> latest(String code) {
+        return latest.get(code);
     }
 
     /** 시가총액(REST 에서만 옴)을 아직 못 받은 종목인지 */

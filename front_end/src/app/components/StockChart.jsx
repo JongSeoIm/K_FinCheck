@@ -15,11 +15,22 @@ import useStockStore from '@/app/store/useStockStore'
 import CandleChart from './CandleChart'
 
 const ranges = [
-  { value: '1D', label: '1일', description: '당일 · 1분봉 + 실시간 체결 누적' },
+  { value: '1D', label: '1일', description: '당일' },
   { value: '1W', label: '1주', description: '최근 1주 · 일봉' },
   { value: '1M', label: '1개월', description: '최근 1개월 · 일봉' },
   { value: '1Y', label: '1년', description: '최근 1년 · 일봉' },
 ]
+
+// 1일 차트의 간격 (봉 하나가 몇 분짜리인지). 1초는 화면을 연 뒤 받은 실시간 체결로 만듭니다.
+const intervals = [
+  { value: '1s', label: '1초', minutes: 0, description: '1초 간격 · 화면을 연 뒤 받은 실시간 체결' },
+  { value: '1m', label: '1분', minutes: 1, description: '1분 간격 · 1분봉 + 실시간 체결 누적' },
+  { value: '5m', label: '5분', minutes: 5, description: '5분 간격 · 1분봉을 5개씩 묶음' },
+  { value: '10m', label: '10분', minutes: 10, description: '10분 간격 · 1분봉을 10개씩 묶음' },
+  { value: '30m', label: '30분', minutes: 30, description: '30분 간격 · 1분봉을 30개씩 묶음' },
+  { value: '60m', label: '60분', minutes: 60, description: '60분 간격 · 1분봉을 60개씩 묶음' },
+]
+const MAX_SECONDS = 3600 // 1초 간격은 최근 1시간까지만 보관
 
 const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
@@ -29,6 +40,37 @@ const nowMinute = () => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 const todayString = () => new Date().toLocaleDateString('sv-SE')
+const nowSecond = () => new Date().toTimeString().slice(0, 8)
+
+// "HH:MM" → 분, 분 → "HH:MM"
+const toMinutes = (time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+const toTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+
+// 캔들 차트용 시각 (한국 시각을 그대로 보이게 UTC 값으로 넣습니다)
+const toTimestamp = (date, time) => {
+  const [y, m, d] = date.split('-').map(Number)
+  return Date.UTC(y, m - 1, d, Number(time.slice(0, 2)), Number(time.slice(3, 5)), Number(time.slice(6, 8) || 0)) / 1000
+}
+
+// 1분봉을 N분 단위로 묶기 (09:00 기준). 시가=첫 봉 시가, 종가=마지막 봉 종가, 고가·저가=최고·최저
+function groupBars(minuteBars, size) {
+  if (size <= 1) return minuteBars
+  const groups = new Map()
+  const open = 9 * 60
+  minuteBars.forEach((bar) => {
+    const start = open + Math.floor((toMinutes(bar.time) - open) / size) * size
+    const key = toTime(start)
+    const group = groups.get(key)
+    if (!group) {
+      groups.set(key, { ...bar, time: key })
+    } else {
+      group.high = Math.max(group.high, bar.high)
+      group.low = Math.min(group.low, bar.low)
+      group.close = bar.close
+    }
+  })
+  return [...groups.values()]
+}
 
 // 기간의 기준 날짜: 1주=7일 전, 1개월=한 달 전, 1년=1년 전 (그날 또는 그 이전 마지막 거래일 종가가 시작값)
 function periodStart(range) {
@@ -73,6 +115,8 @@ export default function StockChart({ code }) {
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('')
   const [livePoints, setLivePoints] = useState({})
+  const [liveSeconds, setLiveSeconds] = useState({})
+  const [interval, setBarInterval] = useState('1m')
   const [reloadKey, setReloadKey] = useState(0)
   const [mode, setMode] = useState('line') // line | candle (캔들은 일봉 기간에서만)
 
@@ -115,6 +159,7 @@ export default function StockChart({ code }) {
     if (value === range) return
     setBars([])
     setLivePoints({})
+    setLiveSeconds({})
     setStatus('loading')
     setRange(value)
   }
@@ -132,7 +177,7 @@ export default function StockChart({ code }) {
     }
   }), [])
 
-  // 2) 실시간 시세(WebSocket push)를 1일 차트에 분 단위로 누적합니다. 종목 정보와 같은 값을 씁니다.
+  // 2) 실시간 시세(WebSocket push)를 1일 차트에 분 단위·초 단위로 누적합니다. 종목 정보와 같은 값을 씁니다.
   const live = useStockStore((state) => state.quotes[code])
 
   useEffect(() => {
@@ -140,9 +185,18 @@ export default function StockChart({ code }) {
     const accumulate = (quote) => {
       if (!quote?.price) return
       // 체결 시각이 있으면 그 시각, 없으면 받은 시각 기준
+      const second = quote.tradeTime && quote.tradeTime.length === 8 ? quote.tradeTime : nowSecond()
       const key = quote.tradeTime ? quote.tradeTime.slice(0, 5) : nowMinute()
       if (key < '09:00' || key > '15:30') return // 장 시간 밖은 누적하지 않음
-      setLivePoints((current) => (current[key] === Number(quote.price) ? current : { ...current, [key]: Number(quote.price) }))
+      const price = Number(quote.price)
+      setLivePoints((current) => (current[key] === price ? current : { ...current, [key]: price }))
+      setLiveSeconds((current) => {
+        if (current[second] === price) return current
+        const next = { ...current, [second]: price }
+        const keys = Object.keys(next)
+        if (keys.length > MAX_SECONDS) keys.sort().slice(0, keys.length - MAX_SECONDS).forEach((old) => delete next[old])
+        return next
+      })
     }
     return useStockStore.subscribe((state, previous) => {
       if (state.quotes[code] !== previous.quotes[code]) accumulate(state.quotes[code])
@@ -168,19 +222,38 @@ export default function StockChart({ code }) {
     return list
   }, [bars, range, live])
 
+  // 1일: 1분봉 + 실시간 누적 → 고른 간격으로 묶은 봉
+  const intradayBars = useMemo(() => {
+    if (range !== '1D') return []
+    const map = new Map(bars.map((bar) => [bar.time, { ...bar }]))
+    const today = todayString()
+    // 오늘 분봉이 있을 때만 실시간 값을 이어 붙입니다 (휴장일 방지).
+    if (bars.length > 0 && bars[0].date === today) {
+      Object.entries(livePoints).forEach(([key, price]) => {
+        const bar = map.get(key)
+        if (bar) {
+          bar.close = price
+          bar.high = Math.max(bar.high, price)
+          bar.low = Math.min(bar.low, price)
+        } else {
+          map.set(key, { date: today, time: key, open: price, high: price, low: price, close: price })
+        }
+      })
+    }
+    const minuteBars = [...map.values()].sort((a, b) => a.time.localeCompare(b.time))
+    const size = intervals.find((item) => item.value === interval)?.minutes || 1
+    return groupBars(minuteBars, size).map((bar) => ({ ...bar, ts: toTimestamp(bar.date, bar.time) }))
+  }, [bars, livePoints, range, interval])
+
   const points = useMemo(() => {
-    if (range === '1D') {
-      const map = new Map(
-        bars.map((bar) => [bar.time, { label: bar.time, full: `${bar.date} ${bar.time}`, price: bar.close, high: bar.high, low: bar.low }])
-      )
+    if (range === '1D' && interval === '1s') {
       const today = todayString()
-      // 오늘 분봉이 있을 때만 실시간 값을 이어 붙입니다 (휴장일 방지).
-      if (bars.length > 0 && bars[0].date === today) {
-        Object.entries(livePoints).forEach(([key, price]) => {
-          map.set(key, { label: key, full: `${today} ${key}`, price })
-        })
-      }
-      return [...map.values()].sort((a, b) => a.label.localeCompare(b.label))
+      return Object.entries(liveSeconds)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([second, price]) => ({ label: second, full: `${today} ${second}`, price }))
+    }
+    if (range === '1D') {
+      return intradayBars.map((bar) => ({ label: bar.time, full: `${bar.date} ${bar.time}`, price: bar.close, high: bar.high, low: bar.low }))
     }
     return dailyBars.map((bar) => ({
       label: bar.date.slice(5).replace('-', '/'),
@@ -189,7 +262,7 @@ export default function StockChart({ code }) {
       high: bar.high,
       low: bar.low,
     }))
-  }, [bars, livePoints, range, dailyBars])
+  }, [range, interval, liveSeconds, intradayBars, dailyBars])
 
   const prices = points.map((point) => point.price)
   // 1일은 전일 종가 기준(StockInfo와 같은 등락률), 나머지는 기간 시작 종가 기준
@@ -203,8 +276,11 @@ export default function StockChart({ code }) {
   const rising = lastPrice >= firstPrice
   const changeRate = firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
   const selectedRange = ranges.find((item) => item.value === range)
+  const selectedInterval = intervals.find((item) => item.value === interval)
   const liveCount = Object.keys(livePoints).length
-  const showCandle = mode === 'candle' && range !== '1D'
+  const secondCount = Object.keys(liveSeconds).length
+  const isSecond = range === '1D' && interval === '1s'
+  const showCandle = mode === 'candle' && !isSecond
 
   return (
     <div className='chart-container'>
@@ -221,8 +297,8 @@ export default function StockChart({ code }) {
           <button
             type='button'
             className={showCandle ? 'active' : ''}
-            disabled={range === '1D'}
-            title={range === '1D' ? '캔들은 1주·1개월·1년(일봉)에서 볼 수 있습니다' : undefined}
+            disabled={isSecond}
+            title={isSecond ? '1초 간격은 선 차트로만 볼 수 있습니다' : undefined}
             onClick={() => setMode('candle')}
           >
             캔들
@@ -246,14 +322,37 @@ export default function StockChart({ code }) {
         </div>
       </div>
 
+      {range === '1D' && (
+        <div className='chart-controls'>
+          <div className='range-tabs' aria-label='차트 간격 선택'>
+            <span style={{ color: '#666', fontSize: 13, marginRight: 4 }}>간격</span>
+            {intervals.map((item, index) => (
+              <Fragment key={item.value}>
+                {index > 0 && <span className='tab-separator' aria-hidden='true'>·</span>}
+                <button
+                  type='button'
+                  className={interval === item.value ? 'active' : ''}
+                  aria-pressed={interval === item.value}
+                  onClick={() => setBarInterval(item.value)}
+                >
+                  {item.label}
+                </button>
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className='stream-status'>
-        <span>{selectedRange.description}</span>
+        <span>{range === '1D' ? `${selectedRange.description} · ${selectedInterval.description}` : selectedRange.description}</span>
         <span>
           {status === 'error'
             ? '연결 오류'
-            : range === '1D'
-              ? liveCount > 0 ? `실시간 체결 누적 중 · ${liveCount}분` : '장 마감 또는 체결 대기'
-              : showCandle ? '일봉 캔들 (시가·고가·저가·종가)' : '일봉 종가'}
+            : isSecond
+              ? secondCount > 0 ? `실시간 체결 누적 중 · ${secondCount}초` : '체결 대기 (화면을 연 뒤부터 쌓입니다)'
+              : range === '1D'
+                ? liveCount > 0 ? `실시간 체결 누적 중 · ${liveCount}분` : '장 마감 또는 체결 대기'
+                : showCandle ? '일봉 캔들 (시가·고가·저가·종가)' : '일봉 종가'}
           {status === 'ready' && errorMessage ? ' · 갱신 지연' : ''}
         </span>
       </div>
@@ -278,7 +377,11 @@ export default function StockChart({ code }) {
       {!offline && status === 'ready' && points.length === 0 && (
         <Message>
           <strong>표시할 데이터가 없습니다.</strong>
-          <small>{range === '1D' ? '장 시작 전이거나 오늘 체결 내역이 없습니다.' : '해당 기간의 일봉이 없습니다.'}</small>
+          <small>
+            {isSecond
+              ? '1초 간격은 화면을 연 뒤 받은 실시간 체결로 그립니다. 장중에 잠시 기다려 주세요.'
+              : range === '1D' ? '장 시작 전이거나 오늘 체결 내역이 없습니다.' : '해당 기간의 일봉이 없습니다.'}
+          </small>
         </Message>
       )}
 
@@ -300,7 +403,11 @@ export default function StockChart({ code }) {
 
           <div className='chart-area'>
             {showCandle ? (
-              <CandleChart bars={dailyBars} />
+              <CandleChart
+                key={`${range}-${interval}`}
+                bars={range === '1D' ? intradayBars : dailyBars}
+                intraday={range === '1D'}
+              />
             ) : (
               <ResponsiveContainer width='100%' height='100%'>
                 <LineChart data={points} margin={{ top: 8, right: 6, bottom: 0, left: 0 }}>

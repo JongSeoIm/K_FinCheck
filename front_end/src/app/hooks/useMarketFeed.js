@@ -3,7 +3,9 @@
 import { useEffect } from 'react'
 import useStockStore from '@/app/store/useStockStore'
 
-const POLL_MS = 10000
+const POLL_MS = 10000 // Push 방식에서 WebSocket 이 끊겼을 때 임시로 조회하는 간격
+const MANUAL_POLL_MS = 2000 // 사용자가 Polling 방식을 골랐을 때 조회 간격
+const STATUS_MS = 15000 // Polling 방식에서 장 운영 여부·KIS 연결 상태를 다시 확인하는 간격
 const HEARTBEAT_TIMEOUT_MS = 40000 // 서버가 15초마다 status 를 보내므로 40초 동안 아무것도 없으면 끊긴 것으로 봅니다
 const RECONNECT_MAX_MS = 30000
 
@@ -13,9 +15,11 @@ function socketUrl() {
   return `${protocol}://${window.location.hostname}:8080/ws/stock`
 }
 
-// 지원 종목 목록을 받고, 시세를 WebSocket(서버 push)으로 받습니다.
-// WebSocket 이 끊기면 다시 연결을 시도하면서 그동안 REST 를 10초마다 polling 합니다.
+// 지원 종목 목록을 받고 시세를 받아옵니다. 전달 방식은 사용자가 고릅니다 (feedMode).
+// - push : WebSocket 으로 서버가 보내 주는 실시간 시세. 끊기면 다시 연결하면서 그동안 10초마다 조회합니다.
+// - poll : WebSocket 을 쓰지 않고 2초마다 서버에 시세를 물어봅니다.
 export default function useMarketFeed() {
+  const feedMode = useStockStore((state) => state.feedMode)
   const setStocks = useStockStore((state) => state.setStocks)
   const setQuote = useStockStore((state) => state.setQuote)
   const setConnection = useStockStore((state) => state.setConnection)
@@ -26,6 +30,7 @@ export default function useMarketFeed() {
     let codes = []
     let reconnectTimer = null
     let pollTimer = null
+    let statusTimer = null
     let heartbeatTimer = null
     let stocksTimer = null
     let reconnectDelay = 2000
@@ -36,40 +41,65 @@ export default function useMarketFeed() {
       })
     }
 
-    // REST 로 한 번에 받기 (처음 화면 · WebSocket 끊김 동안)
+    // REST 로 한 번에 받기 (첫 화면 · Polling 방식 · WebSocket 끊김 동안)
+    // 결과: 'ok' | 'not-configured' | 'fail'
     const poll = async () => {
-      if (codes.length === 0) return false
+      if (codes.length === 0) return 'fail'
       try {
         const response = await fetch(`/api/kis/prices?codes=${codes.join(',')}`, { cache: 'no-store' })
         const result = await response.json()
         if (!response.ok) throw new Error(result.error)
         const values = Object.values(result)
-        if (values.length > 0 && values.every((q) => q?.code === 'KIS_NOT_CONFIGURED')) {
-          setConnection({ state: 'not-configured' })
-          return false
-        }
+        if (values.length > 0 && values.every((q) => q?.code === 'KIS_NOT_CONFIGURED')) return 'not-configured'
         applyQuotes(result)
-        return true
+        return 'ok'
       } catch {
-        return false
+        return 'fail'
       }
-    }
-
-    const startPolling = () => {
-      if (pollTimer) return
-      const run = async () => {
-        const ok = await poll()
-        if (closed || socket?.readyState === WebSocket.OPEN) return
-        const current = useStockStore.getState().connection.state
-        if (current !== 'not-configured' || ok) setConnection({ state: ok ? 'polling' : 'disconnected' })
-      }
-      run()
-      pollTimer = setInterval(run, POLL_MS)
     }
 
     const stopPolling = () => {
       clearInterval(pollTimer)
       pollTimer = null
+    }
+
+    // ───── Polling 방식 (사용자 선택, 2초) ─────
+
+    const loadStatus = async () => {
+      try {
+        const response = await fetch('/api/kis/status', { cache: 'no-store' })
+        const status = await response.json()
+        if (!closed && response.ok) setConnection({ marketOpen: status.marketOpen })
+      } catch {
+        // 시세 조회 결과로 연결 상태를 판단하므로 여기서는 무시
+      }
+    }
+
+    const startManualPolling = () => {
+      const run = async () => {
+        const result = await poll()
+        if (closed) return
+        setConnection({ state: result === 'ok' ? 'manual-polling' : result === 'not-configured' ? 'not-configured' : 'disconnected' })
+      }
+      run()
+      loadStatus()
+      pollTimer = setInterval(run, MANUAL_POLL_MS)
+      statusTimer = setInterval(loadStatus, STATUS_MS)
+    }
+
+    // ───── Push 방식 (WebSocket) ─────
+
+    // WebSocket 이 끊긴 동안 임시로 10초마다 조회
+    const startFallbackPolling = () => {
+      if (pollTimer) return
+      const run = async () => {
+        const result = await poll()
+        if (closed || socket?.readyState === WebSocket.OPEN) return
+        if (result === 'not-configured') setConnection({ state: 'not-configured' })
+        else setConnection({ state: result === 'ok' ? 'polling' : 'disconnected' })
+      }
+      run()
+      pollTimer = setInterval(run, POLL_MS)
     }
 
     const resetHeartbeat = () => {
@@ -113,7 +143,7 @@ export default function useMarketFeed() {
       socket.onclose = () => {
         clearTimeout(heartbeatTimer)
         if (closed) return
-        startPolling()
+        startFallbackPolling()
         scheduleReconnect()
       }
 
@@ -126,6 +156,8 @@ export default function useMarketFeed() {
       reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS)
     }
 
+    // ───── 시작 ─────
+
     // 지원 종목 목록 (DB). 실패하면 10초 뒤 다시 시도
     const loadStocks = async () => {
       try {
@@ -135,8 +167,14 @@ export default function useMarketFeed() {
         if (closed) return
         setStocks(result)
         codes = result.map((stock) => stock.code)
-        await poll() // 첫 화면은 REST 로 바로 채우고
-        connect() // 이후는 WebSocket push
+        if (feedMode === 'poll') {
+          startManualPolling()
+        } else {
+          const first = await poll() // 첫 화면은 REST 로 바로 채우고
+          if (closed) return
+          if (first === 'not-configured') setConnection({ state: 'not-configured' })
+          connect() // 이후는 WebSocket push
+        }
       } catch (error) {
         if (closed) return
         setStocks(useStockStore.getState().stocks, error.message)
@@ -145,6 +183,7 @@ export default function useMarketFeed() {
       }
     }
 
+    setConnection({ state: 'connecting' })
     loadStocks()
 
     return () => {
@@ -152,8 +191,12 @@ export default function useMarketFeed() {
       clearTimeout(reconnectTimer)
       clearTimeout(heartbeatTimer)
       clearTimeout(stocksTimer)
+      clearInterval(statusTimer)
       stopPolling()
-      socket?.close()
+      if (socket) {
+        socket.onclose = null
+        socket.close()
+      }
     }
-  }, [setStocks, setQuote, setConnection])
+  }, [feedMode, setStocks, setQuote, setConnection])
 }

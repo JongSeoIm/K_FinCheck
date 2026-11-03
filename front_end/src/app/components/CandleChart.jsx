@@ -5,9 +5,14 @@ import { CandlestickSeries, createChart } from 'lightweight-charts'
 
 const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
-// 일봉 캔들 차트 (Lightweight Charts). bars: [{ date, open, high, low, close }]
+// 캔들 차트 (Lightweight Charts)
+// - 일봉: bars = [{ date, open, high, low, close }]
+// - 1일(분 간격): bars = [{ ts, time, open, high, low, close }], intraday = true
 // 국내 증시 관례에 맞춰 상승은 빨강, 하락은 파랑으로 표시합니다.
-export default function CandleChart({ bars }) {
+// 마우스를 올린 봉의 시각 표시 ("YYYY-MM-DD" 또는 "HH:MM")
+const formatTime = (time) => (typeof time === 'number' ? new Date(time * 1000).toISOString().slice(11, 16) : String(time))
+
+export default function CandleChart({ bars, intraday = false }) {
     const containerRef = useRef(null)
     const chartRef = useRef(null)
     const seriesRef = useRef(null)
@@ -22,7 +27,7 @@ export default function CandleChart({ bars }) {
             grid: { vertLines: { color: '#eeeeee' }, horzLines: { color: '#eeeeee' } },
             rightPriceScale: { borderColor: '#cccccc' },
             // 데이터 범위 밖으로 끌고 가면 빈 화면만 보이던 문제: 양 끝에서 멈추게 합니다
-            timeScale: { borderColor: '#cccccc', fixLeftEdge: true, fixRightEdge: true },
+            timeScale: { borderColor: '#cccccc', fixLeftEdge: true, fixRightEdge: true, timeVisible: intraday, secondsVisible: false },
             handleScale: { axisPressedMouseMove: { time: true, price: false } },
             localization: { priceFormatter: (price) => Math.round(price).toLocaleString('ko-KR') },
         })
@@ -43,7 +48,7 @@ export default function CandleChart({ bars }) {
                 setHover(null)
                 return
             }
-            setHover({ time: String(param.time), ...point })
+            setHover({ time: formatTime(param.time), ...point })
         })
 
         chartRef.current = chart
@@ -55,6 +60,8 @@ export default function CandleChart({ bars }) {
             chartRef.current = null
             seriesRef.current = null
         }
+        // intraday 가 바뀌면 부모가 key 로 새로 만들기 때문에 처음 한 번만 실행합니다
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // 데이터 넣기 (현재가가 바뀔 때마다 갱신하되, 화면 확대/이동은 유지)
@@ -62,7 +69,7 @@ export default function CandleChart({ bars }) {
         if (!seriesRef.current) return
         seriesRef.current.setData(
             bars.map((bar) => ({
-                time: bar.date,
+                time: bar.ts ?? bar.date,
                 open: bar.open,
                 high: bar.high,
                 low: bar.low,

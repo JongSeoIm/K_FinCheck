@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware'
 // - watchlist : 관심 종목 코드 (브라우저 localStorage 에 저장)
 // - stocks    : 지원 종목 목록 (서버 DB)
 // - quotes    : 종목별 최신 시세 (WebSocket push 또는 polling)
+// - feedMode  : 시세 전달 방식 (push | poll)
 // - connection: 연결 상태 배지용
 const useStockStore = create(
   persist(
@@ -13,8 +14,9 @@ const useStockStore = create(
       stocks: [],
       stocksError: null,
       quotes: {},
+      feedMode: 'push', // push = WebSocket 실시간 / poll = 2초마다 조회 (사용자가 선택, 브라우저에 저장)
       connection: {
-        state: 'connecting', // connecting | live | server-polling | polling | disconnected | not-configured
+        state: 'connecting', // connecting | live | server-polling | polling | manual-polling | disconnected | not-configured
         lastUpdated: null,
         marketOpen: null,
       },
@@ -28,6 +30,8 @@ const useStockStore = create(
       removeFromWatchlist: (code) => {
         set((state) => ({ watchlist: state.watchlist.filter((item) => item !== code) }))
       },
+
+      setFeedMode: (feedMode) => set({ feedMode }),
 
       setStocks: (stocks, stocksError = null) => set({ stocks, stocksError }),
 
@@ -48,7 +52,7 @@ const useStockStore = create(
     }),
     {
       name: 'stock-dashboard',
-      partialize: (state) => ({ watchlist: state.watchlist }),
+      partialize: (state) => ({ watchlist: state.watchlist, feedMode: state.feedMode }),
     }
   )
 )
