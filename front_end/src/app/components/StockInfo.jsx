@@ -1,8 +1,8 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FaRegStar, FaStar } from 'react-icons/fa'
-import useHydrated from '@/app/hooks/useHydrated'
 import useStockStore from '@/app/store/useStockStore'
 
 const won = (value) => (value == null || Number.isNaN(Number(value)) ? '—' : '₩' + Math.round(Number(value)).toLocaleString('ko-KR'))
@@ -20,13 +20,17 @@ const time = (iso) => (iso ? new Date(iso).toLocaleTimeString('ko-KR') : '—')
 
 // 선택 종목 시세. 값은 WebSocket/폴링으로 받은 store 의 실제 시세만 씁니다 (예시 값 없음)
 export default function StockInfo({ stock }) {
-  const hydrated = useHydrated()
+  const router = useRouter()
   const quote = useStockStore((state) => state.quotes[stock.code])
   const connectionState = useStockStore((state) => state.connection.state)
+  const user = useStockStore((state) => state.user)
+  const accountStatus = useStockStore((state) => state.accountStatus)
   const watchlist = useStockStore((state) => state.watchlist)
   const addToWatchlist = useStockStore((state) => state.addToWatchlist)
   const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
   const [marketCap, setMarketCap] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -44,7 +48,25 @@ export default function StockInfo({ stock }) {
   const priceChange = hasQuote ? Number(quote.priceChange) : null
   const tone = change > 0 ? 'positive' : change < 0 ? 'negative' : ''
   const sign = change > 0 ? '+' : change < 0 ? '−' : ''
-  const isSaved = hydrated && watchlist.includes(stock.code)
+  const isSaved = watchlist.includes(stock.code)
+
+  const handleToggle = async () => {
+    const loginPage = `/login?symbol=${stock.code}`
+    if (!user) {
+      router.push(loginPage)
+      return
+    }
+    setSaving(true)
+    setSaveError('')
+    try {
+      await (isSaved ? removeFromWatchlist(stock.code) : addToWatchlist(stock.code))
+    } catch (error) {
+      if (error.code === 'LOGIN_REQUIRED') router.push(loginPage)
+      else setSaveError(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <section className='panel quote-overview'>
@@ -53,15 +75,18 @@ export default function StockInfo({ stock }) {
           <h2>{stock.name || stock.code}</h2>
           <p>{stock.code} · {stock.market || 'KRX'}{stock.industry ? ` · ${stock.industry}` : ''}</p>
         </div>
-        <button
-          className={`watch-toggle ${isSaved ? 'saved' : ''}`}
-          type='button'
-          onClick={() => (isSaved ? removeFromWatchlist(stock.code) : addToWatchlist(stock.code))}
-          disabled={!hydrated}
-        >
-          {isSaved ? <FaStar aria-hidden='true' /> : <FaRegStar aria-hidden='true' />}
-          {isSaved ? '관심 종목 해제' : '관심 종목 추가'}
-        </button>
+        <div className='watch-toggle-box'>
+          <button
+            className={`watch-toggle ${isSaved ? 'saved' : ''}`}
+            type='button'
+            onClick={handleToggle}
+            disabled={accountStatus === 'loading' || saving}
+          >
+            {isSaved ? <FaStar aria-hidden='true' /> : <FaRegStar aria-hidden='true' />}
+            {isSaved ? '관심 종목 해제' : '관심 종목 추가'}
+          </button>
+          {saveError && <small className='inline-warning' role='alert'>{saveError}</small>}
+        </div>
       </div>
 
       <div className='quote-body'>

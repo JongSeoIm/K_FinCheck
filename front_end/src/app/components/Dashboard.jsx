@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import AuthNav from './AuthNav'
 import ConnectionBadge from './ConnectionBadge'
 import EarningsPanel from './EarningsPanel'
 import InvestOpinionPanel from './InvestOpinionPanel'
@@ -18,6 +19,11 @@ const DEFAULT_CODE = '005930'
 
 export default function Dashboard({ initialCode }) {
   useMarketFeed()
+
+  const loadAccount = useStockStore((state) => state.loadAccount)
+  useEffect(() => {
+    loadAccount()
+  }, [loadAccount])
 
   const stocks = useStockStore((state) => state.stocks)
   const stocksError = useStockStore((state) => state.stocksError)
@@ -41,7 +47,10 @@ export default function Dashboard({ initialCode }) {
       <header className='topbar'>
         <h1 className='sr-only'>국내 주식 대시보드</h1>
         <ConnectionBadge />
-        <StockSearch onSelectStock={handleSelectStock} />
+        <div className='topbar-actions'>
+          <AuthNav symbol={selectedCode} />
+          <StockSearch onSelectStock={handleSelectStock} />
+        </div>
       </header>
 
       {stocksError && stocks.length === 0 && (

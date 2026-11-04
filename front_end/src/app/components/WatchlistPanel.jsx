@@ -1,14 +1,16 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
-import useHydrated from '@/app/hooks/useHydrated'
 import useStockStore from '@/app/store/useStockStore'
 
 const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
-// 관심 종목: 6자리 코드로 추가(서버에서 지원 종목인지 확인)·삭제, localStorage 저장, 클릭하면 해당 종목으로 이동
+// 관심 종목: 로그인한 계정의 DB 목록. 6자리 코드로 추가(서버에서 지원 종목 확인)·삭제, 클릭하면 해당 종목으로 이동
 export default function WatchlistPanel({ activeCode, onSelectStock }) {
-  const hydrated = useHydrated()
+  const user = useStockStore((state) => state.user)
+  const accountStatus = useStockStore((state) => state.accountStatus)
+  const loadAccount = useStockStore((state) => state.loadAccount)
   const watchlist = useStockStore((state) => state.watchlist)
   const stocks = useStockStore((state) => state.stocks)
   const quotes = useStockStore((state) => state.quotes)
@@ -33,20 +35,24 @@ export default function WatchlistPanel({ activeCode, onSelectStock }) {
     }
     setChecking(true)
     try {
-      const response = await fetch(`/api/kis/stocks/${value}`, { cache: 'no-store' })
-      const result = await response.json().catch(() => ({}))
-      if (response.status === 404) {
-        setMessage(`지원하지 않는 종목입니다. (지원: ${stocks.map((s) => `${s.code} ${s.name}`).join(', ') || '—'})`)
-        return
-      }
-      if (!response.ok) throw new Error(result.error || '확인에 실패했습니다.')
-      addToWatchlist(value)
+      await addToWatchlist(value)
       setCode('')
       setMessage('')
-    } catch {
-      setMessage('서버에 연결할 수 없어 종목을 확인하지 못했습니다.')
+    } catch (error) {
+      setMessage(error.code === 'STOCK_NOT_FOUND'
+        ? `지원하지 않는 종목입니다. (지원: ${stocks.map((s) => `${s.code} ${s.name}`).join(', ') || '—'})`
+        : error.message)
     } finally {
       setChecking(false)
+    }
+  }
+
+  const handleRemove = async (symbol) => {
+    setMessage('')
+    try {
+      await removeFromWatchlist(symbol)
+    } catch (error) {
+      setMessage(error.message)
     }
   }
 
@@ -54,26 +60,39 @@ export default function WatchlistPanel({ activeCode, onSelectStock }) {
     <section className='panel watchlist-panel'>
       <div className='panel-heading'>
         <h2>관심 종목</h2>
-        <span className='count-badge'>{hydrated ? watchlist.length : 0}</span>
+        <span className='count-badge'>{watchlist.length}</span>
       </div>
 
-      <form className='watchlist-form' onSubmit={handleAdd}>
-        <input
-          type='text'
-          inputMode='numeric'
-          maxLength={6}
-          value={code}
-          onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
-          placeholder='종목코드 6자리'
-          aria-label='관심 종목 코드 입력'
-        />
-        <button type='submit' disabled={checking}>{checking ? '확인 중' : '추가'}</button>
-      </form>
+      {user && (
+        <form className='watchlist-form' onSubmit={handleAdd}>
+          <input
+            type='text'
+            inputMode='numeric'
+            maxLength={6}
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
+            placeholder='종목코드 6자리'
+            aria-label='관심 종목 코드 입력'
+          />
+          <button type='submit' disabled={checking}>{checking ? '확인 중' : '추가'}</button>
+        </form>
+      )}
       {message && <small className='form-message' role='alert'>{message}</small>}
 
-      {!hydrated ? (
+      {accountStatus === 'loading' ? (
         <div className='skeleton-list'>
           {[1, 2].map((item) => <span key={item} className='skeleton-row compact' />)}
+        </div>
+      ) : accountStatus === 'error' ? (
+        <div className='panel-state'>
+          <strong>관심 종목을 불러오지 못했습니다.</strong>
+          <p>서버 연결을 확인해 주세요.</p>
+          <button type='button' onClick={loadAccount}>다시 시도</button>
+        </div>
+      ) : !user ? (
+        <div className='empty-state'>
+          <strong>로그인하면 관심 종목을 저장할 수 있습니다.</strong>
+          <p><Link href={`/login?symbol=${activeCode}`}>로그인</Link> 후 계정에 저장되어 어디서든 그대로 볼 수 있습니다.</p>
         </div>
       ) : watchlist.length === 0 ? (
         <div className='empty-state'>
@@ -110,7 +129,7 @@ export default function WatchlistPanel({ activeCode, onSelectStock }) {
                 <button
                   className='watchlist-remove'
                   type='button'
-                  onClick={() => removeFromWatchlist(symbol)}
+                  onClick={() => handleRemove(symbol)}
                   aria-label={`${symbol} 관심 종목 삭제`}
                 >
                   삭제

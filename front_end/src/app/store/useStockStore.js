@@ -1,8 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { addWatchlist, fetchMe, fetchWatchlist, logout, removeWatchlist } from '../lib/accountApi'
 
 // 화면 전체가 같이 쓰는 상태
-// - watchlist : 관심 종목 코드 (브라우저 localStorage 에 저장)
+// - user      : 로그인한 사용자 (없으면 null). 서버 세션이 기준
+// - accountStatus: loading | ready | error (로그인 상태·관심 종목 불러오기)
+// - watchlist : 로그인한 계정의 관심 종목 코드 (서버 DB)
 // - stocks    : 지원 종목 목록 (서버 DB)
 // - quotes    : 종목별 최신 시세 (WebSocket push 또는 polling)
 // - feedMode  : 시세 전달 방식 (push | poll)
@@ -10,6 +13,8 @@ import { persist } from 'zustand/middleware'
 const useStockStore = create(
   persist(
     (set, get) => ({
+      user: null,
+      accountStatus: 'loading',
       watchlist: [],
       stocks: [],
       stocksError: null,
@@ -21,15 +26,36 @@ const useStockStore = create(
         marketOpen: null,
       },
 
-      addToWatchlist: (code) => {
-        const { watchlist } = get()
-        if (watchlist.includes(code)) return
-        set({ watchlist: [...watchlist, code] })
+      // 화면을 열 때·로그인 후: 서버 세션을 확인하고 그 계정의 관심 종목을 받아 옵니다
+      loadAccount: async () => {
+        set({ accountStatus: 'loading' })
+        try {
+          const user = await fetchMe()
+          const watchlist = user ? await fetchWatchlist() : []
+          set({ user, watchlist, accountStatus: 'ready' })
+        } catch {
+          set({ user: null, watchlist: [], accountStatus: 'error' })
+        }
       },
 
-      removeFromWatchlist: (code) => {
-        set((state) => ({ watchlist: state.watchlist.filter((item) => item !== code) }))
+      signOut: async () => {
+        await logout()
+        set({ user: null, watchlist: [], accountStatus: 'ready' })
       },
+
+      // 세션이 끝난 뒤 변경을 시도하면 로그아웃 상태로 돌립니다
+      changeWatchlist: async (change, code) => {
+        try {
+          set({ watchlist: await change(code) })
+        } catch (error) {
+          if (error.code === 'LOGIN_REQUIRED') set({ user: null, watchlist: [], accountStatus: 'ready' })
+          throw error
+        }
+      },
+
+      addToWatchlist: (code) => get().changeWatchlist(addWatchlist, code),
+
+      removeFromWatchlist: (code) => get().changeWatchlist(removeWatchlist, code),
 
       setFeedMode: (feedMode) => set({ feedMode }),
 
@@ -52,7 +78,9 @@ const useStockStore = create(
     }),
     {
       name: 'stock-dashboard',
-      partialize: (state) => ({ watchlist: state.watchlist, feedMode: state.feedMode }),
+      partialize: (state) => ({ feedMode: state.feedMode }),
+      // 예전에 브라우저에 저장된 관심 종목은 읽지 않습니다
+      merge: (saved, current) => ({ ...current, feedMode: saved?.feedMode ?? current.feedMode }),
     }
   )
 )

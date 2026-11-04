@@ -11,3 +11,54 @@ CREATE TABLE IF NOT EXISTS company (
     PRIMARY KEY (stock_code),
     UNIQUE KEY uk_company_dart_corp_code (dart_corp_code)
 ) DEFAULT CHARSET = utf8mb4 COMMENT = '기업·종목 정보';
+
+-- 회원 계정 (비밀번호는 BCrypt 해시만 저장)
+CREATE TABLE IF NOT EXISTS app_user (
+    user_id        BIGINT       NOT NULL AUTO_INCREMENT COMMENT '회원 번호',
+    login_id       VARCHAR(20)  NOT NULL COMMENT '로그인 ID',
+    password_hash  VARCHAR(100) NOT NULL COMMENT '비밀번호 해시',
+    nickname       VARCHAR(20)  NOT NULL COMMENT '닉네임',
+    created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '가입일',
+    PRIMARY KEY (user_id),
+    UNIQUE KEY uk_app_user_login_id (login_id)
+) DEFAULT CHARSET = utf8mb4 COMMENT = '회원 계정';
+
+-- 계정별 관심 종목 (같은 종목은 계정당 한 번만)
+CREATE TABLE IF NOT EXISTS watchlist (
+    user_id     BIGINT     NOT NULL COMMENT '회원 번호',
+    stock_code  VARCHAR(6) NOT NULL COMMENT '종목 코드',
+    created_at  DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '등록일',
+    PRIMARY KEY (user_id, stock_code),
+    KEY idx_watchlist_stock_code (stock_code),
+    CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES app_user (user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_watchlist_company FOREIGN KEY (stock_code) REFERENCES company (stock_code)
+) DEFAULT CHARSET = utf8mb4 COMMENT = '계정별 관심 종목';
+
+-- 어떤 공시인지 기록 (같은 공시·같은 연결/별도 구분은 한 번만 저장)
+CREATE TABLE IF NOT EXISTS financial_report (
+    report_id      BIGINT      NOT NULL AUTO_INCREMENT COMMENT '공시 번호',
+    receipt_no     VARCHAR(14) NOT NULL COMMENT 'DART 공시 접수번호',
+    stock_code     VARCHAR(6)  NOT NULL COMMENT '기업(종목 코드)',
+    business_year  SMALLINT    NOT NULL COMMENT '사업연도',
+    report_code    VARCHAR(5)  NOT NULL COMMENT '보고서 종류 (11011: 사업보고서)',
+    fs_div         VARCHAR(3)  NOT NULL COMMENT '연결/별도 구분 (CFS: 연결, OFS: 별도)',
+    created_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '저장 일시',
+    PRIMARY KEY (report_id),
+    UNIQUE KEY uk_financial_report (receipt_no, fs_div),
+    KEY idx_financial_report_company_year (stock_code, business_year),
+    CONSTRAINT fk_financial_report_company FOREIGN KEY (stock_code) REFERENCES company (stock_code)
+) DEFAULT CHARSET = utf8mb4 COMMENT = '실적 공시';
+
+-- 공시의 재무 수치 (공시 하나에 계정 코드별 한 행, 값이 없으면 NULL)
+CREATE TABLE IF NOT EXISTS financial_value (
+    value_id         BIGINT        NOT NULL AUTO_INCREMENT COMMENT '수치 번호',
+    report_id        BIGINT        NOT NULL COMMENT '공시 번호',
+    account_code     VARCHAR(50)   NOT NULL COMMENT '계정 코드',
+    account_name     VARCHAR(100)  NOT NULL COMMENT '계정 이름',
+    current_amount   DECIMAL(24,2) NULL     COMMENT '당기 금액',
+    previous_amount  DECIMAL(24,2) NULL     COMMENT '전기 금액',
+    currency         VARCHAR(3)    NOT NULL COMMENT '통화',
+    PRIMARY KEY (value_id),
+    UNIQUE KEY uk_financial_value (report_id, account_code),
+    CONSTRAINT fk_financial_value_report FOREIGN KEY (report_id) REFERENCES financial_report (report_id) ON DELETE CASCADE
+) DEFAULT CHARSET = utf8mb4 COMMENT = '공시 재무 수치';

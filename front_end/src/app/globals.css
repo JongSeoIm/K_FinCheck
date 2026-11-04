@@ -1283,3 +1283,126 @@ a:focus-visible {
   display: block;
   font-size: 9px;
 }
+/* ───── 계정 메뉴 · 로그인 화면 ───── */
+.topbar-actions {
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.topbar-actions .global-search {
+  width: 350px;
+  max-width: 100%;
+}
+
+.auth-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  min-height: 24px;
+  font-size: 13px;
+}
+
+.auth-nav button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.auth-nav small {
+  color: #b3261e;
+}
+
+.watch-toggle-box {
+  flex-shrink: 0;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(400px, 100%);
+  padding: 24px;
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auth-card input {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #888;
+  background: #fff;
+  font-weight: 400;
+}
+
+.auth-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.auth-card button {
+  height: 40px;
+  border: 1px solid #333;
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+}
+
+.auth-card button:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.auth-card p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.auth-notice {
+  color: var(--green);
+}
+
+.auth-error {
+  color: #b3261e;
+}
+
+.auth-switch {
+  color: var(--muted);
+  text-align: center;
+}
+
+.auth-switch a {
+  color: var(--text);
+}
