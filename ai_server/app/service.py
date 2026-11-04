@@ -10,7 +10,8 @@ from app.memory import ChatMessage, ConversationMemory
 from app.provider import ChatProvider
 from app.schemas import ChatRequest, ChatResponse, SourceReference, AnswerPresentation
 from app.quote_tool import StockQuoteTool, is_quote_question, resolve_stock, named_codes
-from app.financial_tool import FinancialResultTool, is_financial_question, financial_year
+from app.financial_tool import FinancialResultTool, is_financial_question, financial_years
+from app.financial_comparison import collect_financial_comparison
 from app.news_tool import CompanyNewsTool, is_news_question
 from app.composite import collect_composite, is_composite_question
 from app.question_context import prepare_question
@@ -103,13 +104,30 @@ class ChatService:
         elif self._financial_tool and is_financial_question(request.message):
             try:
                 stock = resolve_stock(request.message, request.stock)
-                year = financial_year(request.message)
+                years = financial_years(request.message)
             except ValueError as error:
                 return ChatResponse(status="answered", answer=str(error))
             if stock.symbol not in {"005930", "000660"}:
                 return ChatResponse(status="answered", answer="현재 연간 실적은 삼성전자와 SK하이닉스를 지원합니다.")
+            if len(years) > 1:
+                collected = await collect_financial_comparison(self._financial_tool, stock, years)
+                if collected is None:
+                    return ChatResponse(status="answered", answer="요청한 연도의 실적 자료를 확인할 수 없습니다. 잠시 후 다시 질문해 주세요.")
+                instruction, presentation, sources = collected
+                answer = await self._provider.generate([*previous, user_message, instruction])
+                if not answer:
+                    raise RuntimeError("AI가 빈 답변을 반환했습니다.")
+                narrative = answer
+                for year in years:
+                    narrative = narrative.replace(str(year), "")
+                if re.search(r"\d", narrative):
+                    answer = f"{stock.name}의 연결 연간 실적 비교입니다. 연도별 수치와 변화는 아래 표와 그래프에서 확인해 주세요."
+                if request.history is None:
+                    self._memory.append(request.user_id, request.conversation_id, user_message)
+                    self._memory.append(request.user_id, request.conversation_id, ChatMessage(role="assistant", content=answer))
+                return ChatResponse(status="answered", answer=answer, sources=sources, presentation=presentation, context_message=request.message)
             try:
-                report = await self._financial_tool.get_financial_result(stock, year)
+                report = await self._financial_tool.get_financial_result(stock, years[0])
             except (httpx.HTTPError, ValueError, KeyError, TypeError):
                 return ChatResponse(status="answered", answer="요청한 기업·연도의 실적 자료를 확인할 수 없습니다. 잠시 후 다시 질문하거나 다른 사업연도를 선택해 주세요.")
             context = [ChatMessage(role="developer", content=(

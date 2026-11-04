@@ -1,5 +1,7 @@
 'use client'
 
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+
 const number = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 })
 const percent = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2, signDisplay: 'exceptZero' })
 const comparisons = { TURNAROUND: '흑자 전환', TURNED_LOSS: '적자 전환', CONTINUED_LOSS: '적자 지속' }
@@ -23,6 +25,41 @@ export function formatChatTime(value) {
 export default function ChatAnswerData({ presentation }) {
   const data = presentation?.data
   if (!data) return null
+  if (presentation.type === 'financial_comparison' && Array.isArray(data.reports)) {
+    const labels = ['매출액', '영업이익', '당기순이익']
+    const years = data.years || data.reports.map(report => report.businessYear)
+    const rows = years.map(year => {
+      const report = data.reports.find(report => report.businessYear === year)
+      const row = { year }
+      for (const label of labels) {
+        const metric = report?.metrics.find(metric => metric.label === label)
+        row[label] = metric?.status === 'AVAILABLE' && present(metric.current) ? Number(metric.current) : null
+      }
+      return row
+    })
+    return <div className='chat-financial' aria-label='여러 연도 실적 비교'>
+      <div className='chat-data-label'>{data.name} · {data.basis} · {data.unit}</div>
+      <table className='chat-financial-table'>
+        <caption className='sr-only'>{data.name} 연도별 실적 비교</caption>
+        <thead><tr><th scope='col'>사업연도</th>{labels.map(label => <th scope='col' key={label}>{label}</th>)}</tr></thead>
+        <tbody>{rows.map(row => <tr key={row.year}><th scope='row'>{row.year}년</th>{labels.map(label => <td key={label}>{format(row[label])}</td>)}</tr>)}</tbody>
+      </table>
+      {labels.map(label => <div key={label}>
+        <span className='chat-data-label'>{label} 추이 · {data.unit}</span>
+        <ResponsiveContainer width='100%' height={150}>
+          <LineChart data={rows} margin={{ left: 5, right: 12, top: 12, bottom: 5 }}>
+            <CartesianGrid vertical={false} stroke='#e4e4e4' />
+            <XAxis dataKey='year' tick={{ fontSize: 12 }} />
+            <YAxis width={68} tick={{ fontSize: 11 }} tickFormatter={value => new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 }).format(value)} />
+            <Tooltip formatter={value => [`${format(value)}억 원`, label]} labelFormatter={value => `${value}년`} />
+            <Line type='linear' dataKey={label} stroke='#555b5f' strokeWidth={2} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>)}
+      {data.notes?.map(note => <span key={note} className='chat-data-label'>{note}</span>)}
+      <span className='chat-data-label'>— 자료 없음 · 누락된 연도의 그래프는 연결하지 않습니다.</span>
+    </div>
+  }
   if (presentation.type === 'composite' && Array.isArray(data.sections)) return (
     <div className='chat-composite'>
       {data.sections.filter(section => ['quote', 'financial', 'news'].includes(section.type)).map((section, index) =>

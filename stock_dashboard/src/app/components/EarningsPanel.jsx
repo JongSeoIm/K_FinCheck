@@ -59,6 +59,8 @@ function Growth({ metric }) {
 }
 
 export default function EarningsPanel({ symbol }) {
+  const latestYear = Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Seoul', year: 'numeric' }).format(new Date())) - 1
+  const [year, setYear] = useState(latestYear)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [attempt, setAttempt] = useState(0)
@@ -67,26 +69,26 @@ export default function EarningsPanel({ symbol }) {
     const controller = new AbortController()
     async function load() {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/stocks/${encodeURIComponent(symbol)}/financials`, {
+        const response = await fetch(`${BACKEND_URL}/api/stocks/${encodeURIComponent(symbol)}/financials?year=${year}`, {
           signal: controller.signal,
         })
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || '실적 자료를 불러오지 못했습니다.')
         if (controller.signal.aborted) return
         setError(null)
-        setResult({ symbol, attempt, data })
+        setResult({ symbol, year, attempt, data })
       } catch (err) {
         if (!controller.signal.aborted) {
-          setError({ symbol, attempt, message: err.name === 'TypeError' ? '실적 서버에 연결하지 못했습니다.' : err.message })
+          setError({ symbol, year, attempt, message: err.name === 'TypeError' ? '실적 서버에 연결하지 못했습니다.' : err.message })
         }
       }
     }
     load()
     return () => controller.abort()
-  }, [symbol, attempt])
+  }, [symbol, year, attempt])
 
-  const currentError = error?.symbol === symbol && error.attempt === attempt ? error.message : null
-  const report = result?.symbol === symbol && result.attempt === attempt ? result.data : null
+  const currentError = error?.symbol === symbol && error.year === year && error.attempt === attempt ? error.message : null
+  const report = result?.symbol === symbol && result.year === year && result.attempt === attempt ? result.data : null
   if (currentError) return (
     <div className='financial-state' role='status'>
       <p>{currentError}</p>
@@ -97,7 +99,11 @@ export default function EarningsPanel({ symbol }) {
 
   return (
     <div className='financial-panel'>
-      <div className='financial-meta'>{report.businessYear}년 · 연간 · 연결 · 억 원</div>
+      <div className='financial-meta'>
+        <select aria-label='실적 사업연도' value={year} onChange={event => setYear(Number(event.target.value))}>
+          {[latestYear, latestYear - 1, latestYear - 2].map(value => <option key={value} value={value}>{value}년</option>)}
+        </select> · 연간 · 연결 · 억 원
+      </div>
       <table className='financial-table'>
         <caption className='financial-caption'>{report.businessYear}년 연결 연간 실적 및 전년 대비 증감률</caption>
         <thead><tr><th scope='col'>항목</th><th scope='col'>실적</th><th scope='col'>전년 대비</th></tr></thead>

@@ -38,7 +38,9 @@ def resolve_stock(message: str, selected: StockContext) -> StockContext:
     if len(codes) > 1:
         raise ValueError("한 번에 한 종목씩 질문해 주세요.")
     if not codes and selected.name.casefold().replace(" ", "") not in compact:
-        candidate = re.search(r"([가-힣A-Za-z]+?)(?:의)?\s*(?:(?:최근|관련|연간|연결|최신)\s*)*(?:현재가|주가|시세|실적|매출|영업이익|순이익|뉴스|기사)", message)
+        company_text = re.sub(r"(?:최근\s*)?\d+\s*(?:개\s*)?년(?:부터|까지)?", "", message)
+        company_text = re.sub(r"^\s*(?:과|와|~|–|-)\s*", "", company_text)
+        candidate = re.search(r"([가-힣A-Za-z]+?)(?:의)?\s*(?:(?:최근|관련|연간|연결|최신)\s*)*(?:현재가|주가|시세|실적|매출|영업이익|순이익|뉴스|기사)", company_text)
         if candidate and candidate.group(1) not in {"최근", "현재", "오늘", "최신", "연간", "관련", "기업", "회사", "그회사", "해당기업", "연결", "별도", "분기", "반기"}:
             raise ValueError("기업명을 확인할 수 없습니다. 지원 기업명이나 국내 종목 코드 6자리를 알려 주세요.")
     code = next(iter(codes), selected.symbol)

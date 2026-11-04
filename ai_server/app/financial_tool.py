@@ -30,6 +30,29 @@ def financial_year(message: str) -> int | None:
     return year
 
 
+def financial_years(message: str) -> list[int | None]:
+    if any(word in message for word in ("분기", "반기", "별도")):
+        raise ValueError("현재 실적 조회는 연결 기준 연간 사업보고서만 지원합니다.")
+    current = datetime.now(ZoneInfo("Asia/Seoul")).year
+    years = sorted({int(y) for y in re.findall(r"(?<!\d)(20\d{2})(?!\d)", message)})
+    recent = re.search(r"최근\s*(\d+)\s*(?:개\s*)?년", message)
+    if recent:
+        count = int(recent.group(1))
+        if not 1 <= count <= 3:
+            raise ValueError("한 번에 최대 3개 사업연도를 비교할 수 있습니다.")
+        end = years[-1] if years else current - 1
+        years = list(range(end - count + 1, end + 1))
+    elif len(years) == 2 and re.search(r"~|부터|까지|–|20\d{2}\s*(?:년)?\s*-", message):
+        if years[-1] - years[0] > 2:
+            raise ValueError("한 번에 최대 3개 사업연도를 비교할 수 있습니다.")
+        years = list(range(years[0], years[-1] + 1))
+    if len(years) > 3:
+        raise ValueError("한 번에 최대 3개 사업연도를 비교할 수 있습니다.")
+    if any(not 2015 <= year < current for year in years):
+        raise ValueError("연간 실적은 2015년부터 전년도까지 조회할 수 있습니다.")
+    return years or [None]
+
+
 class FinancialResultTool:
     def __init__(self, base_url: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
         self._base_url = base_url

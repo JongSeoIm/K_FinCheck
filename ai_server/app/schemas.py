@@ -39,7 +39,7 @@ class SourceReference(BaseModel):
 
 
 class AnswerPresentation(BaseModel):
-    type: Literal["quote", "financial", "news", "composite"]
+    type: Literal["quote", "financial", "financial_comparison", "news", "composite"]
     data: dict
 
 
