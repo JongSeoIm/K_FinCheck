@@ -84,7 +84,7 @@ public class KisApiClient {
     private static long lastCallEpochMs = 0L;
     private static final long MIN_INTERVAL_MS = 250L;
 
-    private void paceRequest() {
+    public void paceRequest() {
         synchronized (CALL_LOCK) {
             long now = System.currentTimeMillis();
             long waitTime = MIN_INTERVAL_MS - (now - lastCallEpochMs);

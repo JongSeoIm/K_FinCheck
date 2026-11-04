@@ -17,8 +17,11 @@ import {
   usePlotArea,
 } from 'recharts'
 import useStockCandles from '../hooks/useStockCandles'
+import useIntradayCandles from '../hooks/useIntradayCandles'
+import { mergeAndAggregate } from '../lib/intraday.mjs'
 
 const timeAxisFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+const datedTimeFormatter = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 const timeTickSteps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600, 43200, 86400]
 
 const minuteOptions = ['1분', '3분', '5분', '10분', '15분', '30분', '60분']
@@ -112,10 +115,12 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
   const isIntraday = selectedPeriod === '분'
   const seconds = selectedMinute.endsWith('초') ? parseInt(selectedMinute, 10) : parseInt(selectedMinute, 10) * 60
   const { data: historicalCandles, loading: historicalLoading, error: historicalError } = useStockCandles(symbol, periodCode, 45, !isIntraday)
-  const loading = !isIntraday && historicalLoading
-  const error = !isIntraday && historicalError
+  const intraday = useIntradayCandles(symbol, isIntraday)
+  const { loadMore, hasMore, loading: intradayLoading } = intraday
+  const loading = isIntraday ? intraday.loading && !intraday.data.length : historicalLoading
+  const error = isIntraday ? intraday.error : historicalError
   const candles = useMemo(() => {
-    if (isIntraday) return streamInterval === seconds ? (liveCandles || []) : []
+    if (isIntraday) return mergeAndAggregate(intraday.data, streamInterval === 60 ? (liveCandles || []) : [], seconds)
     if (periodCode !== 'D' || !liveQuote || !historicalCandles.length) return historicalCandles
     const day = { date: liveQuote.businessDate, open: liveQuote.open, high: liveQuote.high,
       low: liveQuote.low, close: liveQuote.price, volume: liveQuote.volume }
@@ -123,7 +128,7 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     if (last.date === day.date) return [...historicalCandles.slice(0, -1), day]
     if (last.date < day.date) return [...historicalCandles, day]
     return historicalCandles
-  }, [isIntraday, streamInterval, seconds, liveCandles, periodCode, liveQuote, historicalCandles])
+  }, [isIntraday, streamInterval, seconds, liveCandles, periodCode, liveQuote, historicalCandles, intraday.data])
 
   const viewKey = `${symbol}:${selectedPeriod}:${isIntraday ? seconds : periodCode}`
   const visibleCount = zoom?.key === viewKey ? zoom.count : isIntraday ? 120 : null
@@ -131,25 +136,28 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     visibleCount == null ? candles : candles.slice(-visibleCount)
   ), [candles, visibleCount])
   const chartCandles = useMemo(() => (
-    isIntraday ? visibleCandles.map(candle => ({ ...candle, timestamp: Date.parse(candle.date) })) : visibleCandles
+    isIntraday ? visibleCandles.map((candle, index) => ({ ...candle, timestamp: index, actualTimestamp: Date.parse(candle.date) })) : visibleCandles
   ), [visibleCandles, isIntraday])
   const timeAxis = useMemo(() => {
     if (!isIntraday || !chartCandles.length) return null
-    const first = chartCandles[0].timestamp
-    const last = chartCandles.at(-1).timestamp
     const targetTicks = Math.max(2, Math.min(8, Math.floor((chartWidth - 74) / 100)))
-    const desiredStep = Math.max(1, (last - first) / 1000 / (targetTicks - 1))
-    const step = (timeTickSteps.find(value => value >= desiredStep) || 86400) * 1000
+    const desiredStep = Math.max(seconds, chartCandles.length * seconds / (targetTicks - 1))
+    const step = timeTickSteps.find(value => value >= desiredStep) || 86400
     const ticks = []
-    for (let time = Math.ceil(first / step) * step; time <= last; time += step) ticks.push(time)
-    if (!ticks.length) ticks.push(first)
-    const halfBar = seconds * 500
-    return { dataKey: 'timestamp', type: 'number', scale: 'time',
-      domain: [first - halfBar, last + halfBar], ticks, interval: 'preserveStartEnd', minTickGap: 16, allowDataOverflow: true }
+    for (let i = 0; i < chartCandles.length; i++) {
+      if (chartCandles[i].actualTimestamp % (step * 1000) === 0 && (!ticks.length || i - ticks.at(-1) >= chartCandles.length / targetTicks / 2)) ticks.push(i)
+    }
+    if (!ticks.length) ticks.push(0)
+    return { dataKey: 'timestamp', type: 'number',
+      domain: [-0.5, chartCandles.length - 0.5], ticks, interval: 'preserveStartEnd', minTickGap: 16, allowDataOverflow: true }
   }, [isIntraday, chartCandles, chartWidth, seconds])
-  const formatTimeTick = value => isIntraday
-    ? timeAxisFormatter.format(new Date(value))
-    : (value && value.length > 5 ? value.slice(5) : value)
+  const formatTimeTick = value => {
+    if (!isIntraday) return value && value.length > 5 ? value.slice(5) : value
+    const candle = chartCandles[Math.round(value)]
+    if (!candle) return ''
+    const multipleDays = chartCandles.length > 1 && new Date(chartCandles[0].actualTimestamp + 9 * 3600000).toISOString().slice(0, 10) !== new Date(chartCandles.at(-1).actualTimestamp + 9 * 3600000).toISOString().slice(0, 10)
+    return (multipleDays ? datedTimeFormatter : timeAxisFormatter).format(new Date(candle.actualTimestamp))
+  }
 
   const [minPrice, maxPrice] = useMemo(() => {
     if (!visibleCandles.length) return [0, 100]
@@ -164,11 +172,13 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     const area = chartAreaRef.current
     if (!area) return
     const handleWheel = event => {
-      if (event.ctrlKey || event.deltaY === 0 || candles.length <= 8) return
+      if (event.ctrlKey || event.deltaY === 0 || !candles.length) return
       event.preventDefault()
       const now = Date.now()
       if (now - lastWheelRef.current < 60) return
       lastWheelRef.current = now
+      const count = zoom?.key === viewKey ? Math.min(zoom.count ?? candles.length, candles.length) : Math.min(isIntraday ? 120 : candles.length, candles.length)
+      if (event.deltaY > 0 && count >= candles.length && isIntraday && hasMore && !intradayLoading) loadMore()
       setZoom(current => {
         const count = current?.key === viewKey
           ? Math.min(current.count ?? candles.length, candles.length)
@@ -181,7 +191,7 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     }
     area.addEventListener('wheel', handleWheel, { passive: false })
     return () => area.removeEventListener('wheel', handleWheel)
-  }, [viewKey, candles.length, isIntraday])
+  }, [viewKey, candles.length, isIntraday, zoom, hasMore, intradayLoading, loadMore])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -227,7 +237,7 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
 
   const handleSelectMinute = (m) => {
     setSelectedMinute(m)
-    onIntervalChange?.(parseInt(m, 10) * (m.endsWith('초') ? 1 : 60))
+    onIntervalChange?.(60)
     setSelectedPeriod('분')
     setIsMinuteOpen(false)
   }
@@ -327,12 +337,17 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
 
       <div className='stream-status'>
         <span>
-          {isIntraday ? `${selectedMinute}봉 · 연결 후 수신분` : `${selectedPeriod}봉 시세 · KIS`}
+          {isIntraday ? `${selectedMinute}봉 · KIS 과거 분봉 + 실시간 수신분` : `${selectedPeriod}봉 시세 · KIS`}
         </span>
         <span>
           {loading ? '시세 데이터 수신 중...' : error || `${visibleCandles.length < candles.length ? `${visibleCandles.length}/${candles.length}` : candles.length}개 봉 · ${supported ? streamStatus : '실시간 연결 종목 확인'}`}
         </span>
       </div>
+
+      {isIntraday && <div className='stream-status'>
+        <span>{intraday.loading ? '과거 분봉 조회 중…' : intraday.hasMore ? '더 축소하면 이전 분봉을 불러옵니다.' : '조회 가능한 분봉 범위입니다.'}</span>
+        {intraday.error && <button type='button' onClick={intraday.retry}>다시 조회</button>}
+      </div>}
 
       <div className='chart-summary'>
         <strong>{formatKRW(lastClose)}</strong>
