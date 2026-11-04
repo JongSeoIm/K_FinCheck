@@ -88,6 +88,7 @@ async def get_stock_quote(client: httpx.AsyncClient, code: str) -> ToolResult:
         if not isinstance(data, dict) or data.get("price") is None:
             raise ValueError("시세 형식 오류")
         queried = kst_text(data.get("updatedAt"))
+        volume = f"누적거래량 {int(data['volume']):,}주" if isinstance(data.get('volume'), (int, float)) else "누적거래량은 확인하지 못했다"
         change = data.get("change")
         diff = data.get("priceChange")
         if traded:
@@ -99,7 +100,7 @@ async def get_stock_quote(client: httpx.AsyncClient, code: str) -> ToolResult:
         facts = (
             f"[{name} 현재가] 현재가 {won(data['price'])}, 전일 대비 {won(diff)}({change:+.2f}%), "
             f"시가 {won(data.get('open'))}, 고가 {won(data.get('high'))}, 저가 {won(data.get('low'))}, "
-            f"전일 종가 {won(data.get('prevClose'))}. {basis}"
+            f"전일 종가 {won(data.get('prevClose'))}, {volume}. {basis}"
         )
         source = {"provider": "KIS", "label": f"{name} 현재가", "basisAt": basis_at, "url": None}
         return ToolResult("get_stock_quote", code, True, facts, [source])

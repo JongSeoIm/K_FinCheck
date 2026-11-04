@@ -3,48 +3,39 @@
 import { useEffect, useState } from 'react'
 import useStockStore from '@/app/store/useStockStore'
 
-// Spring(KIS) 현재가를 5초마다 다시 받아 옵니다.
-export default function useStockData(symbol, intervalMs = 5000) {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+// 선택 종목의 현재가. 서버가 Polling/Push 로 보낸 최신 시세(store.quotes)를 그대로 씁니다.
+// 첫 시세가 도착하기 전에만 /api/kis/price 를 한 번 조회합니다.
+export default function useStockData(symbol) {
+  const quote = useStockStore((state) => state.quotes[symbol])
+  const feedStatus = useStockStore((state) => state.feedStatus)
   const setPrice = useStockStore((state) => state.setPrice)
+  const [fallback, setFallback] = useState(null)
+  const [error, setError] = useState(null)
+  const hasQuote = Boolean(quote)
 
   useEffect(() => {
-    if (!symbol) return undefined
+    if (!symbol || hasQuote) return undefined
     const controller = new AbortController()
-    let timer
-
-    const load = async () => {
-      try {
-        const response = await fetch(`/api/kis/price/${symbol}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        })
-        const result = await response.json()
-        if (!response.ok || result.error) {
-          throw new Error(result.error || '시세 조회에 실패했습니다.')
-        }
-        setData(result)
-        // 차트 등 다른 화면이 같은 값을 쓰도록 공유 (한 곳에서만 시세를 받아 옵니다)
-        setPrice(symbol, { price: result.price, at: Date.now() })
+    fetch(`/api/kis/price/${symbol}`, { signal: controller.signal, cache: 'no-store' })
+      .then((response) => response.json().then((body) => ({ ok: response.ok, body })))
+      .then(({ ok, body }) => {
+        if (!ok || body.error) throw new Error(body.error || '시세 조회에 실패했습니다.')
+        setFallback(body)
         setError(null)
-      } catch (requestError) {
+      })
+      .catch((requestError) => {
         if (requestError.name !== 'AbortError') setError(requestError.message)
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
-    }
+      })
+    return () => controller.abort()
+  }, [symbol, hasQuote])
 
-    setLoading(true)
-    load()
-    timer = setInterval(load, intervalMs)
+  // 차트 등 다른 화면이 같은 값을 쓰도록 공유
+  useEffect(() => {
+    if (!quote) return
+    setPrice(symbol, { price: quote.price, prevClose: quote.prevClose, at: Date.now() })
+  }, [quote, symbol, setPrice])
 
-    return () => {
-      controller.abort()
-      clearInterval(timer)
-    }
-  }, [symbol, intervalMs, setPrice])
-
-  return { data, loading, error }
+  const data = quote ?? fallback
+  const feedError = feedStatus === 'disconnected' ? '실시간 연결 끊김' : null
+  return { data, loading: !data && !error, error: data ? feedError : error }
 }

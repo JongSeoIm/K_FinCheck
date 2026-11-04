@@ -98,12 +98,13 @@ export default function StockInfo({ stock }) {
           <p className={isRising ? 'positive' : 'negative'}>
             {isRising ? '+' : ''}{formatCurrency(Math.abs(priceChange)).replace('₩', '')}원 ({isRising ? '+' : ''}{Number(displayChange).toFixed(2)}%)
           </p>
-          <div className='update-time' style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>마지막 갱신 {lastUpdated || '—'}</div>
+          <div className='update-time' style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>조회 시각 {lastUpdated || '—'}</div>
           <div className='update-time' style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>마지막 체결 {tradeTime || '—'} (KRX)</div>
+          <div className='update-time' style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>출처 한국투자증권(KIS)</div>
           {error && <small className='inline-warning'>실시간 조회 지연</small>}
         </div>
 
-        <dl className='quote-metrics' style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', width: '100%', margin: 0 }}>
+        <dl className='quote-metrics' style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px', width: '100%', margin: 0 }}>
           <div>
             <dt style={{ fontSize: '0.85rem', color: '#666' }}>시가</dt>
             <dd style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '4px 0 0 0' }}>{data?.open == null ? '—' : formatCurrency(data.open)}</dd>
@@ -119,6 +120,10 @@ export default function StockInfo({ stock }) {
           <div>
             <dt style={{ fontSize: '0.85rem', color: '#666' }}>전일 종가</dt>
             <dd style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '4px 0 0 0' }}>{(data?.prevClose ?? data?.previousClose) == null ? '—' : formatCurrency(data?.prevClose ?? data?.previousClose)}</dd>
+          </div>
+          <div>
+            <dt style={{ fontSize: '0.85rem', color: '#666' }}>누적거래량</dt>
+            <dd style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '4px 0 0 0' }}>{data?.volume == null ? '—' : `${Number(data.volume).toLocaleString('ko-KR')}주`}</dd>
           </div>
           <div>
             <dt style={{ fontSize: '0.85rem', color: '#666' }}>시가총액</dt>

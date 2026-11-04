@@ -8,7 +8,7 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @Configuration
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
-    
+
     private final StockWebSocketHandler stockWebSocketHandler;
 
     public WebSocketConfig(StockWebSocketHandler stockWebSocketHandler) {
@@ -17,7 +17,8 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        // 프론트엔드가 ws://localhost:8080/ws/stock 으로 접속할 수 있게 열어둠
-        registry.addHandler(stockWebSocketHandler, "/ws/stock").setAllowedOrigins("*");
+        // 화면(localhost:3000)이 ws://localhost:8080/ws/stock 으로 직접 접속합니다.
+        registry.addHandler(stockWebSocketHandler, "/ws/stock")
+                .setAllowedOrigins("http://localhost:3000", "http://127.0.0.1:3000");
     }
 }

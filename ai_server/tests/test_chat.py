@@ -5,7 +5,7 @@ import httpx
 from app.chat import drop_directive_sentences, handle, strip_markdown
 
 PRICE = {"price": 209500, "priceChange": -10000, "change": -4.56, "open": 226500, "high": 228000,
-         "low": 208000, "prevClose": 219500, "updatedAt": "2026-11-04T04:39:10Z"}
+         "low": 208000, "prevClose": 219500, "volume": 12345678, "updatedAt": "2026-11-04T04:39:10Z"}
 EARN = {"businessYear": 2025, "previousYear": 2024, "basis": "연결", "unit": "원", "dartUrl": "https://dart.fss.or.kr/x",
         "lines": [{"key": "REVENUE", "label": "매출액", "current": 300870903000000, "previous": 258935494000000,
                    "changePercent": 16.2, "status": "NORMAL"}]}
@@ -71,6 +71,7 @@ def test_quote_uses_tool_and_returns_source():
     assert out.status == "answered" and sorted(calls) == ["/api/kis/price/005930", "/api/kis/trade-time/005930"]
     assert out.sources[0]["provider"] == "KIS" and out.sources[0]["basisAt"] == "최근 체결 2026-11-04 14:08 KST"
     assert "최근 체결 시각 2026-11-04 14:08 KST" in llm.messages[-1]["content"]
+    assert "누적거래량 12,345,678주" in llm.messages[-1]["content"]
     assert "209,500원" in llm.messages[-1]["content"]
 
 

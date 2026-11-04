@@ -8,45 +8,18 @@ import useStockStore from '../store/useStockStore'
 
 // 티커에 보여 줄 종목 (KIS 호출 부담을 줄이려면 숫자를 줄이세요)
 const tickerStocks = marketStocks.slice(0, 8)
-const TICKER_CODES = tickerStocks.map((stock) => stock.symbol).join(',')
-const REFRESH_MS = 10000
 
 const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
 export default function MarketTicker({ activeSymbol, onSelectStock }) {
   const hydrated = useHydrated()
   const watchlist = useStockStore((state) => state.watchlist)
-  const [prices, setPrices] = useState({})
-  const [failed, setFailed] = useState(false)
+  // 시세는 서버가 보낸 최신 값(Polling/Push 공통)을 그대로 씁니다.
+  const prices = useStockStore((state) => state.quotes)
+  const failed = useStockStore((state) => state.feedStatus === 'disconnected')
   const [priceFlashes, setPriceFlashes] = useState({})
   const previousPricesRef = useRef({})
   const flashTimersRef = useRef({})
-
-  // Spring에서 여러 종목 시세를 10초마다 받아 옵니다.
-  useEffect(() => {
-    const controller = new AbortController()
-
-    const load = async () => {
-      try {
-        const response = await fetch(`/api/kis/prices?codes=${TICKER_CODES}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        })
-        if (!response.ok) throw new Error('ticker error')
-        setPrices(await response.json())
-        setFailed(false)
-      } catch (requestError) {
-        if (requestError.name !== 'AbortError') setFailed(true)
-      }
-    }
-
-    load()
-    const timer = setInterval(load, REFRESH_MS)
-    return () => {
-      controller.abort()
-      clearInterval(timer)
-    }
-  }, [])
 
   // 가격이 바뀌면 잠깐 깜빡이는 효과
   useEffect(() => {

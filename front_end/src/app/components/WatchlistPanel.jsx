@@ -1,11 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import useHydrated from '@/app/hooks/useHydrated'
 import useStockStore from '@/app/store/useStockStore'
 import { marketStocks } from '@/app/lib/market'
-
-const REFRESH_MS = 10000
 
 const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
@@ -17,39 +15,11 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock }) {
   const addToWatchlist = useStockStore((state) => state.addToWatchlist)
   const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
 
-  const [quotes, setQuotes] = useState({})
-  const [failed, setFailed] = useState(false)
+  // 시세는 서버가 보낸 최신 값(Polling/Push 공통)을 그대로 씁니다.
+  const quotes = useStockStore((state) => state.quotes)
+  const failed = useStockStore((state) => state.feedStatus === 'disconnected')
   const [code, setCode] = useState('')
   const [message, setMessage] = useState('')
-
-  const codes = watchlist.join(',')
-
-  // 관심 종목 시세를 10초마다 Spring(KIS)에서 받아 옵니다.
-  useEffect(() => {
-    if (!hydrated || !codes) return undefined
-    const controller = new AbortController()
-
-    const load = async () => {
-      try {
-        const response = await fetch(`/api/kis/prices?codes=${codes}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        })
-        if (!response.ok) throw new Error('watchlist error')
-        setQuotes(await response.json())
-        setFailed(false)
-      } catch (requestError) {
-        if (requestError.name !== 'AbortError') setFailed(true)
-      }
-    }
-
-    load()
-    const timer = setInterval(load, REFRESH_MS)
-    return () => {
-      controller.abort()
-      clearInterval(timer)
-    }
-  }, [hydrated, codes])
 
   // 종목코드(6자리)로 직접 추가
   const handleAdd = async (event) => {

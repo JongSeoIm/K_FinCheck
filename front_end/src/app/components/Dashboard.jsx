@@ -3,8 +3,10 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import AuthStatus from './AuthStatus'
 import EarningsPanel from './EarningsPanel'
+import FeedControl from './FeedControl'
 import StockChatDrawer from './StockChatDrawer'
 import MarketTicker from './MarketTicker'
+import QuoteFeed from './QuoteFeed'
 import RecommendationChart from './RecommendationChart'
 import StockChart from './StockChart'
 import StockInfo from './StockInfo'
@@ -39,6 +41,7 @@ export default function Dashboard({ initialStock }) {
 
   return (
     <main className='app-shell'>
+      <QuoteFeed />
       <header className='topbar'>
         <span className='prototype-label'>K_FinCheck</span>
         <AuthStatus />
@@ -57,8 +60,9 @@ export default function Dashboard({ initialStock }) {
           <StockInfo key={selectedStock.symbol} stock={selectedStock} />
 
           <section className='panel chart-panel'>
-            <div className='panel-heading'>
+            <div className='panel-heading' style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <h2>실시간 주가 차트</h2>
+              <FeedControl />
             </div>
             <StockChart
               key={selectedStock.symbol}

@@ -169,6 +169,7 @@ public class KisService {
         result.put("high", toLong(output.get("stck_hgpr")));
         result.put("low", toLong(output.get("stck_lwpr")));
         result.put("prevClose", toLong(output.get("stck_sdpr")));
+        result.put("volume", toLong(output.get("acml_vol")));
         result.put("marketCapitalization", price * shares);
         result.put("updatedAt", Instant.now().toString());
 

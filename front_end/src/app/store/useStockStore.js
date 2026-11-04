@@ -8,6 +8,37 @@ const useStockStore = create((set, get) => ({
   user: null, // { userId, loginId, nickname } 또는 null
   authReady: false,
 
+  // 서버가 보낸 최신 시세 (종목코드 → 시세). Polling·Push 가 같은 곳에 넣습니다.
+  quotes: {},
+  feedMode: 'polling', // 'polling' | 'push'
+  feedStatus: 'connecting', // 'connecting' | 'connected' | 'stale' | 'disconnected'
+
+  setFeedMode: (mode) => {
+    try {
+      window.localStorage.setItem('kfc-feed-mode', mode)
+    } catch {
+      // 저장이 막힌 환경에서는 이번 접속에서만 유지합니다.
+    }
+    set({ feedMode: mode, feedStatus: 'connecting' })
+  },
+  setFeedStatus: (status) => set((state) => (state.feedStatus === status ? state : { feedStatus: status })),
+
+  // seq 가 이미 받은 값보다 크지 않으면 중복·역순 메시지로 보고 버립니다.
+  setQuotes: (incoming) => {
+    if (!incoming) return
+    set((state) => {
+      let next = null
+      for (const [code, quote] of Object.entries(incoming)) {
+        const current = state.quotes[code]
+        if (!current || quote.seq > current.seq) {
+          if (!next) next = { ...state.quotes }
+          next[code] = quote
+        }
+      }
+      return next ? { quotes: next } : state
+    })
+  },
+
   // 화면이 열릴 때 로그인 상태를 확인하고, 로그인돼 있으면 관심 종목을 불러옵니다.
   loadSession: async () => {
     const me = await apiFetch('/api/auth/me')
