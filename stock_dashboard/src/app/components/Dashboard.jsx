@@ -90,8 +90,8 @@ export default function Dashboard({ initialStock }) {
           />
 
           <section className='panel compact-panel'>
-            <div className='panel-heading'><h2>전문가 투자의견</h2></div>
-            <RecommendationChart key={selectedStock.symbol} symbol={selectedStock.symbol} />
+            <div className='panel-heading'><h2>증권사 투자의견</h2></div>
+            <RecommendationChart key={selectedStock.symbol} symbol={selectedStock.symbol} liveQuote={stream.trades[selectedStock.symbol]} />
           </section>
 
           <section className='panel compact-panel'>

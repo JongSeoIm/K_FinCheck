@@ -321,6 +321,50 @@ a:focus-visible {
 
 .count-badge { font-weight: 700; }
 .empty-state { padding: 14px; }
+.opinion-panel { padding: 14px; font-size: 14px; }
+.opinion-meta, .opinion-footnote, .opinion-message { margin: 0; color: var(--muted); line-height: 1.6; }
+.opinion-meta { margin-bottom: 12px; }
+.opinion-basis { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.opinion-current-quote { display: grid; grid-template-columns: 1fr auto; gap: 7px 12px; padding: 12px; border: 1px solid #e2e2e2; background: #f7f7f7; }
+.opinion-current-quote > span { color: var(--muted); }
+.opinion-current-quote > strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.opinion-current-quote small { grid-column: 1 / -1; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.broker-opinion-scroll { margin-top: 12px; padding: 0 12px; border: 1px solid #e2e2e2; background: #fff; }
+.broker-opinion-window { position: relative; margin: 12px 0; overflow: hidden; }
+.broker-opinion-fade { position: absolute; left: 0; right: 0; height: 28px; pointer-events: none; }
+.broker-opinion-fade-top { top: 0; background: linear-gradient(to bottom, #fff, transparent); }
+.broker-opinion-fade-bottom { bottom: 0; background: linear-gradient(to bottom, transparent, #fff); }
+.broker-opinion-list { list-style: none; margin: 0; padding: 0; max-height: 370px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.broker-opinion-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.broker-opinion-list:focus-visible { outline: 1px solid #aaa; outline-offset: -1px; }
+.broker-opinion { padding: 15px 0; border-bottom: 1px solid var(--line-light); }
+.broker-opinion-heading, .broker-opinion-body { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; }
+.broker-opinion-heading time { font-size: 13px; color: var(--muted); }
+.broker-opinion-body { margin-top: 9px; font-size: 14px; }
+.broker-opinion-body > span { color: var(--muted); }
+.broker-opinion-body strong { color: var(--text); font-weight: 600; }
+.broker-opinion-difference { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.opinion-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.opinion-grid { stroke: var(--line-light); stroke-width: 1; }
+.opinion-axis { fill: var(--muted); font-size: 13px; }
+.opinion-value { fill: var(--text); font-size: 15px; font-weight: 700; }
+.opinion-label { fill: var(--text); font-size: 14px; }
+.opinion-bar-0 { fill: #8fa69b; }
+.opinion-bar-1 { fill: #bbb6ac; }
+.opinion-bar-2 { fill: #b29b9b; }
+.opinion-details { margin-top: 10px; }
+.opinion-details summary { width: fit-content; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.opinion-footnote { margin-top: 12px; font-size: 13px; }
+.opinion-fine-print { font-size: 9pt; color: #767676; }
+.opinion-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
+.opinion-table th, .opinion-table td { padding: 12px 3px; border-bottom: 1px solid var(--line-light); text-align: left; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.opinion-table th { color: var(--muted); font-weight: 400; }
+.opinion-table th:first-child { width: 40%; }
+.opinion-table th:nth-child(2) { width: 20%; }
+.opinion-table td time { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
+.opinion-table th:last-child, .opinion-table td:last-child { text-align: right; }
+.opinion-table td:last-child { font-weight: 700; }
+.opinion-retry { margin-top: 10px; border: 0; padding: 0; background: transparent; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; }
 .empty-state strong { font-size: 13px; }
 .empty-state p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
 .watchlist { margin: 0; padding: 0; list-style: none; }
