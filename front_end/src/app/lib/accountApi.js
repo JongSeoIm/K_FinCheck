@@ -15,7 +15,13 @@ async function request(url, options = {}) {
   throw Object.assign(new Error(body.error), { code: body.code })
 }
 
-const postJson = (url, data) => request(url, {
+// 변경 요청에는 CSRF 토큰을 함께 보냅니다
+async function send(url, options = {}) {
+  const csrf = await request('/api/auth/csrf')
+  return request(url, { ...options, headers: { ...options.headers, [csrf.headerName]: csrf.token } })
+}
+
+const postJson = (url, data) => send(url, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(data),
@@ -24,8 +30,8 @@ const postJson = (url, data) => request(url, {
 export const fetchMe = async () => (await request('/api/auth/me')).user
 export const signup = (form) => postJson('/api/auth/signup', form)
 export const login = (form) => postJson('/api/auth/login', form)
-export const logout = () => request('/api/auth/logout', { method: 'POST' })
+export const logout = () => send('/api/auth/logout', { method: 'POST' })
 
 export const fetchWatchlist = () => request('/api/watchlist')
-export const addWatchlist = (code) => request(`/api/watchlist/${code}`, { method: 'POST' })
-export const removeWatchlist = (code) => request(`/api/watchlist/${code}`, { method: 'DELETE' })
+export const addWatchlist = (code) => send(`/api/watchlist/${code}`, { method: 'POST' })
+export const removeWatchlist = (code) => send(`/api/watchlist/${code}`, { method: 'DELETE' })

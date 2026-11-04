@@ -3,41 +3,72 @@
 import useApi from '../hooks/useApi'
 import { PanelEmpty, PanelError, PanelLoading } from './PanelState'
 
-// 원 → "12.3조" / "4,567억"
-function formatKrw(value) {
-  if (value == null) return '—'
-  const abs = Math.abs(value)
-  const sign = value < 0 ? '−' : ''
-  if (abs >= 1e12) return `${sign}${(abs / 1e12).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}조`
-  return `${sign}${Math.round(abs / 1e8).toLocaleString('ko-KR')}억`
+const WON_PER_EOK = 1e8
+
+// 금액을 표시할 수 없는 이유
+const UNAVAILABLE_TEXT = {
+  AMBIGUOUS: '값 확인 필요',
+  UNSUPPORTED_CURRENCY: '원화 외 통화',
 }
 
-// 전년 대비: 둘 다 흑자일 때만 증감률(%)을 계산하고, 흑자·적자가 바뀌면 문구로 표시합니다.
-// (적자에서 흑자로 바뀐 경우 % 를 계산하면 +403% 처럼 의미 없는 숫자가 나오기 때문)
-function compare(current, previous) {
-  if (current == null || previous == null) return null
-  if (previous < 0 && current >= 0) return { text: '흑자 전환', tone: 'positive' }
-  if (previous >= 0 && current < 0) return { text: '적자 전환', tone: 'negative' }
-  if (previous < 0 && current < 0) return { text: '적자 지속', tone: 'negative' }
-  if (previous === 0) return null
-  const rate = ((current - previous) / previous) * 100
-  return {
-    text: `${rate > 0 ? '+' : ''}${rate.toFixed(1)}%`,
-    tone: rate > 0 ? 'positive' : rate < 0 ? 'negative' : '',
+// 원 → "3,336,059억 원". 금액이 없으면 0 으로 쓰지 않습니다
+function formatEok(value, status) {
+  if (value == null) return UNAVAILABLE_TEXT[status] ?? '자료 없음'
+  const eok = Math.abs(value) / WON_PER_EOK
+  const digits = eok < 10 ? 1 : 0
+  return `${value < 0 ? '−' : ''}${eok.toLocaleString('ko-KR', { maximumFractionDigits: digits })}억 원`
+}
+
+function compareLabel({ comparison, changeRate }) {
+  if (comparison === 'TURN_PROFIT') return { text: '흑자 전환', tone: 'positive' }
+  if (comparison === 'TURN_LOSS') return { text: '적자 전환', tone: 'negative' }
+  if (comparison === 'LOSS_CONTINUE') return { text: '적자 지속', tone: 'negative' }
+  if (comparison === 'NORMAL') {
+    return {
+      text: `${changeRate > 0 ? '+' : changeRate < 0 ? '−' : ''}${Math.abs(changeRate).toFixed(1)}%`,
+      tone: changeRate > 0 ? 'positive' : changeRate < 0 ? 'negative' : '',
+    }
   }
+  return { text: '비교 불가', tone: 'earnings-muted' }
 }
 
-function Cell({ value, previous }) {
-  const result = compare(value, previous)
+function AmountBar({ year, value, largest, status, previous }) {
+  const width = value == null || largest === 0 ? 0 : (Math.abs(value) / largest) * 100
+  const fillClass = ['earnings-bar-fill', previous && 'previous', value < 0 && 'loss'].filter(Boolean).join(' ')
   return (
-    <td>
-      {formatKrw(value)}
-      {result && <small className={result.tone}>{result.text}</small>}
-    </td>
+    <div className='earnings-bar'>
+      <span>{year}</span>
+      <div className='earnings-bar-track' aria-hidden='true'>
+        <div className={fillClass} style={{ width: `${width}%` }} />
+      </div>
+      <strong>{formatEok(value, status)}</strong>
+    </div>
   )
 }
 
-// 최근 실적: OpenDART 사업보고서 기준 최근 3개 연도 매출액 · 영업이익 · 당기순이익 (전년 대비 증감)
+function AccountCompare({ item, year }) {
+  const label = compareLabel(item)
+  const largest = Math.max(Math.abs(item.currentAmount ?? 0), Math.abs(item.previousAmount ?? 0))
+  return (
+    <li className='earnings-account'>
+      <div className='earnings-account-title'>
+        <strong>{item.accountName}</strong>
+        <span className={label.tone}>{label.text}</span>
+      </div>
+      <AmountBar year={year} value={item.currentAmount} largest={largest} status={item.valueStatus} />
+      <AmountBar year={year - 1} value={item.previousAmount} largest={largest} status={item.valueStatus} previous />
+    </li>
+  )
+}
+
+function formatCollectedAt(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// 최근 실적: DB 에 저장한 OpenDART 사업보고서의 당기·전기 비교
 export default function EarningsPanel({ code }) {
   const { status, data, error, reload } = useApi(`/api/kis/financials/${code}`)
 
@@ -52,30 +83,24 @@ export default function EarningsPanel({ code }) {
     return <PanelError error={error} onRetry={reload} />
   }
 
-  const rows = Array.isArray(data?.rows) ? data.rows : []
-  if (rows.length === 0) return <PanelEmpty title='실적 데이터가 없습니다.' />
+  const items = Array.isArray(data?.items) ? data.items : []
+  if (items.length === 0) return <PanelEmpty title='실적 데이터가 없습니다.' />
+
+  const collectedAt = formatCollectedAt(data.collectedAt)
 
   return (
     <>
-      <table className='financial-table'>
-        <thead>
-          <tr><th>연도</th><th>매출액</th><th>영업이익</th><th>순이익</th></tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => {
-            const previous = rows[index + 1]
-            return (
-              <tr key={row.year}>
-                <td>{row.year}</td>
-                <Cell value={row.revenue} previous={previous?.revenue} />
-                <Cell value={row.operatingProfit} previous={previous?.operatingProfit} />
-                <Cell value={row.netIncome} previous={previous?.netIncome} />
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      <small className='panel-source'>출처: {data.source} ({data.reportYear}년, {data.basis} 기준) · 괄호 아래는 전년 대비</small>
+      <p className='earnings-basis'>{data.companyName} · {data.businessYear}년 {data.reportName} · {data.basis} 기준 · 단위 억 원</p>
+      {data.stale && (
+        <p className='earnings-stale' role='status'>최신 자료를 받지 못해 저장된 자료를 표시합니다.</p>
+      )}
+      <ul className='earnings-accounts'>
+        {items.map((item) => <AccountCompare key={item.accountCode} item={item} year={data.businessYear} />)}
+      </ul>
+      <small className='panel-source'>
+        출처: {data.source}{collectedAt && ` · 수집 ${collectedAt}`} ·{' '}
+        <a href={data.url} target='_blank' rel='noreferrer'>DART 공시 원문</a>
+      </small>
     </>
   )
 }

@@ -46,11 +46,11 @@ export default function Dashboard({ initialCode }) {
     <main className='app-shell'>
       <header className='topbar'>
         <h1 className='sr-only'>국내 주식 대시보드</h1>
-        <ConnectionBadge />
         <div className='topbar-actions'>
           <AuthNav symbol={selectedCode} />
-          <StockSearch onSelectStock={handleSelectStock} />
+          <ConnectionBadge />
         </div>
+        <StockSearch onSelectStock={handleSelectStock} />
       </header>
 
       {stocksError && stocks.length === 0 && (

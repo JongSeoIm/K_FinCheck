@@ -19,6 +19,7 @@ const useStockStore = create(
       stocks: [],
       stocksError: null,
       quotes: {},
+      barUpdate: null, // 서버가 push 한 최신 봉 { code, bars }
       feedMode: 'push', // push = WebSocket 실시간 / poll = 2초마다 조회 (사용자가 선택, 브라우저에 저장)
       connection: {
         state: 'connecting', // connecting | live | server-polling | polling | manual-polling | disconnected | not-configured
@@ -58,6 +59,8 @@ const useStockStore = create(
       removeFromWatchlist: (code) => get().changeWatchlist(removeWatchlist, code),
 
       setFeedMode: (feedMode) => set({ feedMode }),
+
+      setBarUpdate: (code, bars) => set({ barUpdate: { code, bars } }),
 
       setStocks: (stocks, stocksError = null) => set({ stocks, stocksError }),
 

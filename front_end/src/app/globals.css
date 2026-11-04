@@ -1252,51 +1252,103 @@ a:focus-visible {
 }
 
 /* ───── 최근 실적 ───── */
-.financial-table {
-  width: calc(100% - 24px);
-  margin: 8px 12px 4px;
-  border-collapse: collapse;
+.panel-source a {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+.earnings-basis {
+  margin: 8px 12px 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.earnings-stale {
+  margin: 6px 12px 0;
+  padding: 5px 7px;
+  border-left: 3px solid var(--red);
+  background: var(--background);
+  font-size: 10px;
+}
+
+.earnings-accounts {
+  margin: 4px 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.earnings-account {
+  padding: 8px 0;
+  border-top: 1px solid var(--line-light);
+}
+
+.earnings-account:first-child {
+  border-top: 0;
+}
+
+.earnings-account-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
   font-size: 11px;
+}
+
+.earnings-account-title span {
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.financial-table th,
-.financial-table td {
-  padding: 7px 4px;
-  border-top: 1px solid var(--line-light);
-  text-align: right;
-}
-
-.financial-table th:first-child,
-.financial-table td:first-child {
-  text-align: left;
-}
-
-.financial-table thead th {
-  border-top: 0;
+.earnings-account-title .earnings-muted {
   color: var(--muted);
-  font-size: 10px;
   font-weight: 400;
 }
 
-.financial-table small {
-  display: block;
-  font-size: 9px;
+.earnings-bar {
+  display: grid;
+  grid-template-columns: 30px minmax(30px, 1fr) 78px;
+  gap: 6px;
+  align-items: center;
+  min-height: 18px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
+
+.earnings-bar>span {
+  color: var(--muted);
+}
+
+.earnings-bar>strong {
+  font-weight: 400;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.earnings-bar-track {
+  height: 8px;
+  background: var(--line-light);
+}
+
+.earnings-bar-fill {
+  height: 100%;
+  background: var(--blue);
+}
+
+.earnings-bar-fill.previous {
+  background: var(--muted);
+}
+
+.earnings-bar-fill.loss {
+  background: repeating-linear-gradient(135deg, var(--red) 0 3px, transparent 3px 5px);
+}
+
 /* ───── 계정 메뉴 · 로그인 화면 ───── */
 .topbar-actions {
-  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  justify-content: flex-end;
   min-width: 0;
-}
-
-.topbar-actions .global-search {
-  width: 350px;
-  max-width: 100%;
 }
 
 .auth-nav {

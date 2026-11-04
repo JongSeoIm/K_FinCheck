@@ -22,6 +22,7 @@ export default function useMarketFeed() {
   const feedMode = useStockStore((state) => state.feedMode)
   const setStocks = useStockStore((state) => state.setStocks)
   const setQuote = useStockStore((state) => state.setQuote)
+  const setBarUpdate = useStockStore((state) => state.setBarUpdate)
   const setConnection = useStockStore((state) => state.setConnection)
 
   useEffect(() => {
@@ -132,6 +133,8 @@ export default function useMarketFeed() {
         }
         if (message.type === 'quote' && message.data?.code) {
           setQuote(message.data.code, message.data)
+        } else if (message.type === 'bars' && message.code) {
+          setBarUpdate(message.code, message.bars)
         } else if (message.type === 'status') {
           setConnection({
             state: !message.kisConfigured ? 'not-configured' : message.realtime ? 'live' : 'server-polling',
@@ -198,5 +201,5 @@ export default function useMarketFeed() {
         socket.close()
       }
     }
-  }, [feedMode, setStocks, setQuote, setConnection])
+  }, [feedMode, setStocks, setQuote, setBarUpdate, setConnection])
 }
