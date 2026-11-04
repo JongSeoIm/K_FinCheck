@@ -4,6 +4,8 @@
 !.env.example
 **/.kis-token.json
 
+**/.env.bak*
+
 # 빌드 결과
 backend/target/
 frontend/.next/

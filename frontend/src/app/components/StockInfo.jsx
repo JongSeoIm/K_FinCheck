@@ -1,6 +1,7 @@
 'use client'
 
-import useHydrated from '@/app/hooks/useHydrated'
+import { useRouter } from 'next/navigation'
+import useAuthStore from '@/app/store/useAuthStore'
 import useStockStore from '@/app/store/useStockStore'
 import {
   directionClass, formatClock, formatPrice, formatRate, formatSignedPrice, formatVolume,
@@ -17,13 +18,22 @@ function StarIcon({ filled }) {
 
 // 선택 종목의 현재가·등락·시가·고가·저가·전일 종가
 export default function StockInfo({ stock }) {
-  const hydrated = useHydrated()
+  const router = useRouter()
+  const user = useAuthStore((state) => state.user)
+  const authChecked = useAuthStore((state) => state.checked)
   const quote = useStockStore((state) => state.quotes[stock.symbol])
   const watchlist = useStockStore((state) => state.watchlist)
+  const watchlistStatus = useStockStore((state) => state.watchlistStatus)
   const addToWatchlist = useStockStore((state) => state.addToWatchlist)
   const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
 
-  const saved = hydrated && watchlist.some((w) => w.symbol === stock.symbol)
+  const saved = Boolean(user) && watchlist.some((w) => w.symbol === stock.symbol)
+  // 로그인 안 했으면 누를 때 로그인 화면으로 보낸다
+  const toggleWatchlist = () => {
+    if (!user) router.push('/login')
+    else if (saved) removeFromWatchlist(stock.symbol)
+    else addToWatchlist(stock)
+  }
   const dir = directionClass(quote?.changeAmount)
 
   const metrics = [
@@ -48,9 +58,10 @@ export default function StockInfo({ stock }) {
         <button
           type='button'
           className={`watch-toggle ${saved ? 'saved' : ''}`}
-          disabled={!hydrated}
+          disabled={!authChecked || (Boolean(user) && watchlistStatus !== 'ready')}
           aria-pressed={saved}
-          onClick={() => (saved ? removeFromWatchlist(stock.symbol) : addToWatchlist(stock))}
+          title={user ? undefined : '로그인하면 관심 종목을 저장할 수 있어요'}
+          onClick={toggleWatchlist}
         >
           <StarIcon filled={saved} />
           {saved ? '관심 종목 해제' : '관심 종목 추가'}

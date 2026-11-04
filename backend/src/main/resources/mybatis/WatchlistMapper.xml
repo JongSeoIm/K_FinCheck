@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.hk.stock.mapper.WatchlistMapper">
+
+	<!-- 등록한 순서대로 -->
+	<select id="getWatchlist" parameterType="Long" resultType="watchlistDto">
+		SELECT w.symbol, c.name, c.market, w.regdate
+		FROM watchlist w
+		JOIN company c ON c.symbol = w.symbol
+		WHERE w.user_id = #{userId}
+		ORDER BY w.regdate, w.symbol
+	</select>
+
+	<!-- 이미 등록한 종목이면 건너뜀 (PK: user_id + symbol) -->
+	<insert id="insertWatchlist">
+		INSERT IGNORE INTO watchlist (user_id, symbol)
+		VALUES (#{userId}, #{symbol})
+	</insert>
+
+	<delete id="deleteWatchlist">
+		DELETE FROM watchlist
+		WHERE user_id = #{userId}
+		  AND symbol = #{symbol}
+	</delete>
+
+</mapper>

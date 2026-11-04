@@ -1,3 +1,3 @@
--- 1차 지원 종목 (이미 있으면 건너뜀)
-INSERT IGNORE INTO stock_info (symbol, name, market) VALUES ('005930', '삼성전자', 'KOSPI');
-INSERT IGNORE INTO stock_info (symbol, name, market) VALUES ('000660', 'SK하이닉스', 'KOSPI');
+-- 지원 종목 (이미 있으면 건너뜀). dart_corp_code 는 OpenDART 기업 고유번호
+INSERT IGNORE INTO company (symbol, name, market, dart_corp_code) VALUES ('005930', '삼성전자', 'KOSPI', '00126380');
+INSERT IGNORE INTO company (symbol, name, market, dart_corp_code) VALUES ('000660', 'SK하이닉스', 'KOSPI', '00164779');

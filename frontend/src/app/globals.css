@@ -567,7 +567,41 @@ a:focus-visible {
 @keyframes stock-chat-backdrop { from { opacity: 0; } to { opacity: 1; } }
 @keyframes stock-chat-dot { 0%, 80%, 100% { opacity: .35; } 40% { opacity: 1; } }
 
+/* 관심 종목 서버 저장 실패·다시 시도 */
+.watch-error { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); background: #fdf1f1; color: var(--bad); font-size: 11px; }
+.watch-retry { margin-top: 10px; padding: 5px 10px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; }
+.watchlist-panel .empty-state a { color: var(--focus); }
+
+/* ===== 로그인 상태 (상단 오른쪽) ===== */
+.auth-menu { display: flex; align-items: center; gap: 6px; min-width: 120px; margin-left: 14px; justify-content: flex-end; }
+.auth-user { margin-right: 4px; color: var(--text-sub); font-size: 12px; white-space: nowrap; }
+.auth-user strong { color: var(--text); }
+.auth-link {
+  padding: 6px 10px; border: 1px solid var(--line); background: var(--surface);
+  font-size: 12px; text-decoration: none; white-space: nowrap;
+}
+.auth-link:hover { background: var(--surface-sub); }
+.auth-link-strong { border-color: var(--accent); background: var(--accent); color: #fff; }
+.auth-link-strong:hover { background: #000; }
+
+/* ===== 로그인·회원가입 화면 ===== */
+.auth-page { display: grid; place-items: center; min-height: 100vh; padding: 32px 16px; }
+.auth-card { display: grid; gap: 14px; width: min(380px, 100%); padding: 28px 26px 24px; }
+.auth-home { color: var(--text-faint); font-size: 11px; text-decoration: none; }
+.auth-card h1 { margin: 0; font-size: 22px; }
+.auth-desc { margin: -6px 0 4px; color: var(--text-sub); font-size: 12px; line-height: 1.6; }
+.auth-field { display: grid; gap: 6px; font-size: 12px; color: var(--text-sub); }
+.auth-field input { padding: 10px 11px; border: 1px solid #b5b5b5; background: var(--surface); color: var(--text); font-size: 14px; }
+.auth-field input:focus-visible { outline: none; border-color: var(--accent); }
+.auth-error { margin: 0; padding: 9px 11px; border: 1px solid var(--up-bg); background: #fdf1f1; color: var(--bad); font-size: 12px; }
+.auth-submit { margin-top: 4px; padding: 11px; border: 0; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; }
+.auth-submit:disabled { background: var(--line); color: var(--text-sub); }
+.auth-switch { margin: 0; color: var(--text-sub); font-size: 12px; text-align: center; }
+.auth-switch a { color: var(--focus); }
+
 @media (max-width: 520px) {
+  .auth-menu { min-width: 0; margin-left: 8px; }
+  .auth-user { display: none; }
   .stock-chat-drawer { width: 100%; }
   .stock-chat-header { min-height: 88px; padding: 20px; }
   .stock-chat-preview { padding: 10px 20px; }

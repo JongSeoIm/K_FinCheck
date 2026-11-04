@@ -3,11 +3,13 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://loca
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8085/ws/quotes'
 
 // fetch 에러 처리와 JSON 파싱을 도와주는 함수 (실습 boardApi.js 방식)
-const fetchWrapper = async (path, options = {}) => {
+// 로그인 세션 쿠키(JSESSIONID)를 함께 보내도록 credentials: 'include'
+export const fetchWrapper = async (path, options = {}) => {
   let response
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json', ...options.headers },
     })
   } catch (error) {
@@ -17,7 +19,9 @@ const fetchWrapper = async (path, options = {}) => {
 
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new Error(data.error || `요청에 실패했습니다. (${response.status})`)
+    const error = new Error(data.error || `요청에 실패했습니다. (${response.status})`)
+    error.status = response.status
+    throw error
   }
   return data
 }
@@ -55,6 +59,16 @@ export const stockApi = {
   // 최근 실적 (분기 매출액·영업이익률·EPS, 단위 억원) → { source, unit, quarters }
   getEarnings: (symbol, options) =>
     fetchWrapper(`/api/stocks/${symbol}/earnings`, options),
+
+  // 내 관심 종목 (로그인 필요, 모두 변경 후 전체 목록 [{ symbol, name, market, regdate }])
+  getWatchlist: (options) =>
+    fetchWrapper('/api/watchlist', options).then((d) => d.list ?? []),
+
+  addWatchlist: (symbol) =>
+    fetchWrapper('/api/watchlist', { method: 'POST', body: JSON.stringify({ symbol }) }).then((d) => d.list ?? []),
+
+  removeWatchlist: (symbol) =>
+    fetchWrapper(`/api/watchlist/${symbol}`, { method: 'DELETE' }).then((d) => d.list ?? []),
 
   // 시세 수신 상태
   getStatus: (options) =>

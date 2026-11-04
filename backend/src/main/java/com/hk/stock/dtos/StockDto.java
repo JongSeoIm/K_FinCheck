@@ -6,7 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-//지원 종목 정보 (stock_info 테이블)
+//지원 종목 정보 (company 테이블)
 @Alias(value = "stockDto")
 @Data
 @NoArgsConstructor

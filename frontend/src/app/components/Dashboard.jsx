@@ -5,7 +5,9 @@ import { stockApi } from '@/api/stockApi'
 import useHydrated from '@/app/hooks/useHydrated'
 import useMarketStatus from '@/app/hooks/useMarketStatus'
 import useQuoteFeed from '@/app/hooks/useQuoteFeed'
+import useAuthStore from '@/app/store/useAuthStore'
 import useStockStore from '@/app/store/useStockStore'
+import AuthMenu from './AuthMenu'
 import EarningsPanel from './EarningsPanel'
 import FeedStatusBar from './FeedStatusBar'
 import MarketTicker from './MarketTicker'
@@ -28,7 +30,16 @@ export default function Dashboard({ initialSymbol }) {
 
   const feedMode = useStockStore((state) => state.feedMode)
   const watchlist = useStockStore((state) => state.watchlist)
+  const loadWatchlist = useStockStore((state) => state.loadWatchlist)
+  const clearWatchlist = useStockStore((state) => state.clearWatchlist)
+  const userId = useAuthStore((state) => state.user?.userId)
   const { status: marketStatus, error: statusError } = useMarketStatus()
+
+  // 로그인한 계정의 관심 종목을 서버에서 불러오고, 로그아웃하면 비운다
+  useEffect(() => {
+    if (userId) loadWatchlist()
+    else clearWatchlist()
+  }, [userId, loadWatchlist, clearWatchlist])
 
   // 지원 종목 목록 (티커·기본 선택 종목)
   useEffect(() => {
@@ -69,6 +80,7 @@ export default function Dashboard({ initialSymbol }) {
         <span className='prototype-label'>국내 주식 실시간 시세 · 한국투자증권 데이터</span>
         <h1 className='sr-only'>국내 주식 대시보드</h1>
         <StockSearch onSelect={handleSelect} />
+        <AuthMenu />
       </header>
 
       <FeedStatusBar feed={feed} marketStatus={marketStatus} statusError={statusError} />

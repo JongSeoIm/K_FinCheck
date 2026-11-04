@@ -31,6 +31,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
+		<!-- 비밀번호 해시 (BCrypt만 사용, Spring Security 전체는 넣지 않는다) -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-crypto</artifactId>
+		</dependency>
 		<!-- DB 접근 -->
 		<dependency>
 			<groupId>org.mybatis.spring.boot</groupId>

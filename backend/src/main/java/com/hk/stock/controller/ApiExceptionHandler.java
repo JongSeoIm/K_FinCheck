@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -14,6 +16,8 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import com.hk.stock.market.MarketDataException;
 import com.hk.stock.service.NewsService.NewsApiException;
 import com.hk.stock.service.StockService.StockNotFoundException;
+import com.hk.stock.service.UserService.DuplicateLoginIdException;
+import com.hk.stock.service.UserService.LoginFailedException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -29,11 +33,16 @@ public class ApiExceptionHandler {
 	}
 
 	@ExceptionHandler({ IllegalArgumentException.class, ConstraintViolationException.class,
-			HandlerMethodValidationException.class, MissingServletRequestParameterException.class })
+			HandlerMethodValidationException.class, MissingServletRequestParameterException.class,
+			MethodArgumentNotValidException.class, HttpMessageNotReadableException.class })
 	public ResponseEntity<Map<String, String>> badRequest(Exception e) {
 		//검증 오류는 "메서드명.파라미터명: " 접두어 없이 메시지만 전달
 		String message;
-		if (e instanceof HandlerMethodValidationException v) {
+		if (e instanceof MethodArgumentNotValidException v) {
+			message = v.getBindingResult().getAllErrors().stream().map(err -> err.getDefaultMessage()).findFirst().orElse("잘못된 요청입니다.");
+		} else if (e instanceof HttpMessageNotReadableException) {
+			message = "요청 형식이 올바르지 않습니다.";
+		} else if (e instanceof HandlerMethodValidationException v) {
 			message = v.getAllErrors().stream().map(err -> err.getDefaultMessage()).findFirst().orElse("잘못된 요청입니다.");
 		} else if (e instanceof ConstraintViolationException v) {
 			message = v.getConstraintViolations().stream().map(cv -> cv.getMessage()).findFirst().orElse("잘못된 요청입니다.");
@@ -54,6 +63,18 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(NewsApiException.class)
 	public ResponseEntity<Map<String, String>> news(NewsApiException e) {
 		return error(e.getStatus(), e.getMessage());
+	}
+
+	//회원가입 아이디 중복 → 409
+	@ExceptionHandler(DuplicateLoginIdException.class)
+	public ResponseEntity<Map<String, String>> conflict(DuplicateLoginIdException e) {
+		return error(HttpStatus.CONFLICT, e.getMessage());
+	}
+
+	//로그인 실패 → 401
+	@ExceptionHandler(LoginFailedException.class)
+	public ResponseEntity<Map<String, String>> unauthorized(LoginFailedException e) {
+		return error(HttpStatus.UNAUTHORIZED, e.getMessage());
 	}
 
 	private ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {
