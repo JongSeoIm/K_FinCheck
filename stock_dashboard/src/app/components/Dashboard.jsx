@@ -18,7 +18,7 @@ const LazyNewsFeed = lazy(() => import('./NewsFeed'))
 export default function Dashboard({ initialStock }) {
   const [selectedStock, setSelectedStock] = useState(initialStock || marketStocks[0])
   const [streamMode, setStreamMode] = useState('push')
-  const [intervalSeconds, setIntervalSeconds] = useState(1)
+  const [intervalSeconds, setIntervalSeconds] = useState(60)
   const stream = useRealtimeQuotes(intervalSeconds, streamMode)
 
   const handleSelectStock = (stock) => {

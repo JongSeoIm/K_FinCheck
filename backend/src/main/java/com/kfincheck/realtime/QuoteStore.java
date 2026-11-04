@@ -7,6 +7,7 @@ import java.util.*;
 @Component
 public class QuoteStore {
     public static final Set<Integer> INTERVALS = Set.of(1, 5, 30, 60, 180, 300, 600, 900, 1800, 3600);
+    public static final int MAX_CANDLES_PER_INTERVAL = 3000;
     private final Map<String, QuoteEvent> quotes = new LinkedHashMap<>();
     private final Map<String, Map<Integer, NavigableMap<Long, ObservedCandle>>> bars = new HashMap<>();
     private String relay = "DISABLED";
@@ -34,7 +35,7 @@ public class QuoteStore {
                     ? new ObservedCandle(date, next.price(), next.price(), next.price(), next.price(), next.tradeVolume())
                     : new ObservedCandle(date, bar.open(), Math.max(bar.high(), next.price()), Math.min(bar.low(), next.price()),
                         next.price(), bar.volume() + next.tradeVolume()));
-            while (history.size() > 120) history.pollFirstEntry();
+            while (history.size() > MAX_CANDLES_PER_INTERVAL) history.pollFirstEntry();
         }
         return true;
     }

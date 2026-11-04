@@ -5,9 +5,8 @@ import { useEffect, useState } from 'react'
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
 
 export default function useStockCandles(symbol, period = 'D', days = 40, enabled = true) {
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState(null)
+  const requestKey = `${symbol}:${period}:${days}`
 
   useEffect(() => {
     if (!symbol || !enabled) return
@@ -16,8 +15,6 @@ export default function useStockCandles(symbol, period = 'D', days = 40, enabled
 
     const fetchCandles = async () => {
       try {
-        setLoading(true)
-        setError(null)
         const response = await fetch(
           `${BACKEND_URL}/api/stocks/${symbol}/candles?period=${period}&days=${days}`,
           { signal: controller.signal }
@@ -26,21 +23,17 @@ export default function useStockCandles(symbol, period = 'D', days = 40, enabled
         if (!response.ok) {
           throw new Error(result.error || '시세 데이터 조회 실패')
         }
-        setData(Array.isArray(result) ? result : [])
+        if (!controller.signal.aborted) setResult({ key: requestKey, data: Array.isArray(result) ? result : [], error: null })
       } catch (err) {
-        if (err.name !== 'AbortError') {
-          setError(err.message)
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        if (!controller.signal.aborted) setResult({ key: requestKey, data: [],
+          error: err instanceof TypeError ? '차트 서버에 연결하지 못했습니다.' : err.message })
       }
     }
 
     fetchCandles()
     return () => controller.abort()
-  }, [symbol, period, days, enabled])
+  }, [symbol, period, days, enabled, requestKey])
 
-  return { data, loading, error }
+  const current = result?.key === requestKey ? result : null
+  return { data: current?.data || [], loading: enabled && !current, error: current?.error || null }
 }

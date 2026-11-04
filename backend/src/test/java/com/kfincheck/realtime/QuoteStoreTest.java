@@ -6,6 +6,24 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.*;
 
 class QuoteStoreTest {
+    @Test void retains3000BarsAndBoundsEveryMinuteInterval() {
+        var store = new QuoteStore();
+        var start = java.time.Instant.parse("2026-11-04T00:00:00Z");
+        int events = QuoteStore.MAX_CANDLES_PER_INTERVAL + 10;
+        for (int i = 0; i < events; i++) {
+            var time = start.plusSeconds(i * 3600L);
+            store.accept(new QuoteEvent("005930", 70000 + i % 100, 0, 0,
+                    70000, 70100, 69900, i + 1, 1, "2026-11-04", "090000", time, time, "KIS"));
+        }
+        for (int interval : List.of(60, 180, 300, 600, 900, 1800, 3600)) {
+            @SuppressWarnings("unchecked")
+            var history = (Map<String, List<QuoteStore.ObservedCandle>>) store.snapshot(interval, List.of("005930")).get("candles");
+            assertThat(history.get("005930")).hasSize(3000);
+            assertThat(history.get("005930")).extracting(QuoteStore.ObservedCandle::date).isSorted();
+            assertThat(history.get("005930").getFirst().date()).isEqualTo(start.plusSeconds(10 * 3600L).toString());
+        }
+    }
+
     @Test void aggregatesObservedOhlcAndRejectsDuplicatesAndOlderTrades() {
         var parser = new KisTradeParser();
         var store = new QuoteStore();

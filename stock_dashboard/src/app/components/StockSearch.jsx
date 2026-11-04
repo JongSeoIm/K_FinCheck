@@ -9,8 +9,9 @@ export default function StockSearch({ onSelectStock }) {
   const [message, setMessage] = useState('')
   const searchAreaRef = useRef(null)
 
-  useEffect(() => {
-    const trimmed = keyword.trim().toLowerCase()
+  const handleKeywordChange = (value) => {
+    setKeyword(value)
+    const trimmed = value.trim().toLowerCase()
     if (!trimmed) {
       setResults([])
       setMessage('')
@@ -24,7 +25,7 @@ export default function StockSearch({ onSelectStock }) {
 
     setResults(filtered)
     setMessage(filtered.length === 0 ? '일치하는 국내 종목이 없습니다.' : '')
-  }, [keyword])
+  }
 
   useEffect(() => {
     const closeResults = (event) => {
@@ -58,7 +59,7 @@ export default function StockSearch({ onSelectStock }) {
           id='stock-search'
           type='search'
           value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
+          onChange={(event) => handleKeywordChange(event.target.value)}
           placeholder='국내 기업명 또는 종목코드 검색 (예: 삼성전자, 005930)'
           autoComplete='off'
         />

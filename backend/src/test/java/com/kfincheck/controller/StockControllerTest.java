@@ -20,6 +20,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(StockController.class)
 class StockControllerTest {
 
+    @Test
+    void upstreamFailureReturnsSafeServiceUnavailableMessage() throws Exception {
+        given(stockService.getStockPrice("005930")).willThrow(new IllegalStateException("upstream URL and internal detail"));
+        mockMvc.perform(get("/api/stocks/005930/price"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("시세 자료를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."));
+    }
+
     @Autowired
     private MockMvc mockMvc;
 

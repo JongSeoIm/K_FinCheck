@@ -5,9 +5,7 @@ import { useEffect, useState } from 'react'
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
 
 export default function useStockData(symbol, enabled = true) {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState(null)
 
   useEffect(() => {
     if (!symbol || !enabled) return
@@ -16,8 +14,6 @@ export default function useStockData(symbol, enabled = true) {
 
     const fetchStockData = async () => {
       try {
-        setLoading(true)
-        setError(null)
         const response = await fetch(`${BACKEND_URL}/api/stocks/${symbol}/price`, {
           signal: controller.signal,
         })
@@ -25,15 +21,10 @@ export default function useStockData(symbol, enabled = true) {
         if (!response.ok) {
           throw new Error(result.error || '시세 조회에 실패했습니다.')
         }
-        if (!controller.signal.aborted) setData({ ...result, fetchedAt: new Date().toISOString() })
+        if (!controller.signal.aborted) setResult({ symbol, data: { ...result, fetchedAt: new Date().toISOString() }, error: null })
       } catch (requestError) {
-        if (requestError.name !== 'AbortError') {
-          setError(requestError.message)
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        if (!controller.signal.aborted) setResult({ symbol, data: null,
+          error: requestError instanceof TypeError ? '시세 서버에 연결하지 못했습니다.' : requestError.message })
       }
     }
 
@@ -41,5 +32,6 @@ export default function useStockData(symbol, enabled = true) {
     return () => controller.abort()
   }, [symbol, enabled])
 
-  return { data, loading, error }
+  const current = result?.symbol === symbol ? result : null
+  return { data: current?.data || null, loading: enabled && !current, error: current?.error || null }
 }

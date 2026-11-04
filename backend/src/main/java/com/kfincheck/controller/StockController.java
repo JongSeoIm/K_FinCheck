@@ -48,7 +48,7 @@ public class StockController {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> handleServiceError(IllegalStateException e) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", e.getMessage()));
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", "시세 자료를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."));
     }
 }

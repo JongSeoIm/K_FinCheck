@@ -21,7 +21,7 @@ import useStockCandles from '../hooks/useStockCandles'
 const timeAxisFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
 const timeTickSteps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600, 43200, 86400]
 
-const minuteOptions = ['1초', '5초', '30초', '1분', '3분', '5분', '10분', '15분', '30분', '60분']
+const minuteOptions = ['1분', '3분', '5분', '10분', '15분', '30분', '60분']
 
 function formatKRW(value) {
   if (value == null) return '—'
@@ -92,7 +92,7 @@ function ChartTooltip({ active, payload }) {
 export default function StockChart({ symbol, liveQuote, liveCandles, streamInterval, streamStatus, supported, onIntervalChange }) {
   const [chartType, setChartType] = useState('candle')
   const [selectedPeriod, setSelectedPeriod] = useState('일')
-  const [selectedMinute, setSelectedMinute] = useState('1초')
+  const [selectedMinute, setSelectedMinute] = useState('1분')
   const [isMinuteOpen, setIsMinuteOpen] = useState(false)
   const dropdownRef = useRef(null)
   const chartAreaRef = useRef(null)
@@ -126,7 +126,7 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
   }, [isIntraday, streamInterval, seconds, liveCandles, periodCode, liveQuote, historicalCandles])
 
   const viewKey = `${symbol}:${selectedPeriod}:${isIntraday ? seconds : periodCode}`
-  const visibleCount = zoom?.key === viewKey ? zoom.count : null
+  const visibleCount = zoom?.key === viewKey ? zoom.count : isIntraday ? 120 : null
   const visibleCandles = useMemo(() => (
     visibleCount == null ? candles : candles.slice(-visibleCount)
   ), [candles, visibleCount])
@@ -170,8 +170,9 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
       if (now - lastWheelRef.current < 60) return
       lastWheelRef.current = now
       setZoom(current => {
-        const count = current?.key === viewKey && current.count != null
-          ? Math.min(current.count, candles.length) : candles.length
+        const count = current?.key === viewKey
+          ? Math.min(current.count ?? candles.length, candles.length)
+          : Math.min(isIntraday ? 120 : candles.length, candles.length)
         const next = event.deltaY < 0
           ? Math.max(8, Math.floor(count * 0.8))
           : Math.min(candles.length, Math.ceil(count * 1.25))
@@ -180,7 +181,7 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     }
     area.addEventListener('wheel', handleWheel, { passive: false })
     return () => area.removeEventListener('wheel', handleWheel)
-  }, [viewKey, candles.length])
+  }, [viewKey, candles.length, isIntraday])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -196,11 +197,11 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     useMemo(() => {
       if (!candles || candles.length === 0) {
         return {
-          firstClose: 0,
-          lastClose: 0,
-          highPrice: 0,
-          lowPrice: 0,
-          changeRate: 0,
+          firstClose: null,
+          lastClose: null,
+          highPrice: null,
+          lowPrice: null,
+          changeRate: null,
           isRising: true,
         }
       }
@@ -329,14 +330,14 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
           {isIntraday ? `${selectedMinute}봉 · 연결 후 수신분` : `${selectedPeriod}봉 시세 · KIS`}
         </span>
         <span>
-          {loading ? '시세 데이터 수신 중...' : error || `${candles.length}개 봉 · ${supported ? streamStatus : '실시간 연결 종목 확인'}`}
+          {loading ? '시세 데이터 수신 중...' : error || `${visibleCandles.length < candles.length ? `${visibleCandles.length}/${candles.length}` : candles.length}개 봉 · ${supported ? streamStatus : '실시간 연결 종목 확인'}`}
         </span>
       </div>
 
       <div className='chart-summary'>
         <strong>{formatKRW(lastClose)}</strong>
-        <span className={isRising ? 'positive' : 'negative'}>
-          {isRising ? '+' : ''}{changeRate.toFixed(2)}%
+        <span className={changeRate == null ? '' : isRising ? 'positive' : 'negative'}>
+          {changeRate == null ? '—' : `${isRising ? '+' : ''}${changeRate.toFixed(2)}%`}
         </span>
       </div>
 
@@ -355,8 +356,8 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
         </div>
         <div>
           <span>기간 등락률</span>
-          <strong className={isRising ? 'positive' : 'negative'}>
-            {isRising ? '+' : ''}{changeRate.toFixed(2)}%
+          <strong className={changeRate == null ? '' : isRising ? 'positive' : 'negative'}>
+            {changeRate == null ? '—' : `${isRising ? '+' : ''}${changeRate.toFixed(2)}%`}
           </strong>
         </div>
       </div>

@@ -30,9 +30,9 @@ export default function StockInfo({ stock, liveQuote }) {
   const isSaved = hydrated && watchlist.includes(stock.symbol)
   const displayName = data?.stockName || stock.name || stock.symbol
   const displayMarket = data?.marketName || stock.market || 'KOSPI'
-  const displayPrice = data?.price ?? stock.price ?? 0
-  const displayChangeRate = data?.changeRate ?? stock.change ?? 0
-  const priceChange = data?.priceChange ?? 0
+  const displayPrice = data?.price ?? null
+  const displayChangeRate = data?.changeRate ?? null
+  const priceChange = data?.priceChange ?? null
   const isRising = displayChangeRate >= 0
   const isZero = displayChangeRate === 0
 
@@ -71,11 +71,11 @@ export default function StockInfo({ stock, liveQuote }) {
           {loading ? (
             <span className='price-skeleton' />
           ) : (
-            <strong>{formatNumber(displayPrice)}원</strong>
+            <strong>{displayPrice == null ? '—' : `${formatNumber(displayPrice)}원`}</strong>
           )}
-          <p className={isZero ? '' : isRising ? 'positive' : 'negative'}>
-            {!isZero && (isRising ? '+' : '')}{formatNumber(priceChange)}원
-            <span>({!isZero && (isRising ? '+' : '')}{formatNumber(displayChangeRate, 2)}%)</span>
+          <p className={displayChangeRate == null || isZero ? '' : isRising ? 'positive' : 'negative'}>
+            {priceChange == null ? '—' : `${priceChange > 0 ? '+' : ''}${formatNumber(priceChange)}원`}
+            {displayChangeRate != null && <span>({displayChangeRate > 0 ? '+' : ''}{formatNumber(displayChangeRate, 2)}%)</span>}
           </p>
           {error && <small className='inline-warning'>{error}</small>}
         </div>
