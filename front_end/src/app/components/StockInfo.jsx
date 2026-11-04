@@ -31,6 +31,7 @@ export default function StockInfo({ stock }) {
   const { data, loading, error } = useStockData(stock.symbol)
   const [profile, setProfile] = useState(null)
   const [lastUpdated, setLastUpdated] = useState('')
+  const [tradeTime, setTradeTime] = useState('')
 
   const watchlist = useStockStore((state) => state.watchlist)
   const addToWatchlist = useStockStore((state) => state.addToWatchlist)
@@ -45,6 +46,20 @@ export default function StockInfo({ stock }) {
         if (requestError.name !== 'AbortError') console.error(requestError)
       })
     return () => controller.abort()
+  }, [stock.symbol])
+
+  // 마지막 체결 시각 (KIS 체결 내역 기준, 15초마다 갱신)
+  useEffect(() => {
+    let alive = true
+    const load = () => fetch(`/api/kis/trade-time/${stock.symbol}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result) => {
+        if (alive) setTradeTime(result ? `${result.tradeDate.slice(5).replace('-', '/')} ${result.tradeTime}` : '')
+      })
+      .catch(() => { if (alive) setTradeTime('') })
+    load()
+    const timer = setInterval(load, 15000)
+    return () => { alive = false; clearInterval(timer) }
   }, [stock.symbol])
 
   useEffect(() => {
@@ -84,6 +99,7 @@ export default function StockInfo({ stock }) {
             {isRising ? '+' : ''}{formatCurrency(Math.abs(priceChange)).replace('₩', '')}원 ({isRising ? '+' : ''}{Number(displayChange).toFixed(2)}%)
           </p>
           <div className='update-time' style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>마지막 갱신 {lastUpdated || '—'}</div>
+          <div className='update-time' style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>마지막 체결 {tradeTime || '—'} (KRX)</div>
           {error && <small className='inline-warning'>실시간 조회 지연</small>}
         </div>
 

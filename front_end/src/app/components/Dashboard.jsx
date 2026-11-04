@@ -1,6 +1,7 @@
 'use client'
 
 import { lazy, Suspense, useMemo, useState } from 'react'
+import AuthStatus from './AuthStatus'
 import EarningsPanel from './EarningsPanel'
 import StockChatDrawer from './StockChatDrawer'
 import MarketTicker from './MarketTicker'
@@ -40,6 +41,7 @@ export default function Dashboard({ initialStock }) {
     <main className='app-shell'>
       <header className='topbar'>
         <span className='prototype-label'>K_FinCheck</span>
+        <AuthStatus />
         <h1 className='sr-only'>주식 대시보드</h1>
         <StockSearch onSelectStock={handleSelectStock} />
       </header>
@@ -70,7 +72,7 @@ export default function Dashboard({ initialStock }) {
 
           <section className='panel news-panel'>
             <div className='panel-heading'>
-              <h2>{selectedStock.name || selectedSymbol} 관련 뉴스</h2>
+              <h2>{selectedStock.name || selectedStock.symbol} 관련 뉴스</h2>
             </div>
             <Suspense fallback={<NewsSkeleton />}>
               <LazyNewsFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />

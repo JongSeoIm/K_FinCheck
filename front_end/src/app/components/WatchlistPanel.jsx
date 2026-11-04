@@ -12,6 +12,8 @@ const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 export default function WatchlistPanel({ activeSymbol, onSelectStock }) {
   const hydrated = useHydrated()
   const watchlist = useStockStore((state) => state.watchlist)
+  const user = useStockStore((state) => state.user)
+  const authReady = useStockStore((state) => state.authReady)
   const addToWatchlist = useStockStore((state) => state.addToWatchlist)
   const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
 
@@ -22,7 +24,7 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock }) {
 
   const codes = watchlist.join(',')
 
-  // 관심 종목 시세를 10초마다 Spring(KIS)에서 받아 옴
+  // 관심 종목 시세를 10초마다 Spring(KIS)에서 받아 옵니다.
   useEffect(() => {
     if (!hydrated || !codes) return undefined
     const controller = new AbortController()
@@ -50,7 +52,7 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock }) {
   }, [hydrated, codes])
 
   // 종목코드(6자리)로 직접 추가
-  const handleAdd = (event) => {
+  const handleAdd = async (event) => {
     event.preventDefault()
     const value = code.trim()
     if (!/^\d{6}$/.test(value)) {
@@ -61,7 +63,12 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock }) {
       setMessage('이미 관심 종목에 있습니다.')
       return
     }
-    addToWatchlist(value)
+    // 서버(계정별 DB)에 저장합니다. 로그인 전이면 로그인 화면으로 안내됩니다.
+    const result = await addToWatchlist(value)
+    if (!result.ok) {
+      setMessage(result.error)
+      return
+    }
     setCode('')
     setMessage('')
   }
@@ -96,8 +103,17 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock }) {
         </div>
       ) : watchlist.length === 0 ? (
         <div className='empty-state'>
-          <strong>아직 저장한 종목이 없습니다.</strong>
-          <p>위에서 종목코드를 입력하거나, 종목 상단의 ‘관심 종목 추가’를 눌러 보세요.</p>
+          {authReady && !user ? (
+            <>
+              <strong>로그인하면 관심 종목을 저장할 수 있습니다.</strong>
+              <p>상단의 ‘로그인’을 누르면 내 계정의 관심 종목이 표시됩니다.</p>
+            </>
+          ) : (
+            <>
+              <strong>아직 저장한 종목이 없습니다.</strong>
+              <p>위에서 종목코드를 입력하거나, 종목 상단의 ‘관심 종목 추가’를 눌러 보세요.</p>
+            </>
+          )}
         </div>
       ) : (
         <ul className='watchlist'>
