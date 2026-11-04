@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.hk.stock.mapper.FinancialMapper">
+
+	<select id="getCompany" parameterType="String" resultType="companyDto">
+		SELECT symbol, name, market, dart_corp_code
+		FROM company
+		WHERE symbol = #{symbol}
+		  AND use_yn = 'Y'
+	</select>
+
+	<!-- 같은 공시(접수번호 + 연결/별도)는 한 번만 저장한다 (UNIQUE uk_financial_report) -->
+	<insert id="insertReport" parameterType="financialReportDto">
+		INSERT IGNORE INTO financial_report (rcept_no, symbol, bsns_year, reprt_code, fs_div)
+		VALUES (#{rceptNo}, #{symbol}, #{bsnsYear}, #{reprtCode}, #{fsDiv})
+	</insert>
+
+	<select id="getReport" resultType="financialReportDto">
+		SELECT report_id, rcept_no, symbol, bsns_year, reprt_code, fs_div, regdate
+		FROM financial_report
+		WHERE rcept_no = #{rceptNo}
+		  AND fs_div = #{fsDiv}
+	</select>
+
+	<!-- 정정 공시가 있으면 접수번호가 큰(나중) 공시가 먼저 -->
+	<select id="findReports" resultType="financialReportDto">
+		SELECT report_id, rcept_no, symbol, bsns_year, reprt_code, fs_div, regdate
+		FROM financial_report
+		WHERE symbol = #{symbol}
+		  AND bsns_year = #{bsnsYear}
+		  AND reprt_code = #{reprtCode}
+		ORDER BY rcept_no DESC
+	</select>
+
+	<!-- 같은 공시의 같은 계정은 한 번만 (PK report_id + account_id) -->
+	<insert id="insertValue" parameterType="financialValueDto">
+		INSERT IGNORE INTO financial_value (report_id, account_id, account_nm, thstrm_amount, frmtrm_amount, currency)
+		VALUES (#{reportId}, #{accountId}, #{accountNm}, #{thstrmAmount}, #{frmtrmAmount}, #{currency})
+	</insert>
+
+	<select id="getValues" parameterType="Long" resultType="financialValueDto">
+		SELECT report_id, account_id, account_nm, thstrm_amount, frmtrm_amount, currency
+		FROM financial_value
+		WHERE report_id = #{reportId}
+	</select>
+
+</mapper>

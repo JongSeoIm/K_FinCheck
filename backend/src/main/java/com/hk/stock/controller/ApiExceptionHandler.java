@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import com.hk.stock.market.MarketDataException;
+import com.hk.stock.service.DartClient.DartApiException;
+import com.hk.stock.service.FinancialService.FinancialNotFoundException;
 import com.hk.stock.service.NewsService.NewsApiException;
 import com.hk.stock.service.StockService.StockNotFoundException;
 import com.hk.stock.service.UserService.DuplicateLoginIdException;
@@ -63,6 +65,18 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(NewsApiException.class)
 	public ResponseEntity<Map<String, String>> news(NewsApiException e) {
 		return error(e.getStatus(), e.getMessage());
+	}
+
+	//OpenDART 오류 → 원인별 상태 코드 (키 미설정·키 오류 503, 한도 초과 429, 그 외 502)
+	@ExceptionHandler(DartApiException.class)
+	public ResponseEntity<Map<String, String>> dart(DartApiException e) {
+		return error(e.getStatus(), e.getMessage());
+	}
+
+	//공시된 실적이 없음 → 404
+	@ExceptionHandler(FinancialNotFoundException.class)
+	public ResponseEntity<Map<String, String>> financialNotFound(FinancialNotFoundException e) {
+		return error(HttpStatus.NOT_FOUND, e.getMessage());
 	}
 
 	//회원가입 아이디 중복 → 409
