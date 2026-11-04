@@ -1,8 +1,10 @@
 'use client'
 
 import { lazy, Suspense, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import EarningsPanel from './EarningsPanel'
-import MarketTicker from './MarketTicker'
+import DomesticStocks from './DomesticStocks'
 import RecommendationChart from './RecommendationChart'
 import StockChart from './StockChart'
 import StockChatDrawer from './StockChatDrawer'
@@ -11,12 +13,18 @@ import StockSearch from './StockSearch'
 import WatchlistPanel from './WatchlistPanel'
 import AuthNav from './AuthNav'
 import useRealtimeQuotes from '../hooks/useRealtimeQuotes'
+import useRecentStock from '../hooks/useRecentStock'
 import { marketStocks } from '../lib/market'
 
 const LazyNewsFeed = lazy(() => import('./NewsFeed'))
 
 export default function Dashboard({ initialStock }) {
-  const [selectedStock, setSelectedStock] = useState(initialStock || marketStocks[0])
+  const router = useRouter()
+  const params = useSearchParams()
+  const isList = !params.has('symbol')
+  const selectedStock = marketStocks.find(stock => stock.symbol === params.get('symbol')) || initialStock || marketStocks[0]
+  const recentSymbol = useRecentStock(isList ? null : selectedStock.symbol)
+  const recentStock = marketStocks.find(stock => stock.symbol === recentSymbol)
   const [streamMode, setStreamMode] = useState('push')
   const [intervalSeconds, setIntervalSeconds] = useState(60)
   const stream = useRealtimeQuotes(intervalSeconds, streamMode)
@@ -28,25 +36,32 @@ export default function Dashboard({ initialStock }) {
       name: stock.name || String(stock.symbol),
     }
 
-    setSelectedStock(normalizedStock)
-    window.history.replaceState({}, '', `/?symbol=${encodeURIComponent(normalizedStock.symbol)}`)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    router.push(`/?symbol=${encodeURIComponent(normalizedStock.symbol)}`)
   }
 
   return (
     <main className='app-shell'>
       <header className='topbar'>
-        <h1 className='sr-only'>주식 대시보드</h1>
-        <AuthNav symbol={selectedStock.symbol} />
-        <StockSearch onSelectStock={handleSelectStock} />
+        {!isList && <h1 className='sr-only'>종목 상세 정보</h1>}
+        <div className='topbar-navigation'>
+          <Link className={`market-nav-link${isList ? ' active' : ''}`} href='/' aria-current={isList ? 'page' : undefined}>국내 주식</Link>
+          {recentStock
+            ? <Link className={`market-nav-link recent-stock-link${!isList ? ' active' : ''}`}
+              href={`/?symbol=${recentStock.symbol}`} title={recentStock.name} aria-current={!isList ? 'page' : undefined}>최근 본 종목</Link>
+            : <span className='market-nav-link recent-stock-link unavailable' title='종목을 선택하면 다시 열 수 있습니다.'>최근 본 종목</span>}
+        </div>
+        <div className='topbar-actions'>
+          <StockSearch onSelectStock={handleSelectStock} />
+          <AuthNav symbol={selectedStock.symbol} returnTo={isList ? '/' : undefined} />
+        </div>
       </header>
 
-      <MarketTicker
-        activeSymbol={selectedStock.symbol}
-        onSelectStock={handleSelectStock}
-        trades={stream.trades}
-      />
-
+      {isList ? <div className='dashboard-layout market-layout'>
+        <DomesticStocks trades={stream.trades} onSelectStock={handleSelectStock} />
+        <aside className='insight-column' aria-label='관심 종목'>
+          <WatchlistPanel onSelectStock={handleSelectStock} trades={stream.trades} />
+        </aside>
+      </div> : (
       <div className='dashboard-layout'>
         <section className='primary-column' aria-label='선택 종목 정보'>
           <StockInfo key={selectedStock.symbol} stock={selectedStock} liveQuote={stream.trades[selectedStock.symbol]} />
@@ -100,6 +115,7 @@ export default function Dashboard({ initialStock }) {
           </section>
         </aside>
       </div>
+      )}
     </main>
   )
 }

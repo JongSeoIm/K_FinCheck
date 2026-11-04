@@ -5,7 +5,7 @@ import useAuthStore from '../store/useAuthStore'
 import useStockStore from '../store/useStockStore'
 import { accountApi } from '../lib/accountApi'
 
-export default function AuthNav({ symbol }) {
+export default function AuthNav({ symbol, returnTo }) {
   const { user, ready, refresh, setUser } = useAuthStore()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -40,6 +40,6 @@ export default function AuthNav({ symbol }) {
     {error && <span role='alert'>{error}</span>}
     {!ready ? <span>계정 확인 중…</span> : user ? <>
       <button type='button' disabled={busy} onClick={logout}>{busy ? '로그아웃 중…' : '로그아웃'}</button>
-    </> : <a href={`/login?next=${encodeURIComponent(`/?symbol=${symbol}`)}`}>로그인</a>}
+    </> : <a href={`/login?next=${encodeURIComponent(returnTo || `/?symbol=${symbol}`)}`}>로그인</a>}
   </nav>
 }

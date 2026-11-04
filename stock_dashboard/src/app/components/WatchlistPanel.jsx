@@ -48,7 +48,7 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock, trades = {
       ) : watchlist.length === 0 ? (
         <div className='empty-state'>
           <strong>{user ? '아직 저장한 종목이 없습니다.' : '로그인 후 관심 종목을 저장해 보세요.'}</strong>
-          <p>{user ? '종목 상단의 ‘관심 추가’를 누르면 여기에 보관됩니다.' : '계정별로 관심 종목을 보관합니다.'}</p>
+          <p>{user ? '종목 옆 별표를 누르면 여기에 보관됩니다.' : '계정별로 관심 종목을 보관합니다.'}</p>
         </div>
       ) : (
         <ul className='watchlist'>
