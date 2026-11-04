@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import com.hk.stock.market.MarketDataException;
+import com.hk.stock.service.ChatService.AiServerException;
 import com.hk.stock.service.DartClient.DartApiException;
 import com.hk.stock.service.FinancialService.FinancialNotFoundException;
 import com.hk.stock.service.NewsService.NewsApiException;
@@ -70,6 +71,12 @@ public class ApiExceptionHandler {
 	//OpenDART 오류 → 원인별 상태 코드 (키 미설정·키 오류 503, 한도 초과 429, 그 외 502)
 	@ExceptionHandler(DartApiException.class)
 	public ResponseEntity<Map<String, String>> dart(DartApiException e) {
+		return error(e.getStatus(), e.getMessage());
+	}
+
+	//AI 서버 연결 실패 503, 시간 초과 504, 그 외 502
+	@ExceptionHandler(AiServerException.class)
+	public ResponseEntity<Map<String, String>> ai(AiServerException e) {
 		return error(e.getStatus(), e.getMessage());
 	}
 

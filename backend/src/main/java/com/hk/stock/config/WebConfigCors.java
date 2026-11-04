@@ -28,10 +28,10 @@ public class WebConfigCors implements WebMvcConfigurer{
 			    .maxAge(3600);
 	}
 
-	//로그인 필요 API: 관심 종목
+	//로그인 필요 API: 관심 종목, AI 챗봇
 	@Override
 	public void addInterceptors(InterceptorRegistry registry) {
 		registry.addInterceptor(loginInterceptor)
-				.addPathPatterns("/api/watchlist/**");
+				.addPathPatterns("/api/watchlist/**", "/api/chat/**");
 	}
 }

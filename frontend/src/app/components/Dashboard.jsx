@@ -120,7 +120,7 @@ export default function Dashboard({ initialSymbol }) {
             </section>
 
             <aside className='insight-column' aria-label='AI 대화·관심 종목·투자의견·실적'>
-              {selected && <StockChatDrawer stock={selected} />}
+              {selected && <StockChatDrawer key={userId ?? 'guest'} stock={selected} />}
               <WatchlistPanel activeSymbol={selected?.symbol} onSelect={handleSelect} />
               {selected && (
                 <>

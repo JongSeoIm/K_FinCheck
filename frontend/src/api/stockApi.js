@@ -70,6 +70,18 @@ export const stockApi = {
   removeWatchlist: (symbol) =>
     fetchWrapper(`/api/watchlist/${symbol}`, { method: 'DELETE' }).then((d) => d.list ?? []),
 
+  // AI 챗봇 (로그인 필요) → { status, answer, sources: [{ provider, label, basisAt, url }] }
+  askChat: (symbol, question) =>
+    fetchWrapper('/api/chat/messages', { method: 'POST', body: JSON.stringify({ symbol, question }) }),
+
+  // 서버가 기억 중인 최근 대화 (최대 10개) → [{ role, content, status, sources, createdAt }]
+  getConversation: (symbol, options) =>
+    fetchWrapper(`/api/chat/conversations/${symbol}`, options).then((d) => d.messages ?? []),
+
+  // 새 대화 (서버의 대화 문맥 삭제)
+  clearConversation: (symbol) =>
+    fetchWrapper(`/api/chat/conversations/${symbol}`, { method: 'DELETE' }),
+
   // 시세 수신 상태
   getStatus: (options) =>
     fetchWrapper('/api/market/status', options).then((d) => d.status),

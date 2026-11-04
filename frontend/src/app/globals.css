@@ -523,11 +523,27 @@ a:focus-visible {
   border: 0; background: transparent; color: var(--text-sub); font-size: 27px;
 }
 .stock-chat-close:hover { background: var(--line-soft); }
+.stock-chat-header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.stock-chat-new { padding: 6px 10px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font-size: 12px; white-space: nowrap; }
+.stock-chat-new:hover:not(:disabled) { background: var(--surface-sub); }
+.stock-chat-new:disabled { color: var(--text-faint); }
+.stock-ai-launcher.is-locked { border-color: var(--line); background: var(--surface); color: var(--text); }
+.stock-ai-launcher.is-locked:hover { background: var(--surface-sub); }
+.stock-ai-launcher.is-locked > span:last-child { font-size: 15px; }
+.stock-ai-launcher:disabled { opacity: .6; }
+/* 답변 출처 (provider · label · 기준 시각 · 원문 링크) */
+.stock-chat-sources { display: grid; gap: 6px; margin: 12px 0 0; padding: 10px 0 0; border-top: 1px dashed var(--line-soft); list-style: none; }
+.stock-chat-sources li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 11px; line-height: 1.5; color: var(--text-sub); }
+.stock-chat-source-provider { flex-shrink: 0; padding: 0 5px; border: 1px solid var(--line); color: var(--text); font-size: 10px; font-weight: 600; }
+.stock-chat-source-label { min-width: 0; overflow-wrap: anywhere; }
+.stock-chat-source-time { color: var(--text-faint); white-space: nowrap; }
+.stock-chat-sources a { color: var(--focus); white-space: nowrap; }
+.stock-chat-message.assistant.is-error p { color: var(--bad); }
 .stock-chat-preview {
   display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 44px; padding: 10px 24px;
   border-bottom: 1px solid var(--line-soft); background: var(--surface-sub); color: var(--text-faint); font-size: 11px;
 }
-.stock-chat-preview-tag { flex-shrink: 0; padding: 2px 5px; border: 1px solid #e7c66b; background: var(--demo-bg); color: var(--demo-text); font-size: 10px; }
+.stock-chat-preview-tag { flex-shrink: 0; padding: 2px 5px; border: 1px solid var(--line); background: var(--surface); color: var(--text-sub); font-size: 10px; font-weight: 600; }
 .stock-chat-messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; scrollbar-width: thin; }
 .stock-chat-empty { display: flex; flex-direction: column; justify-content: center; gap: 36px; min-height: calc(100% - 48px); padding: 8px 0 16px; }
 .stock-chat-empty-copy h3 { margin: 0 0 16px; font-size: 24px; font-weight: 500; line-height: 1.55; }
