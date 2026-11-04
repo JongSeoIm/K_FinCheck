@@ -82,6 +82,24 @@ class NewsParsersTests {
 	}
 
 	@Test
+	void 시장_환율_기사에_종목명만_스치면_기타다() {
+		assertFalse(NewsParsers.isRelated("외국인 배당금 최대 16.8조 해외로…씨티 “환율 1270원까지 하락”",
+				"삼성전자와 SK하이닉스의 대규모 배당금 지급으로 외화 유출이 늘어날 것으로 예상되지만 수출기업의 환전 수요가 이를 웃돌면서 원화 강세 흐름은 이어질 것이라는 분석이다.", SAMSUNG));
+		assertFalse(NewsParsers.isRelated("'8700 vs 4200' 코스피 극과 극 전망",
+				"코스피 대표 종목인 삼성전자의 내년도 예상 실적 PER은 3.12배에 불과하다.", SAMSUNG));
+	}
+
+	@Test
+	void 계열사_이름은_종목명으로_보지_않는다() {
+		assertFalse(NewsParsers.isRelated("삼성전자서비스, 에어컨 AS 품질 2년 연속 1위", "삼성전자서비스가 서비스 품질 평가에서 1위를 했다.", SAMSUNG));
+	}
+
+	@Test
+	void 시황_기사의_종목_등락_문장은_종목_기사다() {
+		assertTrue(NewsParsers.isRelated("코스피, 장중 급등락 끝 0.6% 상승", "삼성전자는 0.68% 내린 21만8000원에 거래를 마쳤다.", SAMSUNG));
+	}
+
+	@Test
 	void 의견_글과_정치_기사는_제목에_종목명이_있어도_기타다() {
 		assertFalse(NewsParsers.isRelated("[부산 변호사 한변의 리얼상담실 66] 주성엔지니어링 주가 7배",
 				"매출의 84%가 SK하이닉스에서 나왔고 주가는 7배 올랐다.", List.of("SK하이닉스", "000660")));

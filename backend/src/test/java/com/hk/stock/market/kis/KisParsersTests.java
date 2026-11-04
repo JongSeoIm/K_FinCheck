@@ -31,6 +31,19 @@ class KisParsersTests {
 		assertEquals(new BigDecimal("-0.70"), q.getChangeRate());
 		assertEquals(new BigDecimal("71000"), q.getPreviousClose());
 		assertEquals(1234567L, q.getCumulativeVolume());
+		assertNull(q.getEventTime());	//현재가 응답에는 체결 시각이 없다. 조회 시각을 체결 시각으로 쓰지 않는다
+	}
+
+	@Test
+	void 분봉에서_가장_최근_체결_시각을_찾는다() throws Exception {
+		String json = """
+				[{"stck_bsop_date":"20261104","stck_cntg_hour":"152900"},
+				 {"stck_bsop_date":"20261104","stck_cntg_hour":"153000"},
+				 {"stck_bsop_date":"20261103","stck_cntg_hour":"153000"},
+				 {}]
+				""";
+		assertEquals("2026-11-04T15:30+09:00", KisParsers.latestTradeTime(objectMapper.readTree(json)));
+		assertNull(KisParsers.latestTradeTime(objectMapper.readTree("[]")));
 	}
 
 	@Test

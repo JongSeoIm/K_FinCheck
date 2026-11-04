@@ -11,11 +11,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.hk.stock.dtos.ChartPointDto;
 import com.hk.stock.dtos.FinancialRowDto;
 import com.hk.stock.dtos.OpinionReportDto;
 import com.hk.stock.dtos.QuoteDto;
+import com.hk.stock.market.MarketDataException;
 import com.hk.stock.market.MarketDataProvider;
 import com.hk.stock.market.MarketHours;
 
@@ -32,6 +36,7 @@ import com.hk.stock.market.MarketHours;
  */
 public class KisMarketDataProvider implements MarketDataProvider {
 
+	private static final Logger log = LoggerFactory.getLogger(KisMarketDataProvider.class);
 	private static final DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
 	private static final DateTimeFormatter HMS = DateTimeFormatter.ofPattern("HHmmss");
 	private static final int OPINION_PAGE_SIZE = 100;	//투자의견 1회 최대 건수
@@ -54,7 +59,26 @@ public class KisMarketDataProvider implements MarketDataProvider {
 		JsonNode body = rest.get("/uapi/domestic-stock/v1/quotations/inquire-price", "FHKST01010100", Map.of(
 				"FID_COND_MRKT_DIV_CODE", "J",
 				"FID_INPUT_ISCD", symbol));
-		return KisParsers.quote(symbol, body.path("output"));
+		QuoteDto quote = KisParsers.quote(symbol, body.path("output"));
+		return quote.toBuilder().eventTime(fetchLatestTradeTime(symbol)).build();
+	}
+
+	//현재가 응답에는 체결 시각이 없어 당일 분봉의 가장 최근 시각을 쓴다. 조회에 실패하면 null (현재가는 그대로 돌려준다)
+	private String fetchLatestTradeTime(String symbol) {
+		ZonedDateTime now = MarketHours.now();
+		LocalTime cursor = MarketHours.isOpen(now) ? now.toLocalTime().withNano(0) : MarketHours.CLOSE;
+		try {
+			JsonNode body = rest.get("/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice", "FHKST03010200", Map.of(
+					"FID_ETC_CLS_CODE", "",
+					"FID_COND_MRKT_DIV_CODE", "J",
+					"FID_INPUT_ISCD", symbol,
+					"FID_INPUT_HOUR_1", cursor.format(HMS),
+					"FID_PW_DATA_INCU_YN", "N"));
+			return KisParsers.latestTradeTime(body.path("output2"));
+		} catch (MarketDataException e) {
+			log.warn("체결 시각 조회 실패 ({}): {}", symbol, e.getMessage());
+			return null;
+		}
 	}
 
 	/**

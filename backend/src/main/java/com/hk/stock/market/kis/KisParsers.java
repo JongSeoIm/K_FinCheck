@@ -30,7 +30,7 @@ public final class KisParsers {
 
 	private KisParsers() {}
 
-	//주식현재가 시세(FHKST01010100) output
+	//주식현재가 시세(FHKST01010100) output. 이 응답에는 체결 시각이 없어 eventTime 을 비워 둔다
 	public static QuoteDto quote(String symbol, JsonNode o) {
 		String sign = o.path("prdy_vrss_sign").asText();
 		return QuoteDto.builder()
@@ -43,9 +43,21 @@ public final class KisParsers {
 				.low(decimal(o.path("stck_lwpr").asText()))
 				.previousClose(decimal(o.path("stck_sdpr").asText()))
 				.cumulativeVolume(toLong(o.path("acml_vol").asText()))
-				.eventTime(MarketHours.now().withNano(0).toOffsetDateTime().toString())
 				.source("KIS")
 				.build();
+	}
+
+	//당일 분봉(FHKST03010200) output2 에서 가장 최근 체결 분의 시각 (ISO-8601 +09:00). 없으면 null
+	public static String latestTradeTime(JsonNode rows) {
+		ZonedDateTime latest = null;
+		for (JsonNode r : rows) {
+			if (!hasDate(r)) continue;
+			LocalDate date = LocalDate.parse(r.path("stck_bsop_date").asText(), YMD);
+			LocalTime time = LocalTime.parse(r.path("stck_cntg_hour").asText(), HMS);
+			ZonedDateTime at = ZonedDateTime.of(date, time, MarketHours.KST);
+			if (latest == null || at.isAfter(latest)) latest = at;
+		}
+		return latest == null ? null : latest.toOffsetDateTime().toString();
 	}
 
 	//실시간 체결가(H0STCNT0) 필드 순서: 0 종목코드, 1 체결시각, 2 현재가, 3 부호, 4 전일대비, 5 등락률,

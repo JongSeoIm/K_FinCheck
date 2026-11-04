@@ -54,12 +54,18 @@ public final class NewsParsers {
 			"기고|칼럼|사설|오피니언|시론|기자수첩|상담실|"
 			+ "野|與|여당|야당|국민의힘|국힘|민주당|시정연설|지도부|국정감사|국감|의원");
 
-	//요약 문장이 주식·실적 이야기인지 판단하는 단어
+	//계열사 이름은 종목명으로 보지 않는다 ("삼성전자서비스, 에어컨 AS 1위")
+	private static final Pattern SUBSIDIARY_NAME = Pattern.compile("삼성전자(서비스|판매|로지텍)");
+
+	//환율 이야기 문장의 '강세·하락'은 종목의 주가가 아니다
+	private static final Pattern CURRENCY_SENTENCE = Pattern.compile("환율|원화|달러");
+
+	//요약의 종목 문장이 그 종목의 주가·실적 이야기인지 판단하는 단어
+	//'%, 주식, 코스피, 배당'처럼 종목 이름이 스쳐 간 시장·환율 기사에도 흔한 단어는 넣지 않는다
 	private static final List<String> MARKET_WORDS = List.of(
-			"주가", "주식", "상승", "하락", "강세", "약세", "급등", "급락", "오른", "올라", "내린", "떨어", "원에 거래",
-			"목표가", "목표주가", "투자의견", "실적", "영업이익", "매출", "순이익", "이익", "배당", "주주환원", "자사주",
-			"시가총액", "시총", "순매수", "순매도", "매수", "매도", "코스피", "코스닥", "증시", "증권", "공급계약", "수주",
-			"수익", "적자", "흑자", "점유율", "출하량", "판매량", "%");
+			"상승", "하락", "강세", "약세", "급등", "급락", "오른", "올라", "내린", "떨어", "원에 거래", "거래를 마쳤", "마감",
+			"목표가", "목표주가", "투자의견", "영업이익", "매출", "순이익", "순매수", "순매도", "공급계약", "수주",
+			"적자", "흑자", "점유율", "출하량", "판매량");
 
 	private NewsParsers() {
 	}
@@ -104,9 +110,11 @@ public final class NewsParsers {
 	 */
 	static boolean isRelated(String headline, String summary, List<String> keywords) {
 		if (EXCLUDED_HEADLINE.matcher(headline).find()) return false;
-		if (containsAny(headline, keywords)) return true;
+		if (containsAny(SUBSIDIARY_NAME.matcher(headline).replaceAll(""), keywords)) return true;
 		//네이버 요약은 검색어 주변 문장을 잘라 준 것이라, 종목명이 있는 문장만 본다
-		for (String sentence : summary.split("(?<=[.!?…])\\s+|(?<=다\\.)")) {
+		String body = SUBSIDIARY_NAME.matcher(summary).replaceAll("");
+		for (String sentence : body.split("(?<=[.!?…])\\s+|(?<=다\\.)")) {
+			if (CURRENCY_SENTENCE.matcher(sentence).find()) continue;
 			if (containsAny(sentence, keywords) && containsAny(sentence, MARKET_WORDS)) return true;
 		}
 		return false;
