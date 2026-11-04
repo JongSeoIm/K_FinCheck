@@ -279,6 +279,11 @@ public class KisService {
 
     // 일봉 한 번 조회 (최대 100개). 날짜 오름차순으로 돌려줌
     private List<Map<String, Object>> fetchDaily(String code, LocalDate from, LocalDate to) {
+        return fetchPeriod(code, from, to, "D");
+    }
+
+    // 기간별 봉 한 번 조회. period = D(일) W(주) M(월) Y(년)
+    private List<Map<String, Object>> fetchPeriod(String code, LocalDate from, LocalDate to, String period) {
         Map<String, Object> res = kisGet(
                 "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
                 "FHKST03010100",
@@ -287,7 +292,7 @@ public class KisService {
                         "FID_INPUT_ISCD", code,
                         "FID_INPUT_DATE_1", from.format(YMD),
                         "FID_INPUT_DATE_2", to.format(YMD),
-                        "FID_PERIOD_DIV_CODE", "D",
+                        "FID_PERIOD_DIV_CODE", period,
                         "FID_ORG_ADJ_PRC", "0"));
 
         List<Map<String, Object>> out = new ArrayList<>();
@@ -308,6 +313,25 @@ public class KisService {
         }
         out.sort((a, b) -> ((String) a.get("date")).compareTo((String) b.get("date")));
         return out;
+    }
+
+    // 일·주·월·년봉: 최근 봉을 KIS 기간별 조회로 가져옵니다 (10분 캐시, 최대 100개)
+    public List<Map<String, Object>> periodCandles(String code, String period) {
+        String key = code + ":period:" + period;
+        CachedList hit = chartCache.get(key);
+        if (hit != null && System.currentTimeMillis() - hit.at() < 600_000) {
+            return hit.data();
+        }
+        int days = switch (period) {
+            case "D" -> 140;
+            case "W" -> 700;
+            case "M" -> 3_000;
+            default -> 11_000;
+        };
+        LocalDate today = LocalDate.now(KST);
+        List<Map<String, Object>> result = fetchPeriod(code, today.minusDays(days), today, period);
+        chartCache.put(key, new CachedList(System.currentTimeMillis(), result));
+        return result;
     }
 
     // 일봉: range = 1W / 1M / 1Y

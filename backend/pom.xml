@@ -29,10 +29,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
-        <!-- 비밀번호 해시(BCrypt)만 사용. Spring Security 전체는 넣지 않습니다 -->
+          <!-- 인증·접근 제어·CSRF 보호, BCrypt 비밀번호 해시 -->
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-crypto</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <!-- 실시간 체결 전달 (Kafka) -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
         </dependency>
         <!-- 브라우저 실시간 push (/ws/stock). KIS 실시간 수신은 JDK 내장 HttpClient WebSocket 사용 -->
         <dependency>

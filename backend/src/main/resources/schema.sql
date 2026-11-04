@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS financial_report (
     business_year  SMALLINT    NOT NULL COMMENT '사업연도',
     report_code    VARCHAR(5)  NOT NULL COMMENT '보고서 종류 (11011: 사업보고서)',
     fs_div         VARCHAR(3)  NOT NULL COMMENT '연결/별도 구분 (CFS: 연결, OFS: 별도)',
+    collected_at   DATETIME    NULL     COMMENT '마지막 수집 시각',
     created_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '저장 일시',
     PRIMARY KEY (report_id),
     UNIQUE KEY uk_financial_report (receipt_no, fs_div),
@@ -58,7 +59,21 @@ CREATE TABLE IF NOT EXISTS financial_value (
     current_amount   DECIMAL(24,2) NULL     COMMENT '당기 금액',
     previous_amount  DECIMAL(24,2) NULL     COMMENT '전기 금액',
     currency         VARCHAR(3)    NOT NULL COMMENT '통화',
+    source_account_id VARCHAR(150) NULL     COMMENT 'OpenDART 표준 계정 코드',
+    source_account_name VARCHAR(100) NULL   COMMENT 'OpenDART 원본 계정명',
+    source_statement VARCHAR(10)   NULL     COMMENT 'OpenDART 재무제표 구분 (IS, CIS 등)',
+    value_status     VARCHAR(30)   NULL     COMMENT 'AVAILABLE, PARTIAL, MISSING, AMBIGUOUS, UNSUPPORTED_CURRENCY',
     PRIMARY KEY (value_id),
     UNIQUE KEY uk_financial_value (report_id, account_code),
     CONSTRAINT fk_financial_value_report FOREIGN KEY (report_id) REFERENCES financial_report (report_id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4 COMMENT = '공시 재무 수치';
+
+-- 이미 만들어진 테이블에도 컬럼 추가 (있으면 건너뜀)
+ALTER TABLE financial_report
+    ADD COLUMN IF NOT EXISTS collected_at DATETIME NULL COMMENT '마지막 수집 시각' AFTER fs_div;
+
+ALTER TABLE financial_value
+    ADD COLUMN IF NOT EXISTS source_account_id VARCHAR(150) NULL COMMENT 'OpenDART 표준 계정 코드' AFTER currency,
+    ADD COLUMN IF NOT EXISTS source_account_name VARCHAR(100) NULL COMMENT 'OpenDART 원본 계정명' AFTER source_account_id,
+    ADD COLUMN IF NOT EXISTS source_statement VARCHAR(10) NULL COMMENT 'OpenDART 재무제표 구분 (IS, CIS 등)' AFTER source_account_name,
+    ADD COLUMN IF NOT EXISTS value_status VARCHAR(30) NULL COMMENT 'AVAILABLE, PARTIAL, MISSING, AMBIGUOUS, UNSUPPORTED_CURRENCY' AFTER source_statement;

@@ -2,8 +2,10 @@ package com.example.stock_api.realtime;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,7 +31,8 @@ import jakarta.annotation.PreDestroy;
 /**
  * 브라우저 WebSocket 세션과 종목별 최신 시세를 관리합니다.
  * 메시지: {"type":"quote","data":{...}} · {"type":"status",...}(15초 하트비트)
- * 시세는 0.5초마다 모아서 보냅니다. 그 사이에 바뀐 종목만, 종목별 가장 최신 값 1건씩 보냅니다.
+ * 시세와 봉은 0.5초마다 모아서 보냅니다. 그 사이에 바뀐 값만, 가장 최신 값 1건씩 보냅니다.
+ * 봉 메시지: {"type":"bars","code":"005930","bars":[...]}
  */
 @Component
 public class QuoteHub {
@@ -48,6 +51,9 @@ public class QuoteHub {
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, Map<String, Object>> latest = new ConcurrentHashMap<>();
     private final Map<String, Long> lastRealtimeAt = new ConcurrentHashMap<>();
+    private final TickFilter tickFilter = new TickFilter();
+    private final BarAggregator barAggregator = new BarAggregator();
+    private final Map<String, Map<Integer, BarAggregator.Bar>> changedBars = new ConcurrentHashMap<>(); // 마지막 전송 후 바뀐 봉
     private final Set<String> changed = ConcurrentHashMap.newKeySet(); // 마지막 전송 후 시세가 바뀐 종목
 
     // 0.5초 전송 전용 스레드 (KIS 조회 같은 다른 예약 작업이 오래 걸려도 전송이 밀리지 않게 따로 둡니다)
@@ -70,11 +76,14 @@ public class QuoteHub {
     /** 0.5초마다: 바뀐 종목의 최신 시세를 브라우저에 보냅니다 */
     private void flush() {
         try {
-            if (changed.isEmpty()) return;
             for (String code : Set.copyOf(changed)) {
                 changed.remove(code);
                 Map<String, Object> q = latest.get(code);
                 if (q != null && hasSessions()) broadcast(quoteMessage(q));
+            }
+            for (String code : Set.copyOf(changedBars.keySet())) {
+                Map<Integer, BarAggregator.Bar> bars = changedBars.remove(code);
+                if (bars != null && hasSessions()) broadcast(barsMessage(code, List.copyOf(bars.values())));
             }
         } catch (RuntimeException e) {
             log.warn("시세 전송 실패: {}", e.getMessage()); // 예외가 나도 다음 0.5초 전송은 계속
@@ -103,6 +112,9 @@ public class QuoteHub {
 
     /** KIS 실시간 체결 수신 */
     public void publishTick(RealtimeMessageParser.Tick t) {
+        if (!tickFilter.accept(t, LocalDate.now(MarketHours.KST))) return; // 중복·역순 체결은 버림
+        Map<Integer, BarAggregator.Bar> bars = changedBars.computeIfAbsent(t.code(), code -> new ConcurrentHashMap<>());
+        barAggregator.apply(t, LocalDate.now(MarketHours.KST)).forEach(bar -> bars.put(bar.interval(), bar));
         Map<String, Object> q = new HashMap<>(latest.getOrDefault(t.code(), Map.of()));
         q.put("code", t.code());
         q.put("source", "realtime");
@@ -146,6 +158,11 @@ public class QuoteHub {
     /** Polling 응답용: 서버가 이미 받아 둔 최신 시세 (없으면 null). Polling 마다 KIS 를 부르지 않기 위해 씁니다. */
     public Map<String, Object> latest(String code) {
         return latest.get(code);
+    }
+
+    /** 서버가 집계한 초·분봉 (Polling 과 화면 첫 조회용) */
+    public List<BarAggregator.Bar> bars(String code, int interval) {
+        return barAggregator.bars(code, interval);
     }
 
     /** 시가총액(REST 에서만 옴)을 아직 못 받은 종목인지 */
@@ -194,6 +211,10 @@ public class QuoteHub {
 
     private String quoteMessage(Map<String, Object> q) {
         return toJson(Map.of("type", "quote", "data", q));
+    }
+
+    private String barsMessage(String code, List<BarAggregator.Bar> bars) {
+        return toJson(Map.of("type", "bars", "code", code, "bars", bars));
     }
 
     // ───── 전송 ─────

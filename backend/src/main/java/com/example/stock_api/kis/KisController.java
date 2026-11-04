@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,7 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.stock_api.common.ApiException;
 import com.example.stock_api.dart.DartService;
+import com.example.stock_api.financial.FinancialService;
 import com.example.stock_api.news.NaverNewsService;
+import com.example.stock_api.realtime.BarAggregator;
 import com.example.stock_api.realtime.QuoteHub;
 import com.example.stock_api.stock.Stock;
 import com.example.stock_api.stock.StockService;
@@ -37,14 +40,16 @@ public class KisController {
     private final DartService dart;
     private final NaverNewsService naver;
     private final QuoteHub hub;
+    private final FinancialService financials;
 
     public KisController(KisService kis, StockService stocks, DartService dart,
-                         NaverNewsService naver, QuoteHub hub) {
+                         NaverNewsService naver, QuoteHub hub, FinancialService financials) {
         this.kis = kis;
         this.stocks = stocks;
         this.dart = dart;
         this.naver = naver;
         this.hub = hub;
+        this.financials = financials;
     }
 
     // ───── 지원 종목 (DB) ─────
@@ -101,6 +106,24 @@ public class KisController {
         return "1D".equals(range) ? kis.minuteCandles(code) : kis.dailyCandles(code, range);
     }
 
+    /** 일·주·월·년봉 (KIS 기간별 조회): period = D | W | M | Y */
+    @GetMapping("/period-candles/{code}")
+    public List<Map<String, Object>> periodCandles(@PathVariable @Pattern(regexp = CODE) String code,
+                                                   @RequestParam @Pattern(regexp = "D|W|M|Y") String period) {
+        supported(code);
+        return kis.periodCandles(code, period);
+    }
+
+    /** 초·분봉 (서버 체결 집계): interval = 봉 하나의 길이(초) */
+    @GetMapping("/bars/{code}")
+    public List<BarAggregator.Bar> bars(@PathVariable @Pattern(regexp = CODE) String code, @RequestParam int interval) {
+        supported(code);
+        if (!BarAggregator.INTERVALS.contains(interval)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INTERVAL", "지원하지 않는 차트 간격입니다.");
+        }
+        return hub.bars(code, interval);
+    }
+
     /** 종목 이름·업종(DB) + 시가총액(KIS) */
     @GetMapping("/profile/{code}")
     public Map<String, Object> profile(@PathVariable @Pattern(regexp = CODE) String code) {
@@ -132,9 +155,10 @@ public class KisController {
         return kis.investOpinion(code);
     }
 
+    /** 최근 사업보고서 실적: DB 저장본을 쓰고, 수집 후 1시간이 지나면 다시 받습니다 */
     @GetMapping("/financials/{code}")
     public Map<String, Object> financials(@PathVariable @Pattern(regexp = CODE) String code) {
-        return dart.annualFinancials(supported(code).getDartCorpCode());
+        return financials.find(supported(code), null);
     }
 
     // ───── 상태 ─────

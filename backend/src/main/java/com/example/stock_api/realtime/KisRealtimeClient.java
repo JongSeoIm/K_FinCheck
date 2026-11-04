@@ -38,6 +38,7 @@ public class KisRealtimeClient {
     private final KisService kis;
     private final StockService stocks;
     private final QuoteHub hub;
+    private final TickPublisher tickPublisher;
     private final ObjectMapper json;
     private final String wsUrl;
 
@@ -53,11 +54,12 @@ public class KisRealtimeClient {
     private volatile boolean stopping = false;
     private volatile int retryDelaySec = 5;
 
-    public KisRealtimeClient(KisService kis, StockService stocks, QuoteHub hub, ObjectMapper json,
+    public KisRealtimeClient(KisService kis, StockService stocks, QuoteHub hub, TickPublisher tickPublisher, ObjectMapper json,
                              @Value("${kis.ws-url}") String wsUrl) {
         this.kis = kis;
         this.stocks = stocks;
         this.hub = hub;
+        this.tickPublisher = tickPublisher;
         this.json = json;
         this.wsUrl = wsUrl;
     }
@@ -150,7 +152,7 @@ public class KisRealtimeClient {
     private void handle(WebSocket ws, String msg) {
         if (RealtimeMessageParser.isDataMessage(msg)) {
             List<RealtimeMessageParser.Tick> ticks = RealtimeMessageParser.parse(msg);
-            ticks.forEach(hub::publishTick);
+            ticks.forEach(tickPublisher::publish);
             return;
         }
         try {

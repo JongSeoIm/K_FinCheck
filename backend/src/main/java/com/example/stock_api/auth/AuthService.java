@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +17,11 @@ public class AuthService {
     private static final int MAX_PASSWORD_BYTES = 72;
 
     private final UserMapper users;
-    private final PasswordEncoder encoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder encoder;
 
-    public AuthService(UserMapper users) {
+    public AuthService(UserMapper users, PasswordEncoder encoder) {
         this.users = users;
+        this.encoder = encoder;
     }
 
     public void signup(AuthRequests.Signup request) {
