@@ -1,5 +1,5 @@
-.stock-ai-launcher { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:52px; padding:14px 16px; border:1px solid #d8d4ce; background:#f5f3ef; color:#3d3934; cursor:pointer; text-align:left; font-size:14px; font-weight:600; transition:background 160ms ease; }
-.stock-ai-launcher:hover { background:#ece9e3; }
+.stock-ai-launcher { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:52px; padding:14px 16px; border:1px solid #e2e2e2; background:#f7f7f7; color:#3d3934; cursor:pointer; text-align:left; font-size:14px; font-weight:600; transition:background 160ms ease; }
+.stock-ai-launcher:hover { background:#efefef; }
 .stock-ai-launcher:focus-visible { outline:2px solid #777168; outline-offset:3px; }
 .stock-ai-launcher > span:last-child { font-size:20px; font-weight:400; }
 .stock-chat-drawer { position:fixed; inset:0 0 0 auto; margin:0; padding:0; width:440px; max-width:100%; height:100dvh; max-height:100dvh; border:0; border-left:1px solid #d3d6d5; background:#fff; color:#272b29; box-shadow:-12px 0 40px #15221b14; overflow:hidden; font-family:Arial,'Noto Sans KR',sans-serif; }

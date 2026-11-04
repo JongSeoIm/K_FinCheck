@@ -17,6 +17,9 @@ export async function accountApi(path, options = {}) {
     const response = await fetch(`${BACKEND_URL}${path}`, { ...options, headers, credentials: 'include', cache: 'no-store' })
     const data = response.status === 204 ? null : await response.json()
     if (!response.ok) {
+      if (response.status === 401 && path !== '/api/auth/login' && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('kfc-session-expired'))
+      }
       const error = new Error(data?.error || '요청을 처리하지 못했습니다.')
       error.status = response.status
       throw error

@@ -29,6 +29,9 @@ export default function StockChatDrawer({ stock }) {
   const inputRef = useRef(null)
   const endRef = useRef(null)
   const closeTimer = useRef(null)
+  const sendLock = useRef(false)
+  const pendingRequest = useRef(null)
+  const viewKey = useRef('')
   const conversationKey = user ? `${user.userId}:${context.symbol}` : `guest:${context.symbol}`
   const storageKey = `kfc-chat-room-${conversationKey}`
   const suggestions = ['현재가와 등락률 알려줘',
@@ -40,6 +43,7 @@ export default function StockChatDrawer({ stock }) {
 
   useEffect(() => {
     if (!open || !user) return
+    if (pendingRequest.current?.key === conversationKey) return
     let cancelled = false
     async function restore() {
       try {
@@ -57,7 +61,7 @@ export default function StockChatDrawer({ stock }) {
     }
     restore()
     return () => { cancelled = true }
-  }, [open, user, context.symbol, storageKey])
+  }, [open, user, context.symbol, storageKey, conversationKey])
 
   async function selectRoom(room) {
     setLoading(true); setNotice('')
@@ -111,7 +115,7 @@ export default function StockChatDrawer({ stock }) {
 
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
-  }, [messages.length, open])
+  }, [messages, open])
 
   function show() {
     if (ready && !user) {
@@ -119,9 +123,17 @@ export default function StockChatDrawer({ stock }) {
       return
     }
     clearTimeout(closeTimer.current)
+    const nextKey = `${user?.userId}:${stock.symbol}`
+    viewKey.current = nextKey
     setContext(stock)
-    setMessages([]); setRooms([]); setActiveRoom(null); setLoading(true)
-    setHistoryOpen(false); setDeleteId(null); setNotice('')
+    const pending = pendingRequest.current
+    if (pending?.key === nextKey) {
+      setMessages(pending.messages); setRooms(pending.rooms); setActiveRoom(pending.room); setLoading(false)
+    } else {
+      setMessages([]); setRooms([]); setActiveRoom(null); setLoading(true)
+    }
+    setHistoryOpen(false); setDeleteId(null)
+    setNotice(pending && pending.key !== nextKey ? '다른 종목의 답변을 처리 중입니다. 완료 후 질문해 주세요.' : '')
     setDraft('')
     setClosing(false)
     setOpen(true)
@@ -138,16 +150,31 @@ export default function StockChatDrawer({ stock }) {
     }, duration)
   }
 
-  async function send() {
-    const question = draft.trim()
-    if (!question || sending || loading || !user) return
+  async function send(value = draft) {
+    const question = value.trim()
+    if (!question || sendLock.current || sending || loading || !user) return
+    sendLock.current = true
+    const replyId = crypto.randomUUID()
     setSending(true)
     setNotice('')
+    setHistoryOpen(false)
+    setDraft('')
+    const nextMessages = [...messages,
+      { role: 'user', text: question },
+      { id: replyId, role: 'assistant', pending: true, text: '답변을 확인하고 있습니다.' },
+    ]
+    const request = { key: conversationKey, messages: nextMessages, rooms, room: activeRoom }
+    pendingRequest.current = request
+    const currentView = () => viewKey.current === request.key && useAuthStore.getState().user?.userId === user.userId
+    setMessages(nextMessages)
     try {
       let room = activeRoom
       if (!room) {
         room = await accountApi('/api/chat/conversations', { method: 'POST', body: JSON.stringify(context) })
-        setActiveRoom(room); setRooms(current => [room, ...current])
+        if (useAuthStore.getState().user?.userId !== user.userId) return
+        request.room = room
+        request.rooms = [room, ...rooms]
+        if (currentView()) { setActiveRoom(room); setRooms(request.rooms) }
         localStorage.setItem(storageKey, room.conversationId)
       }
       const conversationId = room.conversationId
@@ -156,22 +183,35 @@ export default function StockChatDrawer({ stock }) {
         body: JSON.stringify({ conversationId, message: question, stock: context }),
       })
       if (useAuthStore.getState().user?.userId !== user.userId) return
-      setMessages(current => [...current, { role: 'user', text: question },
-        { role: 'assistant', text: response.answer, sources: response.sources || [], presentation: response.presentation }])
-      setDraft('')
-      setRooms(await accountApi(`/api/chat/conversations?symbol=${context.symbol}`))
+      if (!currentView()) return
+      setMessages(current => current.map(message => message.id === replyId
+        ? { id: replyId, role: 'assistant', text: response.answer, sources: response.sources || [], presentation: response.presentation }
+        : message))
+      try {
+        const list = await accountApi(`/api/chat/conversations?symbol=${context.symbol}`)
+        if (currentView()) setRooms(list)
+      } catch {
+        if (currentView()) setNotice('답변을 받았지만 대화 목록을 갱신하지 못했습니다.')
+      }
     } catch (error) {
-      setNotice(error.message)
+      if (currentView()) {
+        setMessages(current => current.map(message => message.id === replyId
+          ? { id: replyId, role: 'assistant', error: true, text: error.message }
+          : message))
+      }
     } finally {
+      sendLock.current = false
+      if (pendingRequest.current === request) pendingRequest.current = null
       setSending(false)
-      inputRef.current?.focus({ preventScroll: true })
+      setNotice(value => value === '다른 종목의 답변을 처리 중입니다. 완료 후 질문해 주세요.' ? '' : value)
+      if (currentView() && dialogRef.current?.open) inputRef.current?.focus({ preventScroll: true })
     }
   }
 
   return (
     <>
       <button className='stock-ai-launcher' type='button' onClick={show} aria-haspopup='dialog'>
-        <span>AI에게 질문하기</span><span aria-hidden='true'>↗</span>
+        <span>이 종목 AI에게 물어보기</span><span aria-hidden='true'>↗</span>
       </button>
       {mounted && createPortal(
         <dialog ref={dialogRef} className={`stock-chat-drawer${closing ? ' is-closing' : ''}`}
@@ -194,8 +234,9 @@ export default function StockChatDrawer({ stock }) {
               <span aria-hidden='true'>·</span>
               <button type='button' onClick={() => setHistoryOpen(value => !value)} disabled={sending || loading} aria-expanded={historyOpen}>이전 대화</button>
             </nav>}
-            {notice && <p className='stock-chat-notice' role='alert'>{notice}</p>}
-            {loading && <p className='stock-chat-notice' role='status'>대화를 불러오고 있습니다.</p>}
+            {user && notice && <p className='stock-chat-notice' role='alert'>{notice}</p>}
+            {!user && ready && <p className='stock-chat-notice' role='alert'>로그인이 필요합니다. <a href={`/login?next=${encodeURIComponent(`/?symbol=${context.symbol}`)}`}>다시 로그인</a>해 주세요.</p>}
+            {user && loading && <p className='stock-chat-notice' role='status'>대화를 불러오고 있습니다.</p>}
             {historyOpen && user && <section className='stock-chat-history' aria-label='이전 대화 목록'>
               {!rooms.length && <p>저장된 대화가 없습니다.</p>}
               {rooms.map(room => <div className='stock-chat-history-row' key={room.conversationId}>
@@ -212,15 +253,17 @@ export default function StockChatDrawer({ stock }) {
                 <div className='stock-chat-empty'>
                   <p>{context.name}에 대해 무엇이 궁금한가요?</p>
                   <div className='stock-chat-suggestions' aria-label='예시 질문'>
-                    {suggestions.map(question => <button type='button' key={question} onClick={() => {
-                      setDraft(`${context.name} ${question}`)
-                      inputRef.current?.focus({ preventScroll: true })
-                    }}><span>{question}</span><span aria-hidden='true'>↗</span></button>)}
+                    {suggestions.map(question => <button type='button' key={question}
+                      onClick={() => send(`${context.name} ${question}`)} disabled={sending || loading}>
+                      <span>{question}</span><span aria-hidden='true'>↗</span>
+                    </button>)}
                   </div>
                 </div>}
               <div className='stock-chat-thread'>
                 {(user ? messages : []).map((message, index) => (
-                  <article key={`${conversationKey}-${index}`} className={`stock-chat-message ${message.role}${message.error ? ' error' : ''}`}>
+                  <article key={message.id || `${conversationKey}-${index}`}
+                    className={`stock-chat-message ${message.role}${message.error ? ' error' : ''}${message.pending ? ' pending' : ''}`}
+                    aria-label={message.pending ? '답변 생성 중' : undefined}>
                     <p>{message.text}</p>
                     <ChatAnswerData presentation={message.presentation} />
                     {message.sources?.length > 0 && <ul className='stock-chat-sources' aria-label='답변 출처'>
@@ -233,7 +276,6 @@ export default function StockChatDrawer({ stock }) {
                     </ul>}
                   </article>
                 ))}
-                {sending && <article className='stock-chat-message assistant pending' aria-label='답변 생성 중'><p>답변을 확인하고 있습니다.</p></article>}
               </div>
               <div ref={endRef} />
             </div>

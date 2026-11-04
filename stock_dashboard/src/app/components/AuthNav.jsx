@@ -11,13 +11,21 @@ export default function AuthNav({ symbol }) {
   const [error, setError] = useState('')
   useEffect(() => {
     let active = true
+    const expireSession = () => {
+      setUser(null)
+      useStockStore.getState().clearWatchlist()
+    }
+    window.addEventListener('kfc-session-expired', expireSession)
     refresh().then(user => {
       if (!active) return
       if (user) useStockStore.getState().loadWatchlist()
       else useStockStore.getState().clearWatchlist()
     })
-    return () => { active = false }
-  }, [refresh])
+    return () => {
+      active = false
+      window.removeEventListener('kfc-session-expired', expireSession)
+    }
+  }, [refresh, setUser])
   async function logout() {
     setBusy(true)
     try {
