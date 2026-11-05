@@ -1,7 +1,6 @@
 package com.example.stock_api.tool;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.stock_api.common.ApiException;
 import com.example.stock_api.common.MarketHours;
+import com.example.stock_api.dart.ListedCompanies;
 import com.example.stock_api.financial.FinancialService;
 import com.example.stock_api.kis.KisService;
 import com.example.stock_api.news.NaverNewsService;
@@ -40,36 +40,50 @@ public class ToolController {
     private final KisService kis;
     private final NaverNewsService naver;
     private final QuoteHub hub;
+    private final ListedCompanies listed;
 
     public ToolController(StockService stocks, FinancialService financials, KisService kis,
-                          NaverNewsService naver, QuoteHub hub) {
+                          NaverNewsService naver, QuoteHub hub, ListedCompanies listed) {
         this.stocks = stocks;
         this.financials = financials;
         this.kis = kis;
         this.naver = naver;
         this.hub = hub;
+        this.listed = listed;
+    }
+
+    /** 질문에서 기업을 찾기 위한 지원 기업 목록 */
+    @GetMapping("/companies")
+    public List<Map<String, Object>> companies() {
+        return stocks.all().stream().map(ToolController::company).toList();
     }
 
     /** get_company_info */
     @GetMapping("/company")
     public List<Map<String, Object>> company(@RequestParam @Size(min = 1, max = 30) String query) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Stock stock : stocks.search(query)) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("stockCode", stock.getCode());
-            item.put("companyName", stock.getName());
-            item.put("market", stock.getMarket());
-            result.add(item);
+        List<Stock> found = stocks.search(query);
+        if (found.isEmpty()) {
+            found = listed.findByName(query).map(List::of).orElse(List.of());
         }
-        return result;
+        return found.stream().map(ToolController::company).toList();
     }
 
-    /** get_stock_quote: 장중 실시간 체결이 있으면 그 값을, 아니면 KIS REST 현재가를 씁니다. */
+    private static Map<String, Object> company(Stock stock) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("stockCode", stock.getCode());
+        item.put("companyName", stock.getName());
+        item.put("market", stock.getMarket());
+        item.put("industry", stock.getIndustry());
+        return item;
+    }
+
+    /** get_stock_quote: 장중 실시간 체결이 있으면 그 값을, 없거나 장외이면 KIS REST 현재가를 씁니다. */
     @GetMapping("/quote/{code}")
     public Map<String, Object> quote(@PathVariable @Pattern(regexp = CODE) String code) {
         Stock stock = supported(code);
         Map<String, Object> live = hub.latest(code);
-        boolean realtime = MarketHours.isOpen() && live != null && "realtime".equals(live.get("source"));
+        boolean marketOpen = MarketHours.isOpen();
+        boolean realtime = marketOpen && live != null && "realtime".equals(live.get("source"));
         Map<String, Object> quote = realtime ? live : kis.currentPrice(code);
 
         Object tradeTime = realtime ? live.get("tradeTime") : null;
@@ -82,6 +96,7 @@ public class ToolController {
         result.put("volume", quote.get("volume"));
         result.put("provider", "KIS");
         result.put("dataSource", realtime ? "realtime" : "rest");
+        result.put("marketOpen", marketOpen);
         result.put("tradeTime", tradeTime);
         // REST 현재가 응답에는 체결 시각이 없어 조회 시각을 기준 시각으로 표시합니다
         result.put("basisAt", realtime ? LocalDate.now(MarketHours.KST) + "T" + tradeTime + "+09:00" : quote.get("updatedAt"));
@@ -93,7 +108,8 @@ public class ToolController {
     @GetMapping("/financial/{code}")
     public Map<String, Object> financial(@PathVariable @Pattern(regexp = CODE) String code,
                                          @RequestParam(required = false) @Min(2015) @Max(2100) Integer year) {
-        return financials.find(supported(code), year);
+        Stock stock = supported(code);
+        return stocks.find(code).isPresent() ? financials.find(stock, year) : financials.findUnsaved(stock, year);
     }
 
     /** get_company_news */
@@ -103,12 +119,12 @@ public class ToolController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("stockCode", code);
         result.put("companyName", stock.getName());
-        result.put("provider", "NAVER");
+        result.put("provider", naver.providerName());
         result.put("articles", naver.search(stock.getName()));
         return result;
     }
 
     private Stock supported(String code) {
-        return stocks.find(code).orElseThrow(() -> ApiException.notSupported(code));
+        return stocks.find(code).or(() -> listed.findByCode(code)).orElseThrow(() -> ApiException.notSupported(code));
     }
 }

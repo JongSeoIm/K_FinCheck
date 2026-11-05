@@ -18,6 +18,5 @@ public class FinancialValue {
     private String currency;
     private String sourceAccountId;
     private String sourceAccountName;
-    private String sourceStatement;
     private String valueStatus;
 }

@@ -60,6 +60,24 @@ public class FinancialService {
         return response(stock, report, mapper.findValues(report.getReportId()), loaded.stale());
     }
 
+    /** company 테이블에 없는 상장사: 외래 키 때문에 저장하지 않고 OpenDART 결과를 바로 돌려줍니다 */
+    public Map<String, Object> findUnsaved(Stock stock, Integer year) {
+        String corpCode = stock.getDartCorpCode();
+        Map<String, Object> result = year == null ? dart.annualFinancials(corpCode) : dart.annualFinancials(corpCode, year);
+        if (result == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "NO_FINANCIALS",
+                    year == null ? "최근 사업보고서 재무 데이터가 없습니다." : year + "년 사업보고서 재무 데이터가 없습니다.");
+        }
+        FinancialReport report = new FinancialReport();
+        report.setStockCode(stock.getCode());
+        report.setReceiptNo((String) result.get("receiptNo"));
+        report.setBusinessYear((Integer) result.get("reportYear"));
+        report.setReportCode((String) result.get("reportCode"));
+        report.setFsDiv((String) result.get("fsDiv"));
+        report.setCollectedAt(LocalDateTime.now(MarketHours.KST));
+        return response(stock, report, FinancialStore.values(result), false);
+    }
+
     private Loaded load(String stockCode, FinancialReport saved,
                         Supplier<Map<String, Object>> collect, Supplier<FinancialReport> reload) {
         if (saved != null && isFresh(saved.getCollectedAt(), LocalDateTime.now(MarketHours.KST))) {

@@ -31,7 +31,7 @@ public class DartService {
 
     /** 수집한 계정 하나. 금액을 확정할 수 없으면 null 이고 status 로 이유를 구분합니다 */
     public record Account(String code, String name, Long current, Long previous, String currency,
-                          String sourceId, String sourceName, String statement, String status) {}
+                          String sourceId, String sourceName, String status) {}
 
     private record AccountRule(String code, String name, Set<String> ids, Set<String> names) {}
 
@@ -136,12 +136,11 @@ public class DartService {
 
     private static Account account(List<Map<?, ?>> rows, AccountRule rule) {
         List<Map<?, ?>> found = candidates(rows, rule);
-        if (found.isEmpty()) return empty(rule, "KRW", null, null, null, "MISSING");
+        if (found.isEmpty()) return empty(rule, "KRW", null, null, "MISSING");
 
         Map<?, ?> first = found.get(0);
         String id = text(first.get("account_id"));
         String name = text(first.get("account_nm"));
-        String statement = text(first.get("sj_div"));
         String currency = text(first.get("currency")) == null ? "KRW" : text(first.get("currency"));
 
         // 같은 계정 후보의 값이 다르면 하나를 임의로 고르지 않습니다
@@ -149,13 +148,13 @@ public class DartService {
                 !Objects.equals(amount(row.get("thstrm_amount")), amount(first.get("thstrm_amount")))
                         || !Objects.equals(amount(row.get("frmtrm_amount")), amount(first.get("frmtrm_amount")))
                         || !Objects.equals(text(row.get("currency")), text(first.get("currency"))));
-        if (ambiguous) return empty(rule, currency, id, name, statement, "AMBIGUOUS");
-        if (!"KRW".equals(currency)) return empty(rule, currency, id, name, statement, "UNSUPPORTED_CURRENCY");
+        if (ambiguous) return empty(rule, currency, id, name, "AMBIGUOUS");
+        if (!"KRW".equals(currency)) return empty(rule, currency, id, name, "UNSUPPORTED_CURRENCY");
 
         Long current = amount(first.get("thstrm_amount"));
         Long previous = amount(first.get("frmtrm_amount"));
-        return new Account(rule.code(), rule.name(), current, previous, currency, id, name, statement,
-                amountStatus(current, previous));
+        return new Account(rule.code(), rule.name(), current, previous, currency, id, name,
+                current == null ? "MISSING" : "AVAILABLE");
     }
 
     /** 찾는 순서: 손익계산서 코드 → 포괄손익계산서 코드 → 손익계산서 이름 → 포괄손익계산서 이름 */
@@ -173,13 +172,8 @@ public class DartService {
         return List.of();
     }
 
-    private static Account empty(AccountRule rule, String currency, String id, String name, String statement, String status) {
-        return new Account(rule.code(), rule.name(), null, null, currency, id, name, statement, status);
-    }
-
-    static String amountStatus(Long current, Long previous) {
-        if (current != null && previous != null) return "AVAILABLE";
-        return current == null && previous == null ? "MISSING" : "PARTIAL";
+    private static Account empty(AccountRule rule, String currency, String id, String name, String status) {
+        return new Account(rule.code(), rule.name(), null, null, currency, id, name, status);
     }
 
     private static String text(Object v) {

@@ -23,13 +23,12 @@ public interface FinancialMapper {
     Long findReportId(@Param("receiptNo") String receiptNo, @Param("fsDiv") String fsDiv);
 
     @Insert("INSERT INTO financial_value (report_id, account_code, account_name, current_amount, previous_amount,"
-            + " currency, source_account_id, source_account_name, source_statement, value_status)"
+            + " currency, source_account_id, source_account_name, value_status)"
             + " VALUES (#{reportId}, #{v.accountCode}, #{v.accountName}, #{v.currentAmount}, #{v.previousAmount},"
-            + " #{v.currency}, #{v.sourceAccountId}, #{v.sourceAccountName}, #{v.sourceStatement}, #{v.valueStatus})"
+            + " #{v.currency}, #{v.sourceAccountId}, #{v.sourceAccountName}, #{v.valueStatus})"
             + " ON DUPLICATE KEY UPDATE account_name = VALUES(account_name), current_amount = VALUES(current_amount),"
             + " previous_amount = VALUES(previous_amount), currency = VALUES(currency),"
             + " source_account_id = VALUES(source_account_id), source_account_name = VALUES(source_account_name),"
-            + " source_statement = VALUES(source_statement),"
             + " value_status = VALUES(value_status)")
     int upsertValue(@Param("reportId") long reportId, @Param("v") FinancialValue value);
 
@@ -41,7 +40,7 @@ public interface FinancialMapper {
     FinancialReport findByYear(@Param("stockCode") String stockCode, @Param("year") int year);
 
     @Select("SELECT account_code, account_name, current_amount, previous_amount, currency,"
-            + " source_account_id, source_account_name, source_statement, value_status"
+            + " source_account_id, source_account_name, value_status"
             + " FROM financial_value WHERE report_id = #{reportId} ORDER BY value_id")
     List<FinancialValue> findValues(@Param("reportId") long reportId);
 }

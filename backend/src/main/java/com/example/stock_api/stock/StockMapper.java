@@ -5,6 +5,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * 지원 종목 조회 (company 테이블).
@@ -27,6 +28,9 @@ public interface StockMapper {
             + " ORDER BY CASE WHEN stock_code = #{q} OR company_name = #{q} THEN 0 ELSE 1 END, stock_code"
             + " LIMIT 20")
     List<Stock> search(@Param("q") String q);
+
+    @Update("UPDATE company SET dart_corp_code = #{corpCode} WHERE stock_code = #{code} AND dart_corp_code IS NULL")
+    int fillDartCorpCode(@Param("code") String code, @Param("corpCode") String corpCode);
 
     @Select("SELECT 1")
     int ping();

@@ -19,7 +19,7 @@ public class BarAggregator {
     /** 지원 간격(초): 1초·5초·30초·1분·3분·5분·10분·15분·30분·60분 */
     public static final List<Integer> INTERVALS = List.of(1, 5, 30, 60, 180, 300, 600, 900, 1800, 3600);
 
-    private static final int MAX_BARS = 300;
+    private static final int MAX_BARS = 3000;
 
     public record Bar(int interval, String time, long open, long high, long low, long close, long volume) {}
 

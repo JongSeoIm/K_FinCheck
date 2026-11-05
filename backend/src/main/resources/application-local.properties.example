@@ -2,5 +2,9 @@
 kis.app-key=
 kis.app-secret=
 dart.api-key=
-spring.datasource.username=root
+naver.client-id=
+naver.client-secret=
+# 네이버 개발자센터 키를 쓸 때만 아래 줄의 # 을 지웁니다
+# naver.provider=developers
+spring.datasource.username=stock
 spring.datasource.password=

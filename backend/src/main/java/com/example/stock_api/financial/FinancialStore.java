@@ -48,7 +48,7 @@ public class FinancialStore {
         List<FinancialValue> result = new ArrayList<>();
         for (DartService.Account a : (List<DartService.Account>) dartResult.get("accounts")) {
             result.add(new FinancialValue(a.code(), a.name(), a.current(), a.previous(), a.currency(),
-                    a.sourceId(), a.sourceName(), a.statement(), a.status()));
+                    a.sourceId(), a.sourceName(), a.status()));
         }
         return result;
     }

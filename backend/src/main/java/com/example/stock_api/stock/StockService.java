@@ -51,6 +51,10 @@ public class StockService {
         return mapper.search(keyword);
     }
 
+    public void fillDartCorpCode(String code, String corpCode) {
+        mapper.fillDartCorpCode(code, corpCode);
+    }
+
     public boolean dbAlive() {
         try {
             return mapper.ping() == 1;

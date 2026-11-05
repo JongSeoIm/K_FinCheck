@@ -30,8 +30,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 네이버 뉴스 검색으로 기업명 관련 최신 기사를 가져옵니다.
- * naver.provider=developers (기본) : 네이버 개발자센터 검색 API (카드 등록 없음, 하루 25,000회 무료)
- * naver.provider=apihub            : NAVER API HUB (네이버 클라우드, 결제수단 등록 필요)
+ * naver.provider=apihub (기본)  : NAVER API HUB (네이버 클라우드, 결제수단 등록 필요)
+ * naver.provider=developers    : 네이버 개발자센터 검색 API (카드 등록 없음, 하루 25,000회 무료)
  * 두 방식은 응답 형식이 같고 호출 주소·인증 헤더만 다릅니다. 키는 서로 호환되지 않습니다.
  * 최신순 최대 10개, 중복 링크·제목 제거, 강조 태그(<b>) 정리, 같은 기업은 5분 동안 재사용.
  */
@@ -56,7 +56,7 @@ public class NaverNewsService {
 
     public NaverNewsService(@Value("${naver.client-id:}") String clientId,
                             @Value("${naver.client-secret:}") String clientSecret,
-                            @Value("${naver.provider:developers}") String provider) {
+                            @Value("${naver.provider:apihub}") String provider) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(8000);
@@ -65,6 +65,11 @@ public class NaverNewsService {
         this.rest = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+    }
+
+    /** 출처 표시용 제공처 이름 */
+    public String providerName() {
+        return apiHub ? "NAVER API HUB" : "NAVER 검색 API";
     }
 
     public boolean isConfigured() {
