@@ -3,8 +3,8 @@
 import { useMemo } from 'react'
 import useApi from '../hooks/useApi'
 import { PanelEmpty, PanelError, PanelLoading } from './PanelState'
+import { won } from '@/app/lib/format'
 
-const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
 // 증권사 의견 문구를 매수 / 중립 / 매도 로 묶습니다 (예: "BUY", "매수", "Outperform", "Trading Buy")
 function classify(opinion) {

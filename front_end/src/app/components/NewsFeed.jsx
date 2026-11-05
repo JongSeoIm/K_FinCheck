@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react'
 import useApi from '../hooks/useApi'
+import { dateTime } from '../lib/format'
 import { PanelEmpty, PanelError, PanelLoading } from './PanelState'
 
 const categories = [
@@ -11,15 +12,9 @@ const categories = [
   { label: '시장·투자', words: ['주가', '시장', '투자', '목표가', '외국인', '기관', '코스피'] },
 ]
 
-function formatTime(iso) {
-  if (!iso) return ''
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime())
-    ? ''
-    : date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
+const formatTime = (iso) => dateTime(iso) ?? ''
 
-// 관련 기사: 네이버 뉴스 검색(기업명, 최신순 최대 10개). 제목을 누르면 원문이 새 탭으로 열립니다.
+// 관련 기사: NAVER API HUB 뉴스 검색(기업명, 최신순 최대 10개). 제목을 누르면 원문이 새 탭으로 열립니다.
 // 설명은 네이버 검색 결과의 요약 문구이며 기사 전문이나 AI 요약이 아닙니다.
 export default function NewsFeed({ code }) {
   const { status, data, error, reload } = useApi(`/api/kis/news/${code}`)
@@ -80,7 +75,7 @@ export default function NewsFeed({ code }) {
           </ul>
         )}
       </div>
-      <small className='panel-source'>출처: 네이버 뉴스 검색 · 설명은 검색 결과 요약이며 기사 전문이 아닙니다</small>
+      <small className='panel-source'>출처: NAVER API HUB · 설명은 검색 결과 요약이며 기사 전문이 아닙니다</small>
     </>
   )
 }

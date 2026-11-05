@@ -17,7 +17,7 @@ function socketUrl() {
 
 // 지원 종목 목록을 받고 시세를 받아옵니다. 전달 방식은 사용자가 고릅니다 (feedMode).
 // - push : WebSocket 으로 서버가 보내 주는 실시간 시세. 끊기면 다시 연결하면서 그동안 10초마다 조회합니다.
-// - poll : WebSocket 을 쓰지 않고 2초마다 서버에 시세를 물어봅니다.
+// - poll : WebSocket 을 쓰지 않고 응답을 받은 뒤 2초마다 서버에 시세를 물어봅니다.
 export default function useMarketFeed() {
   const feedMode = useStockStore((state) => state.feedMode)
   const setStocks = useStockStore((state) => state.setStocks)
@@ -61,6 +61,7 @@ export default function useMarketFeed() {
 
     const stopPolling = () => {
       clearInterval(pollTimer)
+      clearTimeout(pollTimer)
       pollTimer = null
     }
 
@@ -80,11 +81,12 @@ export default function useMarketFeed() {
       const run = async () => {
         const result = await poll()
         if (closed) return
+        // 응답을 받은 뒤 2초를 기다립니다. 응답이 늦어도 요청이 겹치지 않습니다
+        pollTimer = setTimeout(run, MANUAL_POLL_MS)
         setConnection({ state: result === 'ok' ? 'manual-polling' : result === 'not-configured' ? 'not-configured' : 'disconnected' })
       }
       run()
       loadStatus()
-      pollTimer = setInterval(run, MANUAL_POLL_MS)
       statusTimer = setInterval(loadStatus, STATUS_MS)
     }
 

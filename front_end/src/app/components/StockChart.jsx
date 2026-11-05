@@ -13,6 +13,7 @@ import {
   YAxis,
 } from 'recharts'
 import useStockStore from '@/app/store/useStockStore'
+import { signedPercent, won } from '@/app/lib/format'
 
 // 초·분봉: 서버가 체결을 집계한 봉 / 일·주·월·년봉: KIS 기간별 조회
 const liveIntervals = [
@@ -34,11 +35,12 @@ const periods = [
   { value: 'Y', label: '년' },
 ]
 
+// 초·분봉은 서버에 최대 3,000개가 있어도 처음에는 최근 120개만 보여 줍니다
+const DEFAULT_LIVE_BARS = 120
 const POLL_MS = 2000
 const MIN_VISIBLE = 10
 const ZOOM_STEP = 1.2
 
-const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 const isLiveSelection = (selection) => /^\d+$/.test(selection)
 const todayString = () => new Date().toLocaleDateString('sv-SE')
 
@@ -102,7 +104,7 @@ function ChartBody({ code, selection, mode }) {
   const [bars, setBars] = useState([])
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('')
-  const [visibleCount, setVisibleCount] = useState(null) // null = 전체
+  const [visibleCount, setVisibleCount] = useState(live ? DEFAULT_LIVE_BARS : null) // null = 전체
   const [reloadKey, setReloadKey] = useState(0)
   const chartRef = useRef(null)
 
@@ -187,7 +189,7 @@ function ChartBody({ code, selection, mode }) {
     const handleWheel = (event) => {
       event.preventDefault()
       setVisibleCount((current) => {
-        const count = current ?? pointCount
+        const count = Math.min(current ?? pointCount, pointCount)
         const next = event.deltaY < 0 ? Math.floor(count / ZOOM_STEP) : Math.ceil(count * ZOOM_STEP)
         return Math.min(pointCount, Math.max(Math.min(MIN_VISIBLE, pointCount), next))
       })
@@ -251,14 +253,14 @@ function ChartBody({ code, selection, mode }) {
 
       <div className='chart-summary'>
         <strong>{won(lastPrice)}</strong>
-        <span className={rising ? 'positive' : 'negative'}>{rising ? '+' : ''}{changeRate.toFixed(2)}%</span>
+        <span className={rising ? 'positive' : 'negative'}>{signedPercent(changeRate)}</span>
       </div>
 
       <div className='chart-stats' aria-label='차트 주요 값'>
         <div><span>표시 시작</span><strong>{won(firstPrice)}</strong></div>
         <div><span>표시 고가</span><strong>{won(highPrice)}</strong></div>
         <div><span>표시 저가</span><strong>{won(lowPrice)}</strong></div>
-        <div><span>표시 등락</span><strong className={rising ? 'positive' : 'negative'}>{rising ? '+' : ''}{changeRate.toFixed(2)}%</strong></div>
+        <div><span>표시 등락</span><strong className={rising ? 'positive' : 'negative'}>{signedPercent(changeRate)}</strong></div>
       </div>
 
       <div className='chart-area' ref={chartRef}>

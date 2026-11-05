@@ -3,18 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FaRegStar, FaStar } from 'react-icons/fa'
+import { bigWon, shares, won } from '@/app/lib/format'
 import useStockStore from '@/app/store/useStockStore'
-
-const won = (value) => (value == null || Number.isNaN(Number(value)) ? '—' : '₩' + Math.round(Number(value)).toLocaleString('ko-KR'))
-
-function formatMarketCap(value) {
-  if (!value) return '—'
-  const trillion = value / 1e12
-  if (trillion >= 1) return `${trillion.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}조원`
-  return `${Math.round(value / 1e8).toLocaleString('ko-KR')}억원`
-}
-
-const shares = (value) => (value == null || Number.isNaN(Number(value)) ? '—' : Math.round(Number(value)).toLocaleString('ko-KR') + '주')
 
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString('ko-KR') : '—')
 
@@ -122,7 +112,7 @@ export default function StockInfo({ stock }) {
           <div><dt>저가</dt><dd>{hasQuote ? won(quote.low) : '—'}</dd></div>
           <div><dt>전일 종가</dt><dd>{hasQuote ? won(quote.prevClose) : '—'}</dd></div>
           <div><dt>누적거래량</dt><dd>{hasQuote ? shares(quote.volume) : '—'}</dd></div>
-          <div><dt>시가총액</dt><dd>{formatMarketCap(quote?.marketCapitalization || marketCap)}</dd></div>
+          <div><dt>시가총액</dt><dd>{bigWon(quote?.marketCapitalization || marketCap)}</dd></div>
         </dl>
       </div>
     </section>

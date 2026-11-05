@@ -19,6 +19,15 @@
   box-sizing: border-box;
 }
 
+/* 스크롤 기능은 유지하고 스크롤바만 숨깁니다 */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   margin: 0;
   background: var(--background);
@@ -822,21 +831,6 @@ a:focus-visible {
 .news-scroll {
   max-height: 590px;
   overflow-y: auto;
-  scrollbar-gutter: stable;
-  scrollbar-color: #888 #eeeeee;
-}
-
-.news-scroll::-webkit-scrollbar {
-  width: 11px;
-}
-
-.news-scroll::-webkit-scrollbar-track {
-  background: #eee;
-}
-
-.news-scroll::-webkit-scrollbar-thumb {
-  border: 2px solid #eee;
-  background: #888;
 }
 
 .news-list {

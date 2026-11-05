@@ -44,14 +44,8 @@ const useStockStore = create(
         set({ user: null, watchlist: [], accountStatus: 'ready' })
       },
 
-      // 세션이 끝난 뒤 변경을 시도하면 로그아웃 상태로 돌립니다
       changeWatchlist: async (change, code) => {
-        try {
-          set({ watchlist: await change(code) })
-        } catch (error) {
-          if (error.code === 'LOGIN_REQUIRED') set({ user: null, watchlist: [], accountStatus: 'ready' })
-          throw error
-        }
+        set({ watchlist: await change(code) })
       },
 
       addToWatchlist: (code) => get().changeWatchlist(addWatchlist, code),
@@ -87,5 +81,12 @@ const useStockStore = create(
     }
   )
 )
+
+// 어떤 요청에서든 세션 만료를 알게 되면 로그아웃 상태로 돌립니다
+if (typeof window !== 'undefined') {
+  window.addEventListener('session-expired', () => {
+    useStockStore.setState({ user: null, watchlist: [], accountStatus: 'ready' })
+  })
+}
 
 export default useStockStore

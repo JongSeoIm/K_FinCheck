@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import useStockStore from '@/app/store/useStockStore'
+import { signedPercent, won } from '@/app/lib/format'
 
-const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
 // 관심 종목: 로그인한 계정의 DB 목록. 6자리 코드로 추가(서버에서 지원 종목 확인)·삭제, 클릭하면 해당 종목으로 이동
 export default function WatchlistPanel({ activeCode, onSelectStock }) {
@@ -120,7 +120,7 @@ export default function WatchlistPanel({ activeCode, onSelectStock }) {
                       <>
                         {won(quote.price)}{' '}
                         <small className={change > 0 ? 'positive' : change < 0 ? 'negative' : ''}>
-                          {change > 0 ? '+' : ''}{change.toFixed(2)}%
+                          {signedPercent(change)}
                         </small>
                       </>
                     ) : offline ? '연결 끊김' : stocks.length > 0 && !stock ? '—' : '조회 중…'}

@@ -8,6 +8,8 @@ const nextConfig = {
       { source: '/api/auth/:path*', destination: 'http://localhost:8080/api/auth/:path*' },
       { source: '/api/watchlist', destination: 'http://localhost:8080/api/watchlist' },
       { source: '/api/watchlist/:path*', destination: 'http://localhost:8080/api/watchlist/:path*' },
+      { source: '/api/chat', destination: 'http://localhost:8080/api/chat' },
+      { source: '/api/chat/:path*', destination: 'http://localhost:8080/api/chat/:path*' },
     ]
   },
 }

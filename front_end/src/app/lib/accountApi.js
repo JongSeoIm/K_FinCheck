@@ -1,4 +1,4 @@
-// 회원·관심 종목 API. next.config 의 rewrites 로 같은 주소(3000)처럼 호출해서 세션 쿠키가 그대로 오갑니다.
+// 회원·관심 종목·채팅 API. next.config 의 rewrites 로 같은 주소(3000)처럼 호출해서 세션 쿠키가 그대로 오갑니다.
 async function request(url, options = {}) {
   let response
   try {
@@ -12,6 +12,7 @@ async function request(url, options = {}) {
 
   // Next 가 백엔드(8080)에 닿지 못하면 JSON 이 아닌 500 을 돌려줍니다
   if (!body?.code) throw Object.assign(new Error('서버에 연결할 수 없습니다.'), { code: 'OFFLINE' })
+  if (body.code === 'LOGIN_REQUIRED' && typeof window !== 'undefined') window.dispatchEvent(new Event('session-expired'))
   throw Object.assign(new Error(body.error), { code: body.code })
 }
 
@@ -35,3 +36,9 @@ export const logout = () => send('/api/auth/logout', { method: 'POST' })
 export const fetchWatchlist = () => request('/api/watchlist')
 export const addWatchlist = (code) => send(`/api/watchlist/${code}`, { method: 'POST' })
 export const removeWatchlist = (code) => send(`/api/watchlist/${code}`, { method: 'DELETE' })
+
+export const askChat = (conversationId, message, stock) => postJson('/api/chat', { conversationId, message, stock })
+export const fetchConversations = (symbol) => request(`/api/chat/conversations?symbol=${symbol}`)
+export const createConversation = (symbol) => postJson('/api/chat/conversations', { symbol })
+export const fetchConversationMessages = (conversationId) => request(`/api/chat/conversations/${conversationId}/messages`)
+export const deleteConversation = (conversationId) => send(`/api/chat/conversations/${conversationId}`, { method: 'DELETE' })

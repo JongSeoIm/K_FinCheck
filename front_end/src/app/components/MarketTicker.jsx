@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { FaStar } from 'react-icons/fa'
 import useHydrated from '../hooks/useHydrated'
 import useStockStore from '../store/useStockStore'
+import { signedPercent, won } from '@/app/lib/format'
 
-const won = (value) => '₩' + Math.round(Number(value)).toLocaleString('ko-KR')
 
 // 상단 티커: 서버 DB 의 지원 종목 전체를 실제 시세로 표시 (WebSocket 으로 갱신, 가격이 바뀌면 깜빡임)
 export default function MarketTicker({ activeCode, onSelectStock }) {
@@ -74,7 +74,7 @@ export default function MarketTicker({ activeCode, onSelectStock }) {
             <span>{stock.name}</span>
             <strong>{hasQuote ? won(quote.price) : '—'}</strong>
             <small className={!hasQuote ? '' : change > 0 ? 'positive' : change < 0 ? 'negative' : ''}>
-              {hasQuote ? `${change > 0 ? '+' : ''}${change.toFixed(2)}%` : disconnected ? '연결 끊김' : '조회 중…'}
+              {hasQuote ? signedPercent(change) : disconnected ? '연결 끊김' : '조회 중…'}
             </small>
           </button>
         )

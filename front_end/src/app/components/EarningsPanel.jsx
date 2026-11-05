@@ -1,22 +1,13 @@
 'use client'
 
 import useApi from '../hooks/useApi'
+import { dateTime, eokWon, signedPercent } from '../lib/format'
 import { PanelEmpty, PanelError, PanelLoading } from './PanelState'
-
-const WON_PER_EOK = 1e8
 
 // 금액을 표시할 수 없는 이유
 const UNAVAILABLE_TEXT = {
   AMBIGUOUS: '값 확인 필요',
   UNSUPPORTED_CURRENCY: '원화 외 통화',
-}
-
-// 원 → "3,336,059억 원". 금액이 없으면 0 으로 쓰지 않습니다
-function formatEok(value, status) {
-  if (value == null) return UNAVAILABLE_TEXT[status] ?? '자료 없음'
-  const eok = Math.abs(value) / WON_PER_EOK
-  const digits = eok < 10 ? 1 : 0
-  return `${value < 0 ? '−' : ''}${eok.toLocaleString('ko-KR', { maximumFractionDigits: digits })}억 원`
 }
 
 function compareLabel({ comparison, changeRate }) {
@@ -25,7 +16,7 @@ function compareLabel({ comparison, changeRate }) {
   if (comparison === 'LOSS_CONTINUE') return { text: '적자 지속', tone: 'negative' }
   if (comparison === 'NORMAL') {
     return {
-      text: `${changeRate > 0 ? '+' : changeRate < 0 ? '−' : ''}${Math.abs(changeRate).toFixed(1)}%`,
+      text: signedPercent(changeRate, 1),
       tone: changeRate > 0 ? 'positive' : changeRate < 0 ? 'negative' : '',
     }
   }
@@ -41,7 +32,7 @@ function AmountBar({ year, value, largest, status, previous }) {
       <div className='earnings-bar-track' aria-hidden='true'>
         <div className={fillClass} style={{ width: `${width}%` }} />
       </div>
-      <strong>{formatEok(value, status)}</strong>
+      <strong>{eokWon(value, UNAVAILABLE_TEXT[status])}</strong>
     </div>
   )
 }
@@ -59,13 +50,6 @@ function AccountCompare({ item, year }) {
       <AmountBar year={year - 1} value={item.previousAmount} largest={largest} status={item.valueStatus} previous />
     </li>
   )
-}
-
-function formatCollectedAt(value) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 // 최근 실적: DB 에 저장한 OpenDART 사업보고서의 당기·전기 비교
@@ -86,7 +70,7 @@ export default function EarningsPanel({ code }) {
   const items = Array.isArray(data?.items) ? data.items : []
   if (items.length === 0) return <PanelEmpty title='실적 데이터가 없습니다.' />
 
-  const collectedAt = formatCollectedAt(data.collectedAt)
+  const collectedAt = dateTime(data.collectedAt)
 
   return (
     <>
