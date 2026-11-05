@@ -7,7 +7,6 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,12 +14,14 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.example.stock_api.kis.KisService;
+import com.example.stock_api.realtime.RealtimeStatus;
 
 /**
  * 지원 종목의 KIS 현재가를 서버가 대신 읽어 QuoteStore 에 넣습니다.
  * - KIS 초당 호출 한도를 지키기 위해 1초에 한 번, 종목을 돌아가며 한 개씩만 읽습니다.
  *   (장중 종목당 약 3초마다 갱신, 장 밖에는 종목당 60초마다)
  * - "초당 거래건수 초과" 응답이 오면 5초 동안 쉬었다가 다시 읽습니다.
+ * - 실시간 체결(Kafka)이 들어오는 종목은 건너뛰고, 체결이 끊기거나 장 밖이면 이 수집기가 대신합니다.
  * - 화면 수와 상관없이 KIS 호출 횟수는 늘지 않고, 한 종목 실패는 다른 종목에 영향을 주지 않습니다.
  */
 @Component
@@ -33,18 +34,21 @@ public class QuoteCollector {
     private static final long MARKET_GAP_MS = 2_500L;
     private static final long OFF_HOURS_GAP_MS = 60_000L;
     private static final long RATE_LIMIT_PAUSE_MS = 5_000L;
+    /** 실시간 체결이 이 시간 안에 들어온 종목은 REST 로 읽지 않습니다. */
+    private static final long TICK_FRESH_MS = 15_000L;
 
     private final KisService kis;
     private final QuoteStore store;
-    private final AtomicLong sequence = new AtomicLong();
+    private final RealtimeStatus status;
     private final Map<String, Long> lastFetch = new ConcurrentHashMap<>();
     private final Map<String, Long> lastWarn = new ConcurrentHashMap<>();
     private volatile long pausedUntil = 0L;
     private int cursor = 0;
 
-    public QuoteCollector(KisService kis, QuoteStore store) {
+    public QuoteCollector(KisService kis, QuoteStore store, RealtimeStatus status) {
         this.kis = kis;
         this.store = store;
+        this.status = status;
     }
 
     static boolean marketHours(LocalDateTime now) {
@@ -68,6 +72,9 @@ public class QuoteCollector {
         for (int i = 0; i < size; i++) {
             int index = (cursor + i) % size;
             String code = SupportedStocks.CODES.get(index);
+            if (status.recentTick(code, TICK_FRESH_MS)) {
+                continue; // 실시간 체결이 들어오는 종목은 KIS 현재가를 따로 읽지 않습니다.
+            }
             if (nowMs - lastFetch.getOrDefault(code, 0L) < gap) {
                 continue;
             }
@@ -113,7 +120,7 @@ public class QuoteCollector {
         QuoteStore.Quote quote = new QuoteStore.Quote(code, price, down ? -diff : diff, down ? -rate : rate,
                 toLong(out.get("stck_oprc")), toLong(out.get("stck_hgpr")), toLong(out.get("stck_lwpr")),
                 toLong(out.get("stck_sdpr")), volume, Instant.ofEpochMilli(now).toString(),
-                sequence.incrementAndGet());
+                store.nextSeq());
         // 장 밖에서는 최신 시세만 갱신하고, 초·분봉용 샘플은 쌓지 않습니다.
         store.put(quote, marketOpen ? new QuoteStore.Sample(now, price, volume) : null);
     }

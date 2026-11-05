@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.stereotype.Component;
 
@@ -27,8 +28,14 @@ public class QuoteStore {
     /** at 은 epoch 밀리초, volume 은 그 시점의 당일 누적거래량. */
     public record Sample(long at, long price, long volume) {}
 
+    private final AtomicLong sequence = new AtomicLong();
     private final Map<String, Quote> latest = new ConcurrentHashMap<>();
     private final Map<String, ArrayDeque<Sample>> samples = new ConcurrentHashMap<>();
+
+    /** 수집기(REST)와 실시간 체결(Kafka)이 같은 번호표를 쓰도록 저장소가 seq 를 발급합니다. */
+    public long nextSeq() {
+        return sequence.incrementAndGet();
+    }
 
     /**
      * 더 새로운 값일 때만 저장합니다.
