@@ -30,6 +30,9 @@ class SpringClient:
         message = body.get("error") if isinstance(body, dict) else None
         raise SpringError(message or "자료를 조회하지 못했습니다.")
 
+    async def all_companies(self) -> list[dict]:
+        return await self._get("/api/tools/companies")
+
     async def companies(self, query: str) -> list[dict]:
         return await self._get("/api/tools/company", {"query": query})
 
