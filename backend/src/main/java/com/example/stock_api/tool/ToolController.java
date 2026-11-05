@@ -18,7 +18,7 @@ import com.example.stock_api.dart.ListedCompanies;
 import com.example.stock_api.financial.FinancialService;
 import com.example.stock_api.kis.KisService;
 import com.example.stock_api.news.NaverNewsService;
-import com.example.stock_api.realtime.QuoteHub;
+import com.example.stock_api.realtime.QuoteStore;
 import com.example.stock_api.stock.Stock;
 import com.example.stock_api.stock.StockService;
 
@@ -39,11 +39,11 @@ public class ToolController {
     private final FinancialService financials;
     private final KisService kis;
     private final NaverNewsService naver;
-    private final QuoteHub hub;
+    private final QuoteStore hub;
     private final ListedCompanies listed;
 
     public ToolController(StockService stocks, FinancialService financials, KisService kis,
-                          NaverNewsService naver, QuoteHub hub, ListedCompanies listed) {
+                          NaverNewsService naver, QuoteStore hub, ListedCompanies listed) {
         this.stocks = stocks;
         this.financials = financials;
         this.kis = kis;

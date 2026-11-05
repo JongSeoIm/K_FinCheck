@@ -24,9 +24,9 @@ public class RestQuoteRefresher {
 
     private final KisService kis;
     private final StockService stocks;
-    private final QuoteHub hub;
+    private final QuoteStore hub;
 
-    public RestQuoteRefresher(KisService kis, StockService stocks, QuoteHub hub) {
+    public RestQuoteRefresher(KisService kis, StockService stocks, QuoteStore hub) {
         this.kis = kis;
         this.stocks = stocks;
         this.hub = hub;

@@ -7,7 +7,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import com.example.stock_api.realtime.QuoteHub;
+import com.example.stock_api.realtime.QuoteStore;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class StockWebSocketHandler extends TextWebSocketHandler {
 
-    private final QuoteHub hub;
+    private final QuoteStore hub;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {

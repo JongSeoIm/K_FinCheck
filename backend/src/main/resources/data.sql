@@ -4,4 +4,6 @@ INSERT IGNORE INTO company (stock_code, company_name, market_type, industry, dar
     ('005380', '현대차',     'KOSPI', '운송장비·부품', '00164742'),
     ('035420', 'NAVER',      'KOSPI', 'IT 서비스',     NULL),
     ('035720', '카카오',     'KOSPI', 'IT 서비스',     NULL),
+    ('000270', '기아',       'KOSPI', '운송장비·부품', NULL),
+    ('051910', 'LG화학',     'KOSPI', '화학',          NULL),
     ('006400', '삼성SDI',    'KOSPI', '전기·전자',     NULL);

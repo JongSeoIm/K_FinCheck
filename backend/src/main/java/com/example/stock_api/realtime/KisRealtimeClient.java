@@ -28,7 +28,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * KIS 실시간 웹소켓(H0STCNT0 체결가)에 연결해 지원 종목을 구독하고, 받은 체결을 QuoteHub 로 넘깁니다.
+ * KIS 실시간 웹소켓(H0STCNT0 체결가)에 연결해 지원 종목을 구독하고, 받은 체결을 QuoteStore 로 넘깁니다.
  * 끊기면 5초 → 최대 60초 간격으로 다시 연결합니다. JDK 내장 HttpClient WebSocket 을 써서 추가 의존성이 없습니다.
  */
 @Slf4j
@@ -37,7 +37,7 @@ public class KisRealtimeClient {
 
     private final KisService kis;
     private final StockService stocks;
-    private final QuoteHub hub;
+    private final QuoteStore hub;
     private final TickPublisher tickPublisher;
     private final ObjectMapper json;
     private final String wsUrl;
@@ -54,7 +54,7 @@ public class KisRealtimeClient {
     private volatile boolean stopping = false;
     private volatile int retryDelaySec = 5;
 
-    public KisRealtimeClient(KisService kis, StockService stocks, QuoteHub hub, TickPublisher tickPublisher, ObjectMapper json,
+    public KisRealtimeClient(KisService kis, StockService stocks, QuoteStore hub, TickPublisher tickPublisher, ObjectMapper json,
                              @Value("${kis.ws-url}") String wsUrl) {
         this.kis = kis;
         this.stocks = stocks;

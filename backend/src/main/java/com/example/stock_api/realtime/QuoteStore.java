@@ -35,15 +35,15 @@ import jakarta.annotation.PreDestroy;
  * 봉 메시지: {"type":"bars","code":"005930","bars":[...]}
  */
 @Component
-public class QuoteHub {
+public class QuoteStore {
 
-    private static final Logger log = LoggerFactory.getLogger(QuoteHub.class);
+    private static final Logger log = LoggerFactory.getLogger(QuoteStore.class);
     private static final long PUSH_INTERVAL_MS = 500;
 
     private final ObjectMapper json;
     private final KisService kis;
 
-    public QuoteHub(ObjectMapper json, KisService kis) {
+    public QuoteStore(ObjectMapper json, KisService kis) {
         this.json = json;
         this.kis = kis;
     }

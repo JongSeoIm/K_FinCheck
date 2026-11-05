@@ -17,7 +17,7 @@ import com.example.stock_api.dart.DartService;
 import com.example.stock_api.financial.FinancialService;
 import com.example.stock_api.news.NaverNewsService;
 import com.example.stock_api.realtime.BarAggregator;
-import com.example.stock_api.realtime.QuoteHub;
+import com.example.stock_api.realtime.QuoteStore;
 import com.example.stock_api.stock.Stock;
 import com.example.stock_api.stock.StockService;
 
@@ -39,11 +39,11 @@ public class KisController {
     private final StockService stocks;
     private final DartService dart;
     private final NaverNewsService naver;
-    private final QuoteHub hub;
+    private final QuoteStore hub;
     private final FinancialService financials;
 
     public KisController(KisService kis, StockService stocks, DartService dart,
-                         NaverNewsService naver, QuoteHub hub, FinancialService financials) {
+                         NaverNewsService naver, QuoteStore hub, FinancialService financials) {
         this.kis = kis;
         this.stocks = stocks;
         this.dart = dart;

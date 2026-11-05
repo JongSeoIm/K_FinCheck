@@ -16,8 +16,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * KIS 체결 → Kafka → QuoteHub 경로.
- * 전송이 실패하면 시세가 끊기지 않도록 바로 QuoteHub 로 보내고, 10초 동안은 Kafka 를 건너뜁니다.
+ * KIS 체결 → Kafka → QuoteStore 경로.
+ * 전송이 실패하면 시세가 끊기지 않도록 바로 QuoteStore 로 보내고, 10초 동안은 Kafka 를 건너뜁니다.
  */
 @Slf4j
 @Component
@@ -28,11 +28,11 @@ public class QuotePipeline implements TickPublisher {
 
     private final KafkaTemplate<String, String> kafka;
     private final ObjectMapper json;
-    private final QuoteHub hub;
+    private final QuoteStore hub;
     private final String topic;
     private volatile long skipUntil = 0;
 
-    public QuotePipeline(KafkaTemplate<String, String> kafka, ObjectMapper json, QuoteHub hub,
+    public QuotePipeline(KafkaTemplate<String, String> kafka, ObjectMapper json, QuoteStore hub,
                          @Value("${app.kafka.topic}") String topic) {
         this.kafka = kafka;
         this.json = json;
@@ -63,7 +63,7 @@ public class QuotePipeline implements TickPublisher {
         }
     }
 
-    /** 받기: Kafka 에서 꺼낸 시세를 QuoteHub 로 넘깁니다. 이후 화면 전달은 기존과 같습니다. */
+    /** 받기: Kafka 에서 꺼낸 시세를 QuoteStore 로 넘깁니다. 이후 화면 전달은 기존과 같습니다. */
     @KafkaListener(topics = "${app.kafka.topic}")
     public void receive(String message) {
         try {
