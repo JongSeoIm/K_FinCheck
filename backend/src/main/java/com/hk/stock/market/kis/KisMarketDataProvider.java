@@ -120,11 +120,16 @@ public class KisMarketDataProvider implements MarketDataProvider {
 		return result;
 	}
 
-	/**
-	 * 일봉: 1회 최대 100건이라 기간을 뒤에서부터 나눠서 반복 호출한다. (수정주가 기준)
-	 */
 	@Override
 	public List<ChartPointDto> fetchDaily(String symbol, LocalDate from, LocalDate to) {
+		return fetchPeriod(symbol, "D", from, to);
+	}
+
+	/**
+	 * 기간별 시세 (D 일 · W 주 · M 월 · Y 연): 1회 최대 100건이라 기간을 뒤에서부터 나눠서 반복 호출한다. (수정주가 기준)
+	 */
+	@Override
+	public List<ChartPointDto> fetchPeriod(String symbol, String period, LocalDate from, LocalDate to) {
 		Map<String, ChartPointDto> rows = new LinkedHashMap<>();
 		LocalDate end = to;
 
@@ -134,7 +139,7 @@ public class KisMarketDataProvider implements MarketDataProvider {
 					"FID_INPUT_ISCD", symbol,
 					"FID_INPUT_DATE_1", from.format(YMD),
 					"FID_INPUT_DATE_2", end.format(YMD),
-					"FID_PERIOD_DIV_CODE", "D",
+					"FID_PERIOD_DIV_CODE", period,
 					"FID_ORG_ADJ_PRC", "0"));
 
 			LocalDate oldest = null;

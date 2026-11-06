@@ -2,19 +2,40 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8085'
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8085/ws/quotes'
 
+// 값을 바꾸는 요청에 보낼 CSRF 토큰 (서버 세션에 묶여 있어 로그아웃하면 다시 받는다)
+let csrf = null
+
+const loadCsrf = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/csrf`, { credentials: 'include' })
+  csrf = await response.json()
+  return csrf
+}
+
 // fetch 에러 처리와 JSON 파싱을 도와주는 함수 (실습 boardApi.js 방식)
 // 로그인 세션 쿠키(JSESSIONID)를 함께 보내도록 credentials: 'include'
-export const fetchWrapper = async (path, options = {}) => {
+export const fetchWrapper = async (path, options = {}, retried = false) => {
+  const changing = options.method && options.method !== 'GET'
   let response
   try {
+    const token = changing ? (csrf ?? await loadCsrf()) : null
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...options.headers },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { [token.headerName]: token.token } : {}),
+        ...options.headers,
+      },
     })
   } catch (error) {
     if (error.name === 'AbortError') throw error
     throw new Error('서버에 연결할 수 없습니다. stock-api 서버가 실행 중인지 확인하세요.')
+  }
+
+  // 세션이 바뀌어 토큰이 만료되면 새로 받아 한 번만 다시 보낸다
+  if (changing && response.status === 403 && !retried) {
+    csrf = null
+    return fetchWrapper(path, options, true)
   }
 
   const data = await response.json().catch(() => ({}))
@@ -40,13 +61,9 @@ export const stockApi = {
   getQuotes: (symbols, options) =>
     fetchWrapper(`/api/quotes?symbols=${symbols.join(',')}`, options).then((d) => d.list ?? []),
 
-  // 선 차트용 이력 (range: 1D 분봉 | 1W·1M·1Y 일봉)
-  getHistory: (symbol, range, options) =>
-    fetchWrapper(`/api/stocks/${symbol}/history?range=${range}`, options).then((d) => d.history),
-
-  // 캔들 OHLC (일봉, range: 1W | 1M | 1Y)
-  getCandles: (symbol, range, options) =>
-    fetchWrapper(`/api/stocks/${symbol}/candles?interval=1d&range=${range}`, options).then((d) => d.candles),
+  // 봉 데이터 (interval: 1s·5s·30s·1m·3m·5m·10m·15m·30m·60m·1d·1w·1mo·1y)
+  getCandles: (symbol, interval, options) =>
+    fetchWrapper(`/api/stocks/${symbol}/candles?interval=${interval}${interval === '1d' ? '&range=1Y' : ''}`, options).then((d) => d.candles),
 
   // 종목 관련 뉴스 (서버가 네이버 검색 API로 조회, 키는 서버에만 있음)
   getNews: (symbol, options) =>
@@ -60,7 +77,11 @@ export const stockApi = {
   getEarnings: (symbol, options) =>
     fetchWrapper(`/api/stocks/${symbol}/earnings`, options),
 
-  // 내 관심 종목 (로그인 필요, 모두 변경 후 전체 목록 [{ symbol, name, market, regdate }])
+  // 연간 공시 실적·전년 대비·재무 지표 (서버가 OpenDART 조회 후 DB 저장)
+  getAnnualEarnings: (symbol, options) =>
+    fetchWrapper(`/api/companies/${symbol}/annual-earnings`, options).then((d) => d.earnings),
+
+  // 내 관심 종목 (로그인 필요, 모두 변경 후 전체 목록 [{ symbol, name, market, createdAt }])
   getWatchlist: (options) =>
     fetchWrapper('/api/watchlist', options).then((d) => d.list ?? []),
 
@@ -70,17 +91,24 @@ export const stockApi = {
   removeWatchlist: (symbol) =>
     fetchWrapper(`/api/watchlist/${symbol}`, { method: 'DELETE' }).then((d) => d.list ?? []),
 
-  // AI 챗봇 (로그인 필요) → { status, answer, sources: [{ provider, label, basisAt, url }] }
-  askChat: (symbol, question) =>
-    fetchWrapper('/api/chat/messages', { method: 'POST', body: JSON.stringify({ symbol, question }) }),
+  // AI 챗봇 (로그인 필요) → { conversationId, status, answer, sources: [{ provider, label, basisAt, url }], visuals }
+  askChat: (symbol, question, conversationId) =>
+    fetchWrapper('/api/chat', { method: 'POST', body: JSON.stringify({ symbol, question, conversationId: conversationId ?? undefined }) }),
 
-  // 서버가 기억 중인 최근 대화 (최대 10개) → [{ role, content, status, sources, createdAt }]
-  getConversation: (symbol, options) =>
-    fetchWrapper(`/api/chat/conversations/${symbol}`, options).then((d) => d.messages ?? []),
+  // 새 대화방 → { conversationId, stockCode, stockName, title, createdAt, updatedAt }
+  createConversation: (symbol) =>
+    fetchWrapper('/api/chat/conversations', { method: 'POST', body: JSON.stringify({ symbol }) }).then((d) => d.conversation),
 
-  // 새 대화 (서버의 대화 문맥 삭제)
-  clearConversation: (symbol) =>
-    fetchWrapper(`/api/chat/conversations/${symbol}`, { method: 'DELETE' }),
+  // 종목의 대화방 목록 (최근에 이어간 순서) → [{ conversationId, stockCode, stockName, title, createdAt, updatedAt }]
+  getConversations: (symbol, options) =>
+    fetchWrapper(`/api/chat/conversations?symbol=${symbol}`, options).then((d) => d.conversations ?? []),
+
+  // 대화방의 저장된 메시지 → [{ role, content, status, sources, visuals, createdAt }]
+  getConversationMessages: (conversationId, options) =>
+    fetchWrapper(`/api/chat/conversations/${conversationId}/messages`, options).then((d) => d.messages ?? []),
+
+  deleteConversation: (conversationId) =>
+    fetchWrapper(`/api/chat/conversations/${conversationId}`, { method: 'DELETE' }),
 
   // 시세 수신 상태
   getStatus: (options) =>

@@ -12,7 +12,7 @@ import com.hk.stock.dtos.QuoteDto;
 /**
  * 시세 제공처 공통 규격.
  * 실제 데이터(KisMarketDataProvider)와 모의 데이터(DemoMarketDataProvider)가 이 규격을 따른다.
- * 다음 단계에서 Kafka를 넣을 때는 startRealtime 의 콜백 자리에 Kafka 발행을 연결하면 된다.
+ * 실시간 체결은 startRealtime 의 콜백으로 받아 Kafka 로 발행한다.
  */
 public interface MarketDataProvider {
 
@@ -27,6 +27,9 @@ public interface MarketDataProvider {
 
 	//일봉 (오래된 순)
 	List<ChartPointDto> fetchDaily(String symbol, LocalDate from, LocalDate to);
+
+	//주봉 W · 월봉 M · 연봉 Y (오래된 순)
+	List<ChartPointDto> fetchPeriod(String symbol, String period, LocalDate from, LocalDate to);
 
 	//증권사 리포트별 투자의견 (최신순, category 는 비워 두고 OpinionCalculator 가 채운다)
 	List<OpinionReportDto> fetchOpinions(String symbol, LocalDate from, LocalDate to);

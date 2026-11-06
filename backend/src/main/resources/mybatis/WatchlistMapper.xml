@@ -5,23 +5,23 @@
 
 	<!-- 등록한 순서대로 -->
 	<select id="getWatchlist" parameterType="Long" resultType="watchlistDto">
-		SELECT w.symbol, c.name, c.market, w.regdate
+		SELECT w.stock_code AS symbol, c.company_name AS name, c.market_type AS market, w.created_at
 		FROM watchlist w
-		JOIN company c ON c.symbol = w.symbol
+		JOIN company c ON c.stock_code = w.stock_code
 		WHERE w.user_id = #{userId}
-		ORDER BY w.regdate, w.symbol
+		ORDER BY w.created_at, w.stock_code
 	</select>
 
-	<!-- 이미 등록한 종목이면 건너뜀 (PK: user_id + symbol) -->
+	<!-- 이미 등록한 종목이면 건너뜀 (PK: user_id + stock_code) -->
 	<insert id="insertWatchlist">
-		INSERT IGNORE INTO watchlist (user_id, symbol)
+		INSERT IGNORE INTO watchlist (user_id, stock_code)
 		VALUES (#{userId}, #{symbol})
 	</insert>
 
 	<delete id="deleteWatchlist">
 		DELETE FROM watchlist
 		WHERE user_id = #{userId}
-		  AND symbol = #{symbol}
+		  AND stock_code = #{symbol}
 	</delete>
 
 </mapper>

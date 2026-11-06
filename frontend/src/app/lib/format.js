@@ -45,6 +45,20 @@ export const directionClass = (v) => {
 export const formatClock = (value) => (value ? timeFmt.format(new Date(value)) : '—')
 export const formatHourMinute = (value) => (value ? hmFmt.format(new Date(value)) : '')
 
+const dayTimeFmt = new Intl.DateTimeFormat('ko-KR', {
+  month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul',
+})
+
+// 차트 축 표시: 초봉 시:분:초 · 분봉 시:분(며칠에 걸치면 월/일 포함) · 일주봉 월/일 · 월봉 연.월 · 연봉 연
+export const formatChartTime = (value, interval, multiDay = false) => {
+  if (!value) return ''
+  if (['1d', '1w'].includes(interval)) return formatDay(value)
+  if (interval === '1mo') return String(value).slice(0, 7).replace('-', '.')
+  if (interval === '1y') return String(value).slice(0, 4)
+  if (interval?.endsWith('s')) return timeFmt.format(new Date(value))
+  return multiDay ? dayTimeFmt.format(new Date(value)) : hmFmt.format(new Date(value))
+}
+
 export const formatDay = (value) => {
   if (!value) return ''
   const [, m, d] = String(value).split('-')

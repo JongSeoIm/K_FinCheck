@@ -97,6 +97,31 @@ public class DemoMarketDataProvider implements MarketDataProvider {
 		return result;
 	}
 
+	//주·월·연봉: 모의 일봉을 기간별로 묶는다
+	@Override
+	public List<ChartPointDto> fetchPeriod(String symbol, String period, LocalDate from, LocalDate to) {
+		java.util.TreeMap<String, ChartPointDto> bars = new java.util.TreeMap<>();
+		for (ChartPointDto day : fetchDaily(symbol, from, to)) {
+			LocalDate d = LocalDate.parse(day.getTime());
+			String key = switch (period) {
+				case "W" -> d.with(DayOfWeek.MONDAY).toString();
+				case "M" -> d.withDayOfMonth(1).toString();
+				case "Y" -> d.withDayOfYear(1).toString();
+				default -> day.getTime();
+			};
+			ChartPointDto bar = bars.get(key);
+			if (bar == null) {
+				bars.put(key, new ChartPointDto(key, day.getOpen(), day.getHigh(), day.getLow(), day.getClose(), day.getVolume()));
+			} else {
+				bar.setHigh(bar.getHigh().max(day.getHigh()));
+				bar.setLow(bar.getLow().min(day.getLow()));
+				bar.setClose(day.getClose());
+				bar.setVolume(bar.getVolume() + day.getVolume());
+			}
+		}
+		return new ArrayList<>(bars.values());
+	}
+
 	//가상 증권사 리포트: 4일에 1건꼴, 의견은 매수 위주 (실제 국내 리포트 분포와 비슷하게)
 	@Override
 	public List<OpinionReportDto> fetchOpinions(String symbol, LocalDate from, LocalDate to) {

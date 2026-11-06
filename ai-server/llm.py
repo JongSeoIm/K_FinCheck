@@ -1,4 +1,4 @@
-"""OpenAI 호출 (최종 답변 문장만 만든다. Tool 선택·외부 API 호출은 하지 않는다)"""
+"""OpenAI 호출 (최종 답변 문장 생성, 질문 해석 보조. Tool 선택·외부 API 호출은 하지 않는다)"""
 
 import logging
 
@@ -57,3 +57,27 @@ async def generate(instructions: str, messages: list[dict]) -> str:
     if not text:
         raise LlmError("AI 답변이 비어 있습니다.")
     return text
+
+
+async def parse(instructions: str, messages: list[dict], schema: type):
+    """정해진 형식(schema)으로 응답을 받는다. 실패하면 LlmError"""
+    if not is_configured():
+        raise LlmError("AI 서버에 OPENAI_API_KEY 가 설정되지 않았습니다.")
+    params = {
+        "model": config.OPENAI_MODEL,
+        "instructions": instructions,
+        "input": messages,
+        "text_format": schema,
+        "max_output_tokens": config.OPENAI_INTERPRET_MAX_TOKENS,
+    }
+    if config.OPENAI_REASONING_EFFORT:
+        params["reasoning"] = {"effort": config.OPENAI_REASONING_EFFORT}
+    try:
+        response = await _get_client().with_options(timeout=config.OPENAI_INTERPRET_TIMEOUT_SECONDS).responses.parse(**params)
+    except Exception as e:
+        log.warning("질문 해석 실패: %s %s", type(e).__name__, e)
+        raise LlmError("질문을 해석하지 못했습니다.") from e
+    if response.output_parsed is None:
+        log.warning("질문 해석 응답을 읽지 못했습니다.")
+        raise LlmError("질문을 해석하지 못했습니다.")
+    return response.output_parsed

@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 @Builder(toBuilder = true)
 public class QuoteDto {
-	private String eventId;				//서버가 붙인 이벤트 번호 (종목코드-순번). 제공처 원천 ID가 아니다
+	private String eventId;				//서버가 붙인 이벤트 번호 (Kafka 발행 시 또는 REST 조회 시). 제공처 원천 ID가 아니다
 	private String symbol;				//종목코드 (문자열, 앞자리 0 보존)
 	private String name;
 	private String market;				//시장 구분 (company.market, 예: KOSPI)

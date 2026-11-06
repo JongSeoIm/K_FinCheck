@@ -25,7 +25,7 @@ import com.hk.stock.service.ChartService;
 import com.hk.stock.service.EarningsService;
 import com.hk.stock.service.NewsService;
 import com.hk.stock.service.OpinionService;
-import com.hk.stock.service.QuoteService;
+import com.hk.stock.service.QuoteStore;
 import com.hk.stock.service.StockService;
 
 import jakarta.validation.constraints.Pattern;
@@ -41,7 +41,7 @@ public class StockController {
 	@Autowired
 	private StockService stockService;
 	@Autowired
-	private QuoteService quoteService;
+	private QuoteStore quoteStore;
 	@Autowired
 	private ChartService chartService;
 	@Autowired
@@ -73,7 +73,7 @@ public class StockController {
 	public Map<String, QuoteDto> getQuote(
 			@PathVariable @Pattern(regexp = SYMBOL_REGEX, message = SYMBOL_MESSAGE) String symbol) {
 		Map<String, QuoteDto> map = new HashMap<>();
-		map.put("quote", quoteService.getQuote(symbol));
+		map.put("quote", quoteStore.getQuote(symbol));
 		return map;
 	}
 
@@ -82,9 +82,9 @@ public class StockController {
 	public Map<String, List<QuoteDto>> getQuotes(@RequestParam List<String> symbols) {
 		List<QuoteDto> list = new ArrayList<>();
 		for (String symbol : symbols) {
-			if (!symbol.matches(SYMBOL_REGEX) || !quoteService.isSupported(symbol)) continue;
+			if (!symbol.matches(SYMBOL_REGEX) || !quoteStore.isSupported(symbol)) continue;
 			try {
-				list.add(quoteService.getQuote(symbol));
+				list.add(quoteStore.getQuote(symbol));
 			} catch (MarketDataException e) {
 				//한 종목이 실패해도 나머지는 응답한다
 			}
@@ -104,12 +104,12 @@ public class StockController {
 		return map;
 	}
 
-	//캔들 OHLC: /api/stocks/005930/candles?interval=1d&range=1W|1M|1Y → {"candles":{...}}
+	//캔들 OHLC: /api/stocks/005930/candles?interval=1s~60m|1d|1w|1mo|1y (일봉만 range=1W|1M|1Y) → {"candles":{...}}
 	@GetMapping("/stocks/{symbol}/candles")
 	public Map<String, ChartDto> getCandles(
 			@PathVariable @Pattern(regexp = SYMBOL_REGEX, message = SYMBOL_MESSAGE) String symbol,
 			@RequestParam(defaultValue = "1d") String interval,
-			@RequestParam(defaultValue = "1M") String range) {
+			@RequestParam(required = false) String range) {
 		Map<String, ChartDto> map = new HashMap<>();
 		map.put("candles", chartService.getCandles(symbol, interval, range));
 		return map;
@@ -152,7 +152,7 @@ public class StockController {
 	@GetMapping("/market/status")
 	public Map<String, MarketStatusDto> getStatus() {
 		Map<String, MarketStatusDto> map = new HashMap<>();
-		map.put("status", quoteService.getStatus());
+		map.put("status", quoteStore.getStatus());
 		return map;
 	}
 }

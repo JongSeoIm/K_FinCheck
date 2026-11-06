@@ -32,6 +32,7 @@ SYSTEM_PROMPT = """당신은 국내 주식 정보 서비스 'K-FinCheck'의 금�
 - 실적을 말할 때는 사업연도, 보고서 종류, 연결·별도 기준을 함께 말한다.
 - 분기·반기 보고서의 손익 수치는 [조회 자료]의 당기기간에 적힌 3개월 값이다. 상반기 전체나 1년 값이라고 말하지 않는다.
 - 뉴스를 말할 때는 기사 제목과 게시 시각을 함께 말한다.
+- 조회한 기사 자료는 제목과 검색 결과 설명뿐이다. 기사 전문을 읽은 것처럼 말하지 않고, 제목과 설명에 없는 내용을 덧붙이지 않는다.
 - 질문이 금융과 무관하면 "주식·금융 질문만 도와드릴 수 있어요"라고 한 문장으로 안내한다.
 - 조회 대상이 아닌 다른 기업을 물으면 지원 종목만 조회할 수 있다고 안내한다.
 """
@@ -246,6 +247,62 @@ def build_sources(results: list[ToolResult], companies: list[Company]) -> list[d
                 })
         # get_company_info 는 우리 DB 기본 정보라 외부 출처를 표시하지 않는다
     return sources
+
+
+# ===== visuals: 화면의 카드·표·그래프·링크 - sources 처럼 LLM 이 아니라 Tool 결과로 직접 만든다 =====
+_EARNING_ACCOUNTS = ["REVENUE", "OPERATING_INCOME", "NET_INCOME"]
+
+
+def _earning_compare(current: int | None, previous: int | None) -> tuple[float | None, str | None]:
+    """(전년 대비 증감률, 증감률 대신 보여줄 문구)"""
+    if current is None or previous is None or previous == 0:
+        return None, "비교 불가"
+    if previous < 0:
+        return None, "흑자 전환" if current >= 0 else "적자 지속"
+    if current < 0:
+        return None, "적자 전환"
+    return round((current - previous) / previous * 100, 1), None
+
+
+def build_visuals(results: list[ToolResult], companies: list[Company]) -> list[dict]:
+    visuals: list[dict] = []
+    for r in results:
+        if not r.ok:
+            continue
+        name = _name(r.symbol, companies)
+        d = r.data
+        if r.name == QUOTE_TOOL:
+            visuals.append({
+                "type": "quote", "name": name, "symbol": r.symbol, "source": d.get("source"),
+                "price": d.get("price"), "changeAmount": d.get("changeAmount"), "changeRate": d.get("changeRate"),
+                "open": d.get("open"), "high": d.get("high"), "low": d.get("low"), "volume": d.get("cumulativeVolume"),
+                "eventTime": d.get("eventTime"), "receivedAt": d.get("receivedAt"),
+            })
+        elif r.name == FINANCIAL_TOOL:
+            items = {item.get("accountId"): item for item in d.get("items", [])}
+            rows = []
+            for code in _EARNING_ACCOUNTS:
+                item = items.get(code)
+                if not item:
+                    continue
+                rate, label = _earning_compare(item.get("current"), item.get("previous"))
+                rows.append({"code": code, "name": item.get("accountName"), "current": item.get("current"),
+                             "previous": item.get("previous"), "changeRate": rate, "compareLabel": label})
+            current_period, previous_period = _income_periods(d.get("bsnsYear"), d.get("reprtCode"))
+            visuals.append({
+                "type": "financial", "name": name, "symbol": r.symbol, "source": "OpenDART",
+                "year": d.get("bsnsYear"), "report": d.get("reportName"), "fs": d.get("fsName"), "url": d.get("url"),
+                "period": current_period, "previousPeriod": previous_period, "rows": rows,
+            })
+        elif r.name == NEWS_TOOL:
+            visuals.append({
+                "type": "news", "name": name, "symbol": r.symbol, "source": "NAVER API HUB",
+                "items": [{"title": n.get("headline"), "press": n.get("source"), "publishedAt": _iso_from_unix(n.get("datetime")),
+                           "url": n.get("url")} for n in d],
+            })
+        elif r.name == INFO_TOOL:
+            visuals.append({"type": "company", "name": d.get("name"), "symbol": d.get("symbol"), "market": d.get("market")})
+    return visuals
 
 
 # ===== 답변 수치 검사 (PDF "조회하지 못한 값은 추측하거나 임의로 생성하지 않는다") =====

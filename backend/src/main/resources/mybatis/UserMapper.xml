@@ -10,13 +10,13 @@
 	</insert>
 
 	<select id="getUserByLoginId" parameterType="String" resultType="userDto">
-		SELECT user_id, login_id, password_hash, nickname, regdate
+		SELECT user_id, login_id, password_hash, nickname, created_at
 		FROM app_user
 		WHERE login_id = #{loginId}
 	</select>
 
 	<select id="getUserById" parameterType="Long" resultType="userDto">
-		SELECT user_id, login_id, password_hash, nickname, regdate
+		SELECT user_id, login_id, password_hash, nickname, created_at
 		FROM app_user
 		WHERE user_id = #{userId}
 	</select>

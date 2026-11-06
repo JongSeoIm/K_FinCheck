@@ -113,6 +113,7 @@ export default function NewsFeed({ symbol }) {
           </ul>
         )}
       </div>
+      <p className='news-disclaimer'>검색 결과 설명을 제공하며 기사 전문을 표시하지 않습니다.</p>
     </>
   )
 }

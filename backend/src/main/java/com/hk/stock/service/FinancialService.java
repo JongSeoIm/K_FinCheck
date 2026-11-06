@@ -1,17 +1,22 @@
 package com.hk.stock.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.hk.stock.config.DartProperties;
+import com.hk.stock.dtos.AnnualEarningsDto;
 import com.hk.stock.dtos.CompanyDto;
 import com.hk.stock.dtos.FinancialReportDto;
 import com.hk.stock.dtos.FinancialResultDto;
@@ -23,13 +28,17 @@ import com.hk.stock.service.StockService.StockNotFoundException;
 /**
  * 기업·실적 (OpenDART → MariaDB)
  * - DB에 저장된 공시가 있으면 DB 값을 쓰고, 없으면 OpenDART에서 받아 저장한 뒤 돌려준다.
+ * - 수집한 지 1시간이 지나면 다시 수집한다. 실패하면 저장된 값을 그대로 쓴다.
  * - 같은 공시(접수번호 + 연결/별도)는 한 번만 저장한다 (UNIQUE + INSERT IGNORE).
  * - 연결(CFS)이 있으면 연결, 없으면 별도(OFS) 기준으로 답한다.
  */
 @Service
 public class FinancialService {
 
+	private static final Logger log = LoggerFactory.getLogger(FinancialService.class);
 	public static final String SOURCE = "OpenDART";
+	private static final String ANNUAL_REPORT = "11011";
+	private static final long REFRESH_HOURS = 1;
 	private static final Set<String> REPORT_CODES = Set.of("11013", "11012", "11014", "11011");
 	//최근 순서: 사업보고서 → 3분기 → 반기 → 1분기
 	private static final List<String> NEWEST_FIRST = List.of("11011", "11014", "11012", "11013");
@@ -54,6 +63,23 @@ public class FinancialService {
 		CompanyDto company = mapper.getCompany(symbol);
 		if (company == null) throw new StockNotFoundException(symbol);
 		return company;
+	}
+
+	//기업 정보 화면: 가장 최근 사업보고서의 실적·전년 대비·재무 지표
+	public AnnualEarningsDto getAnnualEarnings(String symbol) {
+		FinancialResultDto report = getFinancials(symbol, null, ANNUAL_REPORT);
+		return AnnualEarningsDto.builder()
+				.symbol(report.getSymbol())
+				.name(report.getName())
+				.source(report.getSource())
+				.bsnsYear(report.getBsnsYear())
+				.reportName(report.getReportName())
+				.fsName(report.getFsName())
+				.url(report.getUrl())
+				.unit(report.getUnit())
+				.items(FinancialMetrics.earnings(report.getItems()))
+				.metrics(FinancialMetrics.metrics(report.getItems()))
+				.build();
 	}
 
 	//year·reprtCode 가 없으면 가장 최근에 공시된 보고서를 찾는다
@@ -118,6 +144,8 @@ public class FinancialService {
 			save(company.getSymbol(), rows);
 			reports = mapper.findReports(company.getSymbol(), year, reprtCode);
 			if (reports.isEmpty()) return null;
+		} else if (isStale(reports.get(0))) {
+			reports = refresh(company, year, reprtCode, reports);
 		}
 
 		//가장 최근 접수번호의 연결, 없으면 별도
@@ -126,19 +154,40 @@ public class FinancialService {
 		return toResult(company, report, mapper.getValues(report.getReportId()));
 	}
 
+	private static boolean isStale(FinancialReportDto report) {
+		LocalDateTime collectedAt = report.getCollectedAt();
+		return collectedAt == null || collectedAt.isBefore(LocalDateTime.now().minusHours(REFRESH_HOURS));
+	}
+
+	//다시 수집한다. OpenDART 가 실패하거나 빈 응답이면 저장된 값을 그대로 쓰고, 수집 시각은 바꾸지 않는다
+	private List<FinancialReportDto> refresh(CompanyDto company, String year, String reprtCode, List<FinancialReportDto> stored) {
+		try {
+			List<DartParsers.Row> rows = dartClient.fetchMainAccounts(company.getDartCorpCode(), year, reprtCode);
+			if (rows.isEmpty()) return stored;
+			save(company.getSymbol(), rows);
+			return mapper.findReports(company.getSymbol(), year, reprtCode);
+		} catch (DartClient.DartApiException e) {
+			log.warn("OpenDART 재수집 실패, 저장된 값 사용 ({} {} {}): {}", company.getSymbol(), year, reprtCode, e.getMessage());
+			return stored;
+		}
+	}
+
 	//공시 → financial_report, 계정 → financial_value (한 트랜잭션)
 	int save(String symbol, List<DartParsers.Row> rows) {
 		Integer saved = transaction.execute(status -> {
 			int count = 0;
+			Set<Long> touched = new HashSet<>();
 			for (DartParsers.Row row : rows) {
 				FinancialReportDto report = mapper.getReport(row.rceptNo(), row.fsDiv());
 				if (report == null) {
-					mapper.insertReport(new FinancialReportDto(null, row.rceptNo(), symbol, row.bsnsYear(), row.reprtCode(), row.fsDiv(), null));
+					mapper.insertReport(new FinancialReportDto(null, symbol, row.rceptNo(), row.bsnsYear(), row.reprtCode(), row.fsDiv(), null));
 					report = mapper.getReport(row.rceptNo(), row.fsDiv());
 				}
-				count += mapper.insertValue(new FinancialValueDto(report.getReportId(),
-						FinancialAccounts.codeOf(row.accountName()), row.accountName(),
-						row.current(), row.previous(), row.currency()));
+				if (touched.add(report.getReportId())) mapper.touchReport(report.getReportId());
+				String code = FinancialAccounts.codeOf(row.accountName());
+				count += mapper.insertValue(new FinancialValueDto(null, report.getReportId(),
+						code, FinancialAccounts.nameOf(code, row.accountName()), null, row.accountName(),
+						row.current(), row.previous(), row.currency(), row.current() == null ? "MISSING" : "AVAILABLE"));
 			}
 			return count;
 		});
@@ -147,13 +196,13 @@ public class FinancialService {
 
 	private FinancialResultDto toResult(CompanyDto company, FinancialReportDto report, List<FinancialValueDto> values) {
 		List<FinancialResultDto.Item> items = values.stream()
-				.sorted(Comparator.comparingInt(v -> FinancialAccounts.order(v.getAccountId())))
+				.sorted(Comparator.comparingInt(v -> FinancialAccounts.order(v.getAccountCode())))
 				.map(v -> FinancialResultDto.Item.builder()
-						.accountId(v.getAccountId())
-						.accountName(v.getAccountNm())
-						.statement(FinancialAccounts.statementOf(v.getAccountId()))
-						.current(v.getThstrmAmount())
-						.previous(v.getFrmtrmAmount())
+						.accountId(v.getAccountCode())
+						.accountName(v.getSourceAccountName() != null ? v.getSourceAccountName() : v.getAccountName())
+						.statement(FinancialAccounts.statementOf(v.getAccountCode()))
+						.current(v.getCurrentAmount())
+						.previous(v.getPreviousAmount())
 						.currency(v.getCurrency())
 						.build())
 				.toList();
@@ -161,15 +210,15 @@ public class FinancialService {
 				.symbol(company.getSymbol())
 				.name(company.getName())
 				.source(SOURCE)
-				.rceptNo(report.getRceptNo())
-				.url("https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" + report.getRceptNo())
-				.bsnsYear(report.getBsnsYear())
-				.reprtCode(report.getReprtCode())
-				.reportName(FinancialAccounts.reportName(report.getReprtCode()))
+				.rceptNo(report.getReceiptNo())
+				.url("https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" + report.getReceiptNo())
+				.bsnsYear(report.getBusinessYear())
+				.reprtCode(report.getReportCode())
+				.reportName(FinancialAccounts.reportName(report.getReportCode()))
 				.fsDiv(report.getFsDiv())
 				.fsName(FinancialAccounts.fsName(report.getFsDiv()))
-				.incomeBasis(FinancialAccounts.incomeBasis(report.getReprtCode()))
-				.balanceBasis(FinancialAccounts.balanceBasis(report.getReprtCode()))
+				.incomeBasis(FinancialAccounts.incomeBasis(report.getReportCode()))
+				.balanceBasis(FinancialAccounts.balanceBasis(report.getReportCode()))
 				.unit("원")
 				.items(items)
 				.build();

@@ -7,6 +7,7 @@ import useMarketStatus from '@/app/hooks/useMarketStatus'
 import useQuoteFeed from '@/app/hooks/useQuoteFeed'
 import useAuthStore from '@/app/store/useAuthStore'
 import useStockStore from '@/app/store/useStockStore'
+import AnnualEarningsPanel from './AnnualEarningsPanel'
 import AuthMenu from './AuthMenu'
 import EarningsPanel from './EarningsPanel'
 import FeedStatusBar from './FeedStatusBar'
@@ -32,6 +33,7 @@ export default function Dashboard({ initialSymbol }) {
   const watchlist = useStockStore((state) => state.watchlist)
   const loadWatchlist = useStockStore((state) => state.loadWatchlist)
   const clearWatchlist = useStockStore((state) => state.clearWatchlist)
+  const setLastSymbol = useStockStore((state) => state.setLastSymbol)
   const userId = useAuthStore((state) => state.user?.userId)
   const { status: marketStatus, error: statusError } = useMarketStatus()
 
@@ -40,6 +42,11 @@ export default function Dashboard({ initialSymbol }) {
     if (userId) loadWatchlist()
     else clearWatchlist()
   }, [userId, loadWatchlist, clearWatchlist])
+
+  // 로그인 후 돌아갈 종목을 기억한다
+  useEffect(() => {
+    if (selected) setLastSymbol(selected.symbol)
+  }, [selected, setLastSymbol])
 
   // 지원 종목 목록 (티커·기본 선택 종목)
   useEffect(() => {
@@ -77,10 +84,10 @@ export default function Dashboard({ initialSymbol }) {
   return (
     <main className='app-shell'>
       <header className='topbar'>
+        <AuthMenu />
         <span className='prototype-label'>국내 주식 실시간 시세 · 한국투자증권 데이터</span>
         <h1 className='sr-only'>국내 주식 대시보드</h1>
         <StockSearch onSelect={handleSelect} />
-        <AuthMenu />
       </header>
 
       <FeedStatusBar feed={feed} marketStatus={marketStatus} statusError={statusError} />
@@ -131,6 +138,10 @@ export default function Dashboard({ initialSymbol }) {
                   <section className='panel' aria-label='최근 실적'>
                     <div className='panel-heading'><h2>최근 실적</h2></div>
                     <EarningsPanel key={selected.symbol} symbol={selected.symbol} />
+                  </section>
+                  <section className='panel' aria-label='연간 실적·재무 지표'>
+                    <div className='panel-heading'><h2>연간 실적·재무 지표</h2></div>
+                    <AnnualEarningsPanel key={selected.symbol} symbol={selected.symbol} />
                   </section>
                 </>
               )}

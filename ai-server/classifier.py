@@ -1,6 +1,7 @@
 """질문 분류 규칙 (PDF "Tool 선택 방식")
 
 FastAPI 가 질문 유형을 판별하고 필요한 Tool 을 고른다. OpenAI 는 Tool 을 고르지 않는다.
+규칙으로 판단하기 애매한 질문은 confident=False 로 표시하고, interpreter 가 OpenAI 로 질문을 해석해 다시 판단한다.
 
   "부채비율이 뭐야?"            → Tool 없이 개념 답변
   "삼성전자 현재가 알려줘"       → get_stock_quote
@@ -172,6 +173,7 @@ class Plan:
     targets: list[Company] = field(default_factory=list)
     calls: list[ToolCall] = field(default_factory=list)
     message: str = ""          # 고정 안내 문구 (out_of_scope · need_more_info)
+    confident: bool = True     # False: 규칙에 걸린 단어가 없어 기본값으로 판단함 (interpreter 대상)
 
 
 OUT_OF_SCOPE_MESSAGE = "저는 종목 시세, 실적, 관련 뉴스와 금융 용어 같은 주식·금융 질문만 도와드릴 수 있어요."
@@ -354,13 +356,13 @@ def classify(question: str, current: Company, companies: list[Company], history:
                 plan.calls = _calls([TOOL_INTENT[name] for name in tools], mentioned, previous + " " + text)
             return plan
 
-    # 금융 단어도, 지원 기업명도 없으면 LLM 에 보내지 않고 안내 문구
+    # 금융 단어도, 지원 기업명도 없으면 일단 안내 문구 ("이 회사 돈 잘 벌어?"는 interpreter 가 다시 본다)
     if not finance:
-        return Plan(kind=OUT_OF_SCOPE, message=OUT_OF_SCOPE_MESSAGE)
+        return Plan(kind=OUT_OF_SCOPE, message=OUT_OF_SCOPE_MESSAGE, confident=False)
 
     # 금융 단어 없이 다른 대상의 가격·전망을 묻는 질문 ("아이폰 가격 얼마야?", "가방 사도 돼?")
     if not mentioned and not finance_word and _other_subject(text):
-        return Plan(kind=OUT_OF_SCOPE, message=OUT_OF_SCOPE_MESSAGE)
+        return Plan(kind=OUT_OF_SCOPE, message=OUT_OF_SCOPE_MESSAGE, confident=False)
 
     # 지원하지 않는 기업 (예: "쏘카 주가")
     unknown = _unknown_company(text, companies) if not mentioned else None
@@ -387,14 +389,16 @@ def classify(question: str, current: Company, companies: list[Company], history:
                     calls=_calls(compare_intents, targets, text))
 
     targets = mentioned or [current]
+    confident = True
 
     if not intents:
         if mentioned:
             # "삼성전자 어때?" → 지금 상황을 볼 수 있게 시세 + 뉴스
             intents = [QUOTE, NEWS]
+            confident = False
         else:
             # 기업 없는 일반 금융 질문 ("주식 처음인데 뭐부터 봐야 해?")
-            return Plan(kind=CONCEPT, question_type=TERM)
+            return Plan(kind=CONCEPT, question_type=TERM, confident=False)
 
     if MOVEMENT in intents:
         # 기업명도 기간도 말하지 않았으면 다시 묻는다. 기업을 말한 질문은 PDF 예시("삼성전자 왜 올랐어?")대로 최근 등락을 조회한다
@@ -410,7 +414,7 @@ def classify(question: str, current: Company, companies: list[Company], history:
         question_type = intents[0]
         needed = intents
 
-    return Plan(kind=DATA, question_type=question_type, targets=targets, calls=_calls(needed, targets, text))
+    return Plan(kind=DATA, question_type=question_type, targets=targets, calls=_calls(needed, targets, text), confident=confident)
 
 
 def _calls(intents: list[str], targets: list[Company], text: str) -> list[ToolCall]:

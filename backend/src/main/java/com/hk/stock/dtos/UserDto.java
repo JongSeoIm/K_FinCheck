@@ -21,5 +21,5 @@ public class UserDto {
 	@JsonIgnore
 	private String passwordHash;	//BCrypt 해시 (응답에 절대 포함하지 않는다)
 	private String nickname;		//닉네임
-	private LocalDateTime regdate;	//가입일
+	private LocalDateTime createdAt;	//가입일
 }

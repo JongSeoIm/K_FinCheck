@@ -24,7 +24,7 @@ import com.hk.stock.market.MarketDataProvider.FeedStatus;
 
 /**
  * KIS 실시간 체결가(H0STCNT0) WebSocket 수신
- * - 서버 1곳에서만 KIS에 접속하고, 브라우저에는 우리 서버 WebSocket(/ws/quotes)으로 전달한다.
+ * - 받은 체결은 Kafka 로 발행하고, 소비한 값을 브라우저에 우리 서버 WebSocket(/ws/quotes)으로 전달한다.
  * - 수신 메시지
  *   · 체결 데이터: "0|H0STCNT0|001|005930^093001^71000^2^500^0.71^..." (^ 구분, 여러 건이면 이어 붙여 옴)
  *   · 제어 메시지(JSON): 구독 응답, PINGPONG(받은 그대로 돌려보내야 연결 유지)

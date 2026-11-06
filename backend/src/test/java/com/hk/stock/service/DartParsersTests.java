@@ -69,6 +69,9 @@ class DartParsersTests {
 		assertThat(FinancialAccounts.codeOf("법인세차감전 순이익")).isEqualTo("PRETAX_INCOME");
 		assertThat(FinancialAccounts.codeOf("자산 총계")).isEqualTo("TOTAL_ASSETS");
 		assertThat(FinancialAccounts.codeOf("새로운 계정")).isEqualTo("ETC_새로운계정");
+		assertThat(FinancialAccounts.codeOf("가".repeat(60))).hasSize(50);
+		assertThat(FinancialAccounts.nameOf("REVENUE", "수익(매출액)")).isEqualTo("매출액");
+		assertThat(FinancialAccounts.nameOf("ETC_새로운계정", "새로운 계정")).isEqualTo("새로운 계정");
 		assertThat(FinancialAccounts.statementOf("REVENUE")).isEqualTo("IS");
 		assertThat(FinancialAccounts.statementOf("TOTAL_EQUITY")).isEqualTo("BS");
 	}

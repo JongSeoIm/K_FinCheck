@@ -41,7 +41,7 @@ export default function StockInfo({ stock }) {
     ['고가', formatPrice(quote?.high)],
     ['저가', formatPrice(quote?.low)],
     ['전일 종가', formatPrice(quote?.previousClose)],
-    ['거래량', formatVolume(quote?.cumulativeVolume)],
+    ['누적 거래량', formatVolume(quote?.cumulativeVolume)],
   ]
 
   return (
@@ -79,7 +79,7 @@ export default function StockInfo({ stock }) {
               <span>{formatSignedPrice(quote.changeAmount)}</span>
               <span>{formatRate(quote.changeRate)}</span>
             </p>
-            <small className='updated'>마지막 갱신 {formatClock(quote.receivedAt)}</small>
+            <small className='updated'>{quote.eventTime ? `최근 체결 ${formatClock(quote.eventTime)}` : `조회 ${formatClock(quote.receivedAt)}`} · 마지막 갱신 {formatClock(quote.receivedAt)}</small>
           </div>
 
           <dl className='metrics'>

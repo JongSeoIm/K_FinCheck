@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import useAuthStore from '@/app/store/useAuthStore'
+import useStockStore from '@/app/store/useStockStore'
 
 // 로그인·회원가입 공통 화면 (mode: 'login' | 'signup')
 // 서버와 같은 규칙으로 먼저 검사하고, 최종 검사는 서버가 한다
@@ -20,7 +21,7 @@ function validate(mode, form) {
   return ''
 }
 
-export default function AuthForm({ mode }) {
+export default function AuthForm({ mode, justSignedUp = false }) {
   const isSignup = mode === 'signup'
   const router = useRouter()
   const login = useAuthStore((state) => state.login)
@@ -45,11 +46,15 @@ export default function AuthForm({ mode }) {
     setSubmitting(true)
     try {
       if (isSignup) {
+        // 가입 후 로그인 화면으로 이동한다
         await signup({ loginId: form.loginId, password: form.password, nickname: form.nickname.trim() })
+        router.replace('/login?signup=1')
       } else {
+        // 로그인 후 이전에 보던 종목으로 돌아간다
         await login({ loginId: form.loginId.trim(), password: form.password })
+        const symbol = useStockStore.getState().lastSymbol
+        router.replace(symbol ? `/?symbol=${symbol}` : '/')
       }
-      router.replace('/')
     } catch (err) {
       setError(err.message)
       setSubmitting(false)
@@ -86,6 +91,7 @@ export default function AuthForm({ mode }) {
           </>
         )}
 
+        {justSignedUp && !error && <p className='auth-notice' role='status'>가입이 완료되었습니다. 로그인해 주세요.</p>}
         {error && <p className='auth-error' role='alert'>{error}</p>}
 
         <button type='submit' className='auth-submit' disabled={submitting}>

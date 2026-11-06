@@ -77,6 +77,7 @@ public final class OpinionCalculator {
 				.score(score)
 				.latest(latest)
 				.months(new ArrayList<>(months.values()))
+				.recent(new ArrayList<>(latestByBroker.values()))
 				.build();
 	}
 }

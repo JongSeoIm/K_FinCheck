@@ -7,8 +7,10 @@ from fastapi.testclient import TestClient
 
 import classifier
 import config
+import interpreter
 import llm
 import main
+import prompts
 import tools
 from tools import ToolResult
 
@@ -38,6 +40,11 @@ def client(monkeypatch):
 
     monkeypatch.setattr(tools, "list_companies", fake_companies)
     monkeypatch.setattr(llm, "generate", fake_generate)
+
+    async def no_interpretation(question, plan, current, companies, history):
+        return plan
+
+    monkeypatch.setattr(interpreter, "refine", no_interpretation)
     monkeypatch.setattr(config, "AI_INTERNAL_KEY", "")
     c = TestClient(main.app)
     c.calls = calls
@@ -255,3 +262,47 @@ def test_market_value_question_does_not_call_tools(client, monkeypatch):
     assert body["status"] == "unavailable" and body["sources"] == []
     assert "코스피" in body["answer"]
     assert client.calls["llm"] == 0
+
+
+def test_visuals_are_built_from_tool_results(client, monkeypatch):
+    fake_tools(monkeypatch)
+    body = ask(client, "삼성전자 현재가 알려줘")
+    assert [v["type"] for v in body["visuals"]] == ["quote"]
+    assert body["visuals"][0]["price"] == 222000 and body["visuals"][0]["eventTime"] == QUOTE["eventTime"]
+
+    body = ask(client, "삼성전자 관련 뉴스 알려줘")
+    assert body["visuals"][0]["type"] == "news"
+    assert body["visuals"][0]["items"][0]["url"] == "https://news.example/1"
+
+
+def test_concept_answer_has_no_visuals(client, monkeypatch):
+    fake_tools(monkeypatch)
+    assert ask(client, "부채비율이 뭐야?")["visuals"] == []
+
+
+def test_earning_compare_labels():
+    assert prompts._earning_compare(120, 100) == (20.0, None)
+    assert prompts._earning_compare(50, -10) == (None, "흑자 전환")
+    assert prompts._earning_compare(-50, 10) == (None, "적자 전환")
+    assert prompts._earning_compare(-50, -10) == (None, "적자 지속")
+    assert prompts._earning_compare(None, 10) == (None, "비교 불가")
+    assert prompts._earning_compare(10, 0) == (None, "비교 불가")
+
+
+def test_financial_visual_has_rows_and_link():
+    result = ToolResult("get_financial_result", "005930", True, {
+        "bsnsYear": "2025", "reprtCode": "11011", "reportName": "사업보고서", "fsName": "연결", "url": "https://dart.example",
+        "items": [{"accountId": "REVENUE", "accountName": "매출액", "statement": "IS", "current": 120, "previous": 100},
+                  {"accountId": "TOTAL_ASSETS", "accountName": "자산총계", "statement": "BS", "current": 1, "previous": 1}]})
+    visual = prompts.build_visuals([result], COMPANIES)[0]
+    assert visual["url"] == "https://dart.example" and visual["period"] == "2025년 1년"
+    assert [r["code"] for r in visual["rows"]] == ["REVENUE"]
+    assert visual["rows"][0]["changeRate"] == 20.0
+
+
+def test_failed_tool_has_no_visual():
+    assert prompts.build_visuals([ToolResult("get_stock_quote", "005930", False, error="실패")], COMPANIES) == []
+
+
+def test_article_rule_is_in_instructions():
+    assert "기사 전문을 읽은 것처럼 말하지 않" in prompts.SYSTEM_PROMPT

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.hk.stock.dtos.AnnualEarningsDto;
 import com.hk.stock.dtos.CompanyDto;
 import com.hk.stock.dtos.FinancialResultDto;
 import com.hk.stock.service.FinancialService;
@@ -47,6 +48,15 @@ public class CompanyController {
 			@RequestParam(required = false) String report) {
 		Map<String, FinancialResultDto> map = new HashMap<>();
 		map.put("financial", financialService.getFinancials(symbol, blankToNull(year), blankToNull(report)));
+		return map;
+	}
+
+	//연간 실적·재무 지표: /api/companies/005930/annual-earnings → {"earnings":{...}}
+	@GetMapping("/{symbol}/annual-earnings")
+	public Map<String, AnnualEarningsDto> getAnnualEarnings(
+			@PathVariable @Pattern(regexp = SYMBOL_REGEX, message = SYMBOL_MESSAGE) String symbol) {
+		Map<String, AnnualEarningsDto> map = new HashMap<>();
+		map.put("earnings", financialService.getAnnualEarnings(symbol));
 		return map;
 	}
 

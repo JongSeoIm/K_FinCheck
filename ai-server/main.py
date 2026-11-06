@@ -1,7 +1,7 @@
 """K-FinCheck AI 서버 (FastAPI :8087)
 
 Spring 서버만 호출한다: POST /chat
-  1. 질문 분류 (classifier) → 필요한 Tool 선택
+  1. 질문 분류 (classifier) → 애매하면 OpenAI 로 해석 (interpreter) → 서버가 필요한 Tool 선택
   2. Tool 호출 (tools, 각 5초 제한) → Spring API 로 시세·실적·뉴스·기업 정보 조회
   3. OpenAI 에 조회 결과 + 답변 지침 + 최근 대화(최대 10개)를 주고 답변 문장만 생성
   4. {"status","answer","sources"} 반환 (sources 는 Tool 결과로 직접 만든다)
@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 import classifier
 import config
+import interpreter
 import llm
 import prompts
 import tools
@@ -59,6 +60,7 @@ class ChatResponse(BaseModel):
     status: Literal["answered", "need_more_info", "out_of_scope", "unavailable", "error"]
     answer: str
     sources: list[Source] = Field(default_factory=list)
+    visuals: list[dict] = Field(default_factory=list)  # 화면의 카드·표·그래프·링크용 조회 자료
 
 
 @app.get("/health")
@@ -93,6 +95,7 @@ async def answer(body: ChatRequest) -> ChatResponse:
         companies = companies + [current]
 
     plan = classifier.classify(question, current, companies, history)
+    plan = await interpreter.refine(question, plan, current, companies, history)
     log.info("질문 분류: kind=%s type=%s tools=%s", plan.kind, plan.question_type,
              [f"{c.name}:{c.symbol}" for c in plan.calls])
 
@@ -136,4 +139,5 @@ async def answer(body: ChatRequest) -> ChatResponse:
         status="answered",
         answer=prompts.strip_markdown(text),
         sources=[Source(**s) for s in prompts.build_sources(results, companies)],
+        visuals=prompts.build_visuals(results, companies),
     )

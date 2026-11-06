@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { stockApi } from '@/api/stockApi'
+import useStockStore from '@/app/store/useStockStore'
+import { formatClock, formatNumber } from '@/app/lib/format'
 
 // 목업 RecommendationChart 와 같은 5단계·색상
 const LABELS = [
@@ -33,11 +35,24 @@ function OpinionTooltip({ active, payload, label }) {
   )
 }
 
+// 목표주가가 비교 기준 주가보다 얼마나 높은지
+function targetGap(target, price) {
+  if (target == null || !price) return null
+  return ((Number(target) - Number(price)) / Number(price)) * 100
+}
+
+function gapText(gap) {
+  if (gap == null) return ''
+  if (Math.abs(gap) < 0.05) return '기준 주가와 비슷'
+  return `기준 주가보다 ${Math.abs(gap).toFixed(1)}% ${gap > 0 ? '높음' : '낮음'}`
+}
+
 // 전문가 투자의견 (목업 배치: 점수 · 분포 · 5단계 목록 · 최근 월별 추세)
 // 데이터: 우리 서버 /api/stocks/{symbol}/opinions → KIS 국내주식 종목투자의견
 export default function OpinionPanel({ symbol }) {
   const [retry, setRetry] = useState(0)
   const [result, setResult] = useState({ key: null, opinion: null, error: '' })
+  const quote = useStockStore((state) => state.quotes[symbol])
   const requestKey = `${symbol}:${retry}`
 
   useEffect(() => {
@@ -111,6 +126,30 @@ export default function OpinionPanel({ symbol }) {
         )}
       </ul>
 
+      {opinion.recent?.length > 0 && (
+        <>
+          <div className='trend-heading'>증권사별 발표 당시 의견</div>
+          <div className='opinion-basis'>
+            <span>비교 기준 주가</span>
+            <strong>{quote?.price == null ? '확인 불가' : `${formatNumber(quote.price)}원`}</strong>
+            {quote && <small>{quote.source} · {quote.eventTime ? `체결 ${formatClock(quote.eventTime)}` : `조회 ${formatClock(quote.receivedAt)}`}</small>}
+          </div>
+          <ul className='opinion-reports'>
+            {opinion.recent.map((report) => (
+              <li key={report.broker}>
+                <span>{report.broker}</span>
+                <span>{report.opinion}</span>
+                <span>목표주가 {report.targetPrice == null ? '—' : `${formatNumber(report.targetPrice)}원`}</span>
+                <small>{report.date} 발표</small>
+                {report.targetPrice != null && quote?.price != null && (
+                  <em>{gapText(targetGap(report.targetPrice, quote.price))}</em>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <div className='trend-heading'>최근 월별 추세</div>
       <div className='opinion-chart' aria-label={`${symbol} 월별 투자의견 누적 막대 그래프`}>
         <ResponsiveContainer width='100%' height='100%'>
@@ -125,6 +164,9 @@ export default function OpinionPanel({ symbol }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      <small className='panel-note'>
+        출처: 한국투자증권 종목투자의견 · 조회 기간 {opinion.from} ~ {opinion.to} · 증권사별 최신 의견 1건 기준
+      </small>
     </div>
   )
 }

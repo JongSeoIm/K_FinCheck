@@ -4,15 +4,12 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 
 // epoch ms → 한국 날짜 'YYYY-MM-DD'
 const kstDate = (ms) => new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10)
-// epoch ms → 그 분의 시작 시각(ms)
-const minuteStart = (ms) => Math.floor(ms / 60000) * 60000
 
 /**
- * 받아 둔 차트 데이터의 마지막 봉을 최신 시세로 갱신한다. (정규장 운영 중일 때만 호출)
- * - interval '1d': 오늘 일봉의 고가·저가·종가 갱신, 오늘 봉이 없으면 추가
- * - interval '1m': 같은 분이면 마지막 분봉 갱신, 다음 분이면 새 분봉 추가
+ * 받아 둔 일봉의 마지막 봉을 최신 시세로 갱신한다. (정규장 운영 중일 때만 호출)
+ * 오늘 일봉의 고가·저가·종가를 갱신하고, 오늘 봉이 없으면 추가한다.
  */
-export function mergeLiveQuote(points, interval, quote) {
+export function mergeDailyQuote(points, quote) {
   if (!points?.length || !quote?.price || !quote.eventTime) return points
   const price = Number(quote.price)
   const tradeMs = new Date(quote.eventTime).getTime()
@@ -20,49 +17,40 @@ export function mergeLiveQuote(points, interval, quote) {
 
   const last = points[points.length - 1]
 
-  if (interval === '1d') {
-    const today = kstDate(tradeMs)
-    if (last.time === today) {
-      return [...points.slice(0, -1), {
-        ...last,
-        high: Math.max(Number(last.high), Number(quote.high ?? price), price),
-        low: Math.min(Number(last.low), Number(quote.low ?? price), price),
-        close: price,
-        volume: quote.cumulativeVolume ?? last.volume,
-      }]
-    }
-    if (today > last.time) {
-      return [...points, {
-        time: today,
-        open: Number(quote.open ?? price),
-        high: Number(quote.high ?? price),
-        low: Number(quote.low ?? price),
-        close: price,
-        volume: quote.cumulativeVolume,
-      }]
-    }
-    return points
+  const today = kstDate(tradeMs)
+  if (last.time === today) {
+    return [...points.slice(0, -1), {
+      ...last,
+      high: Math.max(Number(last.high), Number(quote.high ?? price), price),
+      low: Math.min(Number(last.low), Number(quote.low ?? price), price),
+      close: price,
+      volume: quote.cumulativeVolume ?? last.volume,
+    }]
   }
+  if (today > last.time) {
+    return [...points, {
+      time: today,
+      open: Number(quote.open ?? price),
+      high: Number(quote.high ?? price),
+      low: Number(quote.low ?? price),
+      close: price,
+      volume: quote.cumulativeVolume,
+    }]
+  }
+  return points
+}
 
-  if (interval === '1m') {
-    const lastMs = new Date(last.time).getTime()
-    if (kstDate(lastMs) !== kstDate(tradeMs)) return points
-    const tradeMinute = minuteStart(tradeMs)
-    if (tradeMinute === minuteStart(lastMs)) {
-      return [...points.slice(0, -1), {
-        ...last,
-        high: Math.max(Number(last.high), price),
-        low: Math.min(Number(last.low), price),
-        close: price,
-      }]
-    }
-    if (tradeMinute > lastMs) {
-      return [...points, {
-        time: new Date(tradeMinute).toISOString(),
-        open: price, high: price, low: price, close: price, volume: null,
-      }]
-    }
+// Push 로 받은 봉을 합친다. 같은 구간이면 교체하고, 새 구간이면 앞 봉을 완성으로 표시하고 뒤에 붙인다
+export function mergeCandle(points, candle) {
+  if (!candle) return points
+  const time = new Date(candle.time).getTime()
+  const last = points[points.length - 1]
+  const lastTime = last ? new Date(last.time).getTime() : null
+  if (lastTime === null) return [candle]
+  if (time === lastTime) {
+    return [...points.slice(0, -1), { ...candle, open: last.open, high: Math.max(Number(last.high), Number(candle.high)), low: Math.min(Number(last.low), Number(candle.low)) }]
   }
+  if (time > lastTime) return [...points.slice(0, -1), { ...last, complete: true }, candle]
   return points
 }
 

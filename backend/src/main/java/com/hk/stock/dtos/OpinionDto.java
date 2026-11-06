@@ -18,4 +18,5 @@ public class OpinionDto {
 	private Integer score;					//매수 비율 0~100 (증권사별 최신 의견 기준, 분류된 의견이 없으면 null)
 	private OpinionCountsDto latest;		//증권사별 가장 최근 의견 집계
 	private List<OpinionCountsDto> months;	//월별 리포트 의견 (오래된 순)
+	private List<OpinionReportDto> recent;	//증권사별 최신 의견 (최신순, 목표가·발표일 표시용)
 }

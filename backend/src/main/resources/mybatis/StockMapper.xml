@@ -4,28 +4,25 @@
 <mapper namespace="com.hk.stock.mapper.StockMapper">
 
 	<select id="getAllStocks" resultType="stockDto">
-		SELECT symbol, name, market
+		SELECT stock_code AS symbol, company_name AS name, market_type AS market
 		FROM company
-		WHERE use_yn = 'Y'
-		ORDER BY symbol
+		ORDER BY stock_code
 	</select>
 
 	<!-- 종목명 또는 종목코드로 검색 ("삼성", "005930") -->
 	<select id="searchStocks" parameterType="String" resultType="stockDto">
-		SELECT symbol, name, market
+		SELECT stock_code AS symbol, company_name AS name, market_type AS market
 		FROM company
-		WHERE use_yn = 'Y'
-		  AND (name LIKE CONCAT('%', #{query}, '%')
-		       OR symbol LIKE CONCAT(#{query}, '%'))
-		ORDER BY symbol
+		WHERE company_name LIKE CONCAT('%', #{query}, '%')
+		   OR stock_code LIKE CONCAT(#{query}, '%')
+		ORDER BY stock_code
 		LIMIT 20
 	</select>
 
 	<select id="getStock" parameterType="String" resultType="stockDto">
-		SELECT symbol, name, market
+		SELECT stock_code AS symbol, company_name AS name, market_type AS market
 		FROM company
-		WHERE symbol = #{symbol}
-		  AND use_yn = 'Y'
+		WHERE stock_code = #{symbol}
 	</select>
 
 </mapper>

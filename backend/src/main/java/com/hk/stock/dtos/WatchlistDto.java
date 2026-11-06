@@ -17,5 +17,5 @@ public class WatchlistDto {
 	private String symbol;			//종목코드
 	private String name;			//종목명
 	private String market;			//KOSPI, KOSDAQ
-	private LocalDateTime regdate;	//등록일
+	private LocalDateTime createdAt;	//등록일
 }

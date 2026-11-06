@@ -15,10 +15,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class FinancialReportDto {
 	private Long reportId;
-	private String rceptNo;		//공시 접수번호 14자리
-	private String symbol;
-	private String bsnsYear;	//사업연도
-	private String reprtCode;	//11013 1분기 / 11012 반기 / 11014 3분기 / 11011 사업보고서
+	private String stockCode;
+	private String receiptNo;	//공시 접수번호 14자리
+	private String businessYear;	//사업연도
+	private String reportCode;	//11013 1분기 / 11012 반기 / 11014 3분기 / 11011 사업보고서
 	private String fsDiv;		//CFS 연결 / OFS 별도
-	private LocalDateTime regdate;
+	private LocalDateTime collectedAt;	//마지막 수집 시각
 }

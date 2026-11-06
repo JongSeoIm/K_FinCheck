@@ -32,7 +32,7 @@ public class NewsService {
 
 	private static final Logger log = LoggerFactory.getLogger(NewsService.class);
 
-	public static final int NEWS_LIMIT = 20;
+	public static final int NEWS_LIMIT = 10;
 	private static final int FETCH_SIZE = 100;	//걸러낸 뒤에도 종목 기사가 NEWS_LIMIT 건 남도록 최대치(100)로 받는다
 
 	//기사 제목에서 함께 찾을 종목 줄임말 (종목명·종목코드는 항상 포함)

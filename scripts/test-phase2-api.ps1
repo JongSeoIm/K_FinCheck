@@ -11,6 +11,14 @@ $script:fail = 0
 
 # 요청을 보내고 { Status, Json, Raw } 를 돌려준다. 4xx·5xx 도 예외 없이 값으로 받는다
 function Call($method, $path, $body = $null, $session = $null, $headers = @{}) {
+  # 값을 바꾸는 요청에는 CSRF 토큰이 필요하다 (세션이 없으면 임시 세션으로 받는다)
+  if ($method -in @('POST', 'DELETE')) {
+    if (-not $session) { $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession }
+    $csrf = Invoke-WebRequest -Uri "$BaseUrl/api/auth/csrf" -WebSession $session -UseBasicParsing
+    $token = ([Text.Encoding]::UTF8.GetString($csrf.RawContentStream.ToArray()) | ConvertFrom-Json).token
+    $headers = @{} + $headers
+    $headers['X-CSRF-TOKEN'] = $token
+  }
   $params = @{ Uri = "$BaseUrl$path"; Method = $method; UseBasicParsing = $true; Headers = $headers }
   if ($session) { $params.WebSession = $session }
   if ($null -ne $body) {
@@ -66,7 +74,9 @@ Check "가입 성공 201 ($idA)" ($r.Status -eq 201 -and $r.Json.user.loginId -e
 Check '한글 닉네임 저장' ($r.Json.user.nickname -eq '테스트A') $r.Raw
 Check '응답에 비밀번호(해시) 없음' ($r.Raw -notmatch 'password') $r.Raw
 $r = Call GET '/api/auth/me' $null $sA
-Check '가입 직후 로그인 상태' ($r.Status -eq 200 -and $r.Json.user.loginId -eq $idA) "status=$($r.Status)"
+Check '가입만 하면 로그인 상태가 아님 401' ($r.Status -eq 401) "status=$($r.Status)"
+$r = Call POST '/api/auth/login' @{ loginId = $idA; password = $pw } $sA
+Check '가입한 계정으로 로그인 200' ($r.Status -eq 200) "status=$($r.Status)"
 $r = Call POST '/api/auth/signup' @{ loginId = $idA; password = $pw; nickname = '중복' }
 Check '같은 아이디 재가입 409' ($r.Status -eq 409) "status=$($r.Status) $($r.Raw)"
 $r = Call POST '/api/auth/signup' @{ loginId = 'AB'; password = $pw; nickname = '형식' }
@@ -119,6 +129,7 @@ Check '삭제 종목코드 형식 오류 400' ($r.Status -eq 400) "status=$($r.S
 Write-Host "`n=== 5. 계정별 분리 ==="
 $sB = NewSession
 $null = Call POST '/api/auth/signup' @{ loginId = $idB; password = $pw; nickname = '테스트B' } $sB
+$null = Call POST '/api/auth/login' @{ loginId = $idB; password = $pw } $sB
 $r = Call GET '/api/watchlist' $null $sB
 Check 'B 계정에는 A 관심 종목이 안 보임' ($r.Status -eq 200 -and @($r.Json.list).Count -eq 0) $r.Raw
 $null = Call DELETE '/api/watchlist/005930' $null $sB

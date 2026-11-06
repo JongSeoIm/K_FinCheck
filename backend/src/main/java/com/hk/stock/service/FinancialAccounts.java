@@ -12,11 +12,14 @@ public final class FinancialAccounts {
 	public static final String REVENUE = "REVENUE";
 	public static final String OPERATING_INCOME = "OPERATING_INCOME";
 	public static final String NET_INCOME = "NET_INCOME";
+	private static final int CODE_LENGTH = 50;	//financial_value.account_code 길이
 
 	//이름(공백 제거) → 코드. 괄호가 붙은 이름은 괄호를 지운 이름으로도 한 번 더 찾는다
 	private static final Map<String, String> CODES = new LinkedHashMap<>();
 	//코드 → 손익(IS) / 재무상태(BS)
 	private static final Map<String, String> STATEMENTS = new LinkedHashMap<>();
+	//코드 → 공통 계정 이름 (넘긴 이름 중 첫 번째)
+	private static final Map<String, String> NAMES = new LinkedHashMap<>();
 
 	static {
 		put("IS", REVENUE, "매출액", "수익(매출액)", "영업수익", "매출");
@@ -40,6 +43,7 @@ public final class FinancialAccounts {
 
 	private static void put(String statement, String code, String... names) {
 		STATEMENTS.put(code, statement);
+		NAMES.put(code, names[0]);
 		for (String name : names) CODES.put(name, code);
 	}
 
@@ -50,7 +54,12 @@ public final class FinancialAccounts {
 		if (code == null) code = CODES.get(compact.replaceAll("\\(.*?\\)", ""));
 		if (code != null) return code;
 		String etc = "ETC_" + compact;
-		return etc.length() > 100 ? etc.substring(0, 100) : etc;
+		return etc.length() > CODE_LENGTH ? etc.substring(0, CODE_LENGTH) : etc;
+	}
+
+	//공통 계정 이름. 알 수 없는 계정은 공시에 적힌 이름을 쓴다
+	public static String nameOf(String code, String sourceName) {
+		return NAMES.getOrDefault(code, sourceName);
 	}
 
 	public static String statementOf(String code) {

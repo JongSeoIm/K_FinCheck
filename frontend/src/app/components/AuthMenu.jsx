@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect } from 'react'
 import useAuthStore from '@/app/store/useAuthStore'
 
-// 상단 오른쪽 로그인 상태 (로그인 / 회원가입 또는 닉네임 · 로그아웃)
+// 상단 왼쪽 로그인 상태 (로그인 / 회원가입 또는 닉네임 · 로그아웃)
 export default function AuthMenu() {
   const user = useAuthStore((state) => state.user)
   const checked = useAuthStore((state) => state.checked)

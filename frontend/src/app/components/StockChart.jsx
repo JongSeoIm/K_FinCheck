@@ -1,28 +1,40 @@
 'use client'
 
-import dynamic from 'next/dynamic'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { stockApi } from '@/api/stockApi'
+import useChartZoom from '@/app/hooks/useChartZoom'
+import useHydrated from '@/app/hooks/useHydrated'
 import useStockStore from '@/app/store/useStockStore'
-import { mergeLiveQuote, periodStats } from '@/app/lib/chartData'
+import { mergeCandle, mergeDailyQuote, periodStats } from '@/app/lib/chartData'
 import { directionClass, formatPrice, formatRate } from '@/app/lib/format'
+import CandleChart from './CandleChart'
 import PriceLineChart from './PriceLineChart'
 
-// Lightweight Charts는 브라우저에서만 동작하므로 서버 렌더링에서 제외
-const CandleChart = dynamic(() => import('./CandleChart'), {
-  ssr: false,
-  loading: () => <div className='chart-placeholder'>차트를 준비하는 중입니다.</div>,
-})
-
-const RANGES = [
-  { value: 'LIVE', label: '실시간', description: '받은 체결 누적' },
-  { value: '1D', label: '1일', description: '1분 간격' },
-  { value: '1W', label: '1주', description: '일별 종가' },
-  { value: '1M', label: '1개월', description: '일별 종가' },
-  { value: '1Y', label: '1년', description: '일별 종가' },
+const INTRADAY_INTERVALS = [
+  { value: '1s', label: '1초' },
+  { value: '5s', label: '5초' },
+  { value: '30s', label: '30초' },
+  { value: '1m', label: '1분' },
+  { value: '3m', label: '3분' },
+  { value: '5m', label: '5분' },
+  { value: '10m', label: '10분' },
+  { value: '15m', label: '15분' },
+  { value: '30m', label: '30분' },
+  { value: '60m', label: '60분' },
 ]
-const DAILY_RANGES = ['1W', '1M', '1Y']
-const MINUTE_REFRESH_MS = 60000
+const PERIOD_INTERVALS = [
+  { value: '1d', label: '일' },
+  { value: '1w', label: '주' },
+  { value: '1mo', label: '월' },
+  { value: '1y', label: '년' },
+]
+const INTERVALS = [...INTRADAY_INTERVALS, ...PERIOD_INTERVALS]
+const POLL_REFRESH_MS = 2000 // Polling: 응답 후 2초
+const PUSH_REFRESH_MS = 60000 // Push: 봉은 서버가 보내고, 놓친 값은 1분마다 다시 맞춘다
+const DEFAULT_CANDLES = 120 // 캔들이 너무 가늘어지지 않게 처음에 보여줄 봉 수
+
+const isSeconds = (interval) => interval.endsWith('s')
+const isIntraday = (interval) => isSeconds(interval) || interval.endsWith('m')
 
 // 15:20~15:30 은 장 마감 동시호가라 연속 체결이 없다 (한국 시간 기준)
 function inClosingAuction() {
@@ -32,111 +44,188 @@ function inClosingAuction() {
   return minutes >= 15 * 60 + 20 && minutes < 15 * 60 + 30
 }
 
+function sourceNote(interval) {
+  if (isSeconds(interval)) return '연결 후 수신한 체결 집계'
+  if (interval.endsWith('m')) return '당일 KIS 분봉 + 수신 체결'
+  return 'KIS 기간별 조회'
+}
+
+// `1분 ⌄` 초·분봉 선택. 마지막으로 고른 주기를 기억해 일·주·월·년에서 돌아올 때 보여준다
+function IntradayPicker({ interval, onSelect }) {
+  const [open, setOpen] = useState(false)
+  const [lastValue, setLastValue] = useState('1m')
+  const rootRef = useRef(null)
+  const active = isIntraday(interval)
+  const shown = active ? interval : lastValue
+
+  useEffect(() => {
+    if (!open) return undefined
+    const close = (event) => {
+      if (event.key === 'Escape' || (event.type === 'mousedown' && !rootRef.current?.contains(event.target))) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', close)
+    }
+  }, [open])
+
+  return (
+    <div className='interval-picker' ref={rootRef}>
+      <button
+        type='button'
+        className={active ? 'active' : ''}
+        aria-haspopup='listbox'
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {INTRADAY_INTERVALS.find((item) => item.value === shown).label}
+        <span aria-hidden='true'>⌄</span>
+      </button>
+      {open && (
+        <ul className='interval-menu' role='listbox' aria-label='초·분봉 주기'>
+          {INTRADAY_INTERVALS.map((item) => (
+            <li key={item.value}>
+              <button
+                type='button'
+                role='option'
+                aria-selected={item.value === shown}
+                className={item.value === shown ? 'selected' : ''}
+                onClick={() => {
+                  setLastValue(item.value)
+                  setOpen(false)
+                  onSelect(item.value)
+                }}
+              >
+                {item.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export default function StockChart({ symbol, marketOpen }) {
-  const [range, setRange] = useState('1D')
+  const hydrated = useHydrated()
+  const [interval, setInterval] = useState('1m')
   const [chartType, setChartType] = useState('line')
   const [refreshKey, setRefreshKey] = useState(0)
   // 응답에 요청 키를 함께 저장 → 현재 요청 키와 다르면 아직 불러오는 중
   const [chart, setChart] = useState({ key: '', data: null, error: '' })
 
   const quote = useStockStore((state) => state.quotes[symbol])
-  const ticks = useStockStore((state) => state.ticks[symbol])
+  const feedMode = useStockStore((state) => state.feedMode)
+  const setFeedMode = useStockStore((state) => state.setFeedMode)
+  const liveCandle = useStockStore((state) => state.liveCandle)
+  const setChartSubscription = useStockStore((state) => state.setChartSubscription)
 
-  const candleAvailable = DAILY_RANGES.includes(range)
-  const showCandle = candleAvailable && chartType === 'candle'
-  // 선 차트는 /history, 캔들은 /candles 에서 받는다
-  const source = showCandle ? 'candles' : 'history'
-  const requestKey = `${symbol}:${source}:${range}:${refreshKey}`
+  const showCandle = chartType === 'candle'
+  const seriesKey = `${symbol}:${interval}`
+  const requestKey = `${seriesKey}:${refreshKey}`
 
-  // 기간별 차트 조회 (실시간 탭은 서버 조회 없이 누적 시세 사용)
+  // 초·분봉은 Push 로 진행 중인 봉을 받는다
   useEffect(() => {
-    if (range === 'LIVE') return undefined
-    const controller = new AbortController()
-    const key = `${symbol}:${source}:${range}:${refreshKey}`
-    const request = source === 'candles' ? stockApi.getCandles : stockApi.getHistory
+    setChartSubscription(isIntraday(interval) ? { symbol, interval } : null)
+    return () => setChartSubscription(null)
+  }, [symbol, interval, setChartSubscription])
 
-    request(symbol, range, { signal: controller.signal })
+  useEffect(() => {
+    const controller = new AbortController()
+    const key = `${symbol}:${interval}`
+
+    stockApi.getCandles(symbol, interval, { signal: controller.signal })
       .then((data) => setChart({ key, data, error: '' }))
       .catch((error) => {
-        if (error.name !== 'AbortError') setChart({ key, data: null, error: error.message })
+        if (error.name !== 'AbortError') setChart((current) => ({ key, data: current.key === key ? current.data : null, error: error.message }))
       })
 
     return () => controller.abort()
-  }, [symbol, source, range, refreshKey])
+  }, [symbol, interval, refreshKey])
 
-  // 장중에는 1일(분봉) 차트를 1분마다 다시 조회
+  // 초·분봉 다시 조회: 응답을 받은 뒤 정해진 시간 후에 (Polling 2초, Push 1분)
   useEffect(() => {
-    if (range !== '1D' || !marketOpen) return undefined
-    const timer = setInterval(() => setRefreshKey((k) => k + 1), MINUTE_REFRESH_MS)
-    return () => clearInterval(timer)
-  }, [range, marketOpen])
+    if (!isIntraday(interval) || chart.key !== seriesKey) return undefined
+    const timer = setTimeout(() => setRefreshKey((k) => k + 1), feedMode === 'poll' ? POLL_REFRESH_MS : PUSH_REFRESH_MS)
+    return () => clearTimeout(timer)
+  }, [interval, feedMode, chart, seriesKey])
 
-  // 표시할 데이터: 장중에는 최신 시세로 마지막 봉을 갱신
   const points = useMemo(() => {
-    if (range === 'LIVE') {
-      return (ticks || []).map((t) => ({ time: t.time, close: t.price }))
+    const base = chart.key === seriesKey && chart.data ? chart.data.points : []
+    if (interval === '1d') return marketOpen ? mergeDailyQuote(base, quote) : base
+    if (isIntraday(interval) && liveCandle?.symbol === symbol && liveCandle?.interval === interval) {
+      return mergeCandle(base, liveCandle.data)
     }
-    const base = chart.data?.range === range && chart.data?.symbol === symbol ? chart.data.points : []
-    return marketOpen ? mergeLiveQuote(base, chart.data?.interval, quote) : base
-  }, [range, ticks, chart.data, symbol, marketOpen, quote])
+    return base
+  }, [chart, seriesKey, interval, marketOpen, quote, liveCandle, symbol])
 
-  const interval = range === 'LIVE' ? 'live' : chart.data?.interval
-  const stats = periodStats(points, range === '1D' ? quote?.previousClose : undefined)
-  const selectedRange = RANGES.find((r) => r.value === range)
-  // 1분 주기 재조회 중에는 기존 차트를 그대로 보여준다
-  const loading = range !== 'LIVE' && chart.key !== requestKey && points.length === 0
+  const { ref: zoomRef, start, end, zoomed, reset } = useChartZoom(points.length, showCandle ? DEFAULT_CANDLES : undefined)
+  const visible = useMemo(() => points.slice(start, end), [points, start, end])
+  const multiDay = useMemo(() => {
+    if (!visible.length || !interval.endsWith('m')) return false
+    return String(visible[0].time).slice(0, 10) !== String(visible[visible.length - 1].time).slice(0, 10)
+  }, [visible, interval])
 
-  // 목업의 수신 상태 문구 자리: 지금 차트가 어떤 기준으로 갱신되는지
-  const statusText = range === 'LIVE'
-    ? (quote?.source === 'DEMO' ? '모의 체결 반영 중' : !marketOpen ? '장 운영 시간 외 · 새 체결 없음' : inClosingAuction() ? '장 마감 동시호가 중 (15:20~15:30) · 체결 없음' : '실시간 체결 반영 중')
-    : range === '1D'
-      ? (marketOpen ? '1분마다 분봉 갱신' : '최근 거래일 분봉')
-      : '기간별 일봉 조회'
+  const stats = periodStats(visible)
+  const selected = INTERVALS.find((i) => i.value === interval)
+  const loading = chart.key !== seriesKey && !chart.error
+  const hasError = chart.key === seriesKey && chart.error && points.length === 0
+  const selectInterval = (value) => {
+    setInterval(value)
+    reset()
+  }
+
+  const statusText = quote?.source === 'DEMO'
+    ? '모의 체결 반영 중'
+    : !marketOpen ? '장 운영 시간 외 · 새 체결 없음'
+      : inClosingAuction() ? '장 마감 동시호가 중 (15:20~15:30) · 체결 없음'
+        : isIntraday(interval) ? '실시간 체결 반영 중' : '현재가로 오늘 봉 갱신'
 
   return (
     <section className='panel chart-panel'>
       <div className='panel-heading'>
-        <h2>실시간 주가 차트</h2>
+        <h2>주가 차트</h2>
+        <div className='mode-toggle' role='group' aria-label='시세 전달 방식'>
+          {[['push', 'Push'], ['poll', 'Polling']].map(([value, label]) => (
+            <button
+              key={value}
+              type='button'
+              className={hydrated && feedMode === value ? 'active' : ''}
+              aria-pressed={hydrated && feedMode === value}
+              onClick={() => setFeedMode(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className='chart-container'>
         <div className='chart-controls'>
           <div className='stream-mode' role='group' aria-label='차트 종류'>
-            <button
-              type='button'
-              className={!showCandle ? 'active' : ''}
-              aria-pressed={!showCandle}
-              onClick={() => setChartType('line')}
-            >
+            <button type='button' className={!showCandle ? 'active' : ''} aria-pressed={!showCandle} onClick={() => setChartType('line')}>
               선 차트
             </button>
             <span className='tab-separator' aria-hidden='true'>·</span>
-            <button
-              type='button'
-              className={showCandle ? 'active' : ''}
-              aria-pressed={showCandle}
-              title={candleAvailable ? '일봉 캔들 차트' : '캔들은 일봉이라 1개월 차트로 전환됩니다'}
-              onClick={() => {
-                // 캔들은 일봉 기간에서만 그리므로 실시간·1일에서 누르면 1개월로 바꾼다
-                if (!candleAvailable) setRange('1M')
-                setChartType('candle')
-              }}
-            >
+            <button type='button' className={showCandle ? 'active' : ''} aria-pressed={showCandle} onClick={() => setChartType('candle')}>
               캔들 차트
             </button>
           </div>
 
-          <div className='range-tabs' role='group' aria-label='차트 기간'>
-            {RANGES.map((r, index) => (
-              <Fragment key={r.value}>
-                {index > 0 && <span className='tab-separator' aria-hidden='true'>·</span>}
+          <div className='range-tabs' role='group' aria-label='차트 주기'>
+            <IntradayPicker interval={interval} onSelect={selectInterval} />
+            {PERIOD_INTERVALS.map((item) => (
+              <Fragment key={item.value}>
+                <span className='tab-separator' aria-hidden='true'>·</span>
                 <button
                   type='button'
-                  className={range === r.value ? 'active' : ''}
-                  aria-pressed={range === r.value}
-                  onClick={() => setRange(r.value)}
+                  className={interval === item.value ? 'active' : ''}
+                  aria-pressed={interval === item.value}
+                  onClick={() => selectInterval(item.value)}
                 >
-                  {r.label}
+                  {item.label}
                 </button>
               </Fragment>
             ))}
@@ -145,10 +234,14 @@ export default function StockChart({ symbol, marketOpen }) {
 
         <div className='stream-status'>
           <span>
-            {selectedRange.label} · {selectedRange.description}
-            {chart.data?.source === 'DEMO' && range !== 'LIVE' && <span className='badge demo'>모의 데이터</span>}
+            {selected.label} · {sourceNote(interval)}
+            {chart.data?.source === 'DEMO' && <span className='badge demo'>모의 데이터</span>}
           </span>
           <span>{statusText}</span>
+          <span className='chart-zoom-note'>
+            마우스 휠로 확대·축소
+            {zoomed && <button type='button' onClick={reset}>처음 크기로</button>}
+          </span>
         </div>
 
         {stats && (
@@ -158,42 +251,32 @@ export default function StockChart({ symbol, marketOpen }) {
               <span className={directionClass(stats.changeRate)}>{formatRate(stats.changeRate)}</span>
             </div>
             <dl className='period-stats'>
-              <div><dt>기간 시작</dt><dd>{formatPrice(stats.first)}</dd></div>
-              <div><dt>기간 고가</dt><dd>{formatPrice(stats.high)}</dd></div>
-              <div><dt>기간 저가</dt><dd>{formatPrice(stats.low)}</dd></div>
-              <div>
-                <dt>{range === '1D' ? '전일 대비' : '기간 등락'}</dt>
-                <dd className={directionClass(stats.changeRate)}>{formatRate(stats.changeRate)}</dd>
-              </div>
+              <div><dt>구간 시작</dt><dd>{formatPrice(stats.first)}</dd></div>
+              <div><dt>구간 고가</dt><dd>{formatPrice(stats.high)}</dd></div>
+              <div><dt>구간 저가</dt><dd>{formatPrice(stats.low)}</dd></div>
+              <div><dt>구간 등락</dt><dd className={directionClass(stats.changeRate)}>{formatRate(stats.changeRate)}</dd></div>
             </dl>
           </>
         )}
 
-        <div className='chart-area'>
+        <div className='chart-area' ref={zoomRef}>
           {loading ? (
             <div className='chart-placeholder'>차트 데이터를 불러오는 중입니다.</div>
-          ) : chart.error && range !== 'LIVE' ? (
+          ) : hasError ? (
             <div className='chart-placeholder error'>
               <strong>차트를 불러오지 못했습니다.</strong>
               <span>{chart.error}</span>
               <button type='button' onClick={() => setRefreshKey((k) => k + 1)}>다시 시도</button>
             </div>
-          ) : range === 'LIVE' && points.length < 2 ? (
-            // 실시간 탭은 화면을 연 뒤 받은 체결만 그린다. 1건뿐이면 평평한 선이 되어 고장처럼 보이므로 안내한다
-            <div className='chart-placeholder'>
-              <strong>{marketOpen && !inClosingAuction() ? '실시간 체결을 기다리는 중입니다.' : '지금은 새 체결이 들어오지 않는 시간입니다.'}</strong>
-              <span>
-                {marketOpen && !inClosingAuction()
-                  ? '이 화면을 연 뒤 받은 체결이 2건 이상 쌓이면 그래프가 그려집니다.'
-                  : '실시간 탭은 화면을 연 뒤 받은 체결만 그립니다. 오늘 흐름은 1일 탭에서 확인하세요.'}
-              </span>
-            </div>
           ) : points.length === 0 ? (
-            <div className='chart-placeholder'>표시할 데이터가 없습니다.</div>
+            <div className='chart-placeholder'>
+              <strong>{isSeconds(interval) ? '아직 수신한 체결이 없습니다.' : '표시할 데이터가 없습니다.'}</strong>
+              {isSeconds(interval) && <span>초봉은 서버가 연결된 뒤 받은 체결로 만듭니다. 체결이 없는 구간에는 봉을 만들지 않습니다.</span>}
+            </div>
           ) : showCandle ? (
-            <CandleChart points={points} />
+            <CandleChart points={visible} interval={interval} multiDay={multiDay} />
           ) : (
-            <PriceLineChart points={points} interval={interval} />
+            <PriceLineChart points={visible} interval={interval} multiDay={multiDay} />
           )}
         </div>
       </div>

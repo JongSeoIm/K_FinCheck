@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import com.hk.stock.market.MarketDataException;
+import com.hk.stock.service.ChatHistoryStore.ConversationNotFoundException;
 import com.hk.stock.service.ChatService.AiServerException;
 import com.hk.stock.service.DartClient.DartApiException;
 import com.hk.stock.service.FinancialService.FinancialNotFoundException;
@@ -81,6 +82,11 @@ public class ApiExceptionHandler {
 	}
 
 	//공시된 실적이 없음 → 404
+	@ExceptionHandler(ConversationNotFoundException.class)
+	public ResponseEntity<Map<String, String>> conversationNotFound(ConversationNotFoundException e) {
+		return error(HttpStatus.NOT_FOUND, e.getMessage());
+	}
+
 	@ExceptionHandler(FinancialNotFoundException.class)
 	public ResponseEntity<Map<String, String>> financialNotFound(FinancialNotFoundException e) {
 		return error(HttpStatus.NOT_FOUND, e.getMessage());
