@@ -20,6 +20,31 @@ public class OpenDartClient {
                 .requestFactory(factory).build();
     }
 
+    public JsonNode disclosurePage(String corpCode, String start, String end, String type, int page) {
+        if (config.getApiKey() == null || config.getApiKey().isBlank()) {
+            throw new FinancialException(HttpStatus.SERVICE_UNAVAILABLE, "KEY_NOT_CONFIGURED",
+                    "OpenDART API key is not configured.");
+        }
+        JsonNode body;
+        try {
+            body = client.get().uri(uri -> uri.path("/api/list.json")
+                    .queryParam("crtfc_key", config.getApiKey())
+                    .queryParam("corp_code", corpCode).queryParam("bgn_de", start).queryParam("end_de", end)
+                    .queryParam("pblntf_ty", type).queryParam("page_no", page).queryParam("page_count", 100)
+                    .build()).retrieve().body(JsonNode.class);
+        } catch (Exception ignored) {
+            throw new FinancialException(HttpStatus.BAD_GATEWAY, "DART_UNAVAILABLE",
+                    "Could not connect to OpenDART.");
+        }
+        String status = body == null ? "" : body.path("status").asText();
+        if ("013".equals(status)) return body;
+        if (!"000".equals(status) || !body.path("list").isArray() || body.path("total_page").asInt() < 1) {
+            throw new FinancialException(HttpStatus.BAD_GATEWAY, "DART_REJECTED",
+                    "OpenDART disclosure search failed (status: " + (status.matches("[0-9]{3}") ? status : "unknown") + ").");
+        }
+        return body;
+    }
+
     public JsonNode annualReport(String corpCode, int year) {
         if (config.getApiKey() == null || config.getApiKey().isBlank()) {
             throw new FinancialException(HttpStatus.SERVICE_UNAVAILABLE, "KEY_NOT_CONFIGURED",

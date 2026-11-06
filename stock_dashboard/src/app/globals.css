@@ -184,7 +184,8 @@ a:focus-visible {
 .recent-stock-link { font-size: 14px; font-weight: 400; color: var(--muted); }
 .recent-stock-link.active { color: var(--text); font-weight: 600; }
 .recent-stock-link.unavailable { color: #999; cursor: default; }
-.market-nav-link { position: relative; padding: 9px 0; font-size: 18px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.market-nav-link { position: relative; padding: 9px 0; font-size: 18px; font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; }
+.market-nav-link.active { color: var(--text); }
 .market-nav-link.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--text); }
 .topbar + .dashboard-layout { margin-top: 20px; }
 .domestic-market { min-width: 0; }

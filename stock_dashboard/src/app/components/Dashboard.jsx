@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import EarningsPanel from './EarningsPanel'
 import DomesticStocks from './DomesticStocks'
+import CompanyCalendar from './CompanyCalendar'
 import RecommendationChart from './RecommendationChart'
 import StockChart from './StockChart'
 import StockChatDrawer from './StockChatDrawer'
@@ -21,9 +22,11 @@ const LazyNewsFeed = lazy(() => import('./NewsFeed'))
 export default function Dashboard({ initialStock }) {
   const router = useRouter()
   const params = useSearchParams()
-  const isList = !params.has('symbol')
+  const isCalendar = params.get('view') === 'calendar'
+  const isList = !isCalendar && !params.has('symbol')
+  const isDetail = !isCalendar && !isList
   const selectedStock = marketStocks.find(stock => stock.symbol === params.get('symbol')) || initialStock || marketStocks[0]
-  const recentSymbol = useRecentStock(isList ? null : selectedStock.symbol)
+  const recentSymbol = useRecentStock(isDetail ? selectedStock.symbol : null)
   const recentStock = marketStocks.find(stock => stock.symbol === recentSymbol)
   const [streamMode, setStreamMode] = useState('push')
   const [intervalSeconds, setIntervalSeconds] = useState(60)
@@ -42,22 +45,24 @@ export default function Dashboard({ initialStock }) {
   return (
     <main className='app-shell'>
       <header className='topbar'>
-        {!isList && <h1 className='sr-only'>종목 상세 정보</h1>}
+        {isDetail && <h1 className='sr-only'>종목 상세 정보</h1>}
         <div className='topbar-navigation'>
           <Link className={`market-nav-link${isList ? ' active' : ''}`} href='/' aria-current={isList ? 'page' : undefined}>국내 주식</Link>
           {recentStock
-            ? <Link className={`market-nav-link recent-stock-link${!isList ? ' active' : ''}`}
-              href={`/?symbol=${recentStock.symbol}`} title={recentStock.name} aria-current={!isList ? 'page' : undefined}>최근 본 종목</Link>
+            ? <Link className={`market-nav-link recent-stock-link${isDetail ? ' active' : ''}`}
+              href={`/?symbol=${recentStock.symbol}`} title={recentStock.name} aria-current={isDetail ? 'page' : undefined}>최근 본 종목</Link>
             : <span className='market-nav-link recent-stock-link unavailable' title='종목을 선택하면 다시 열 수 있습니다.'>최근 본 종목</span>}
+          <Link className={`market-nav-link calendar-nav-link${isCalendar ? ' active' : ''}`}
+            href='/?view=calendar' aria-current={isCalendar ? 'page' : undefined}>기업 일정</Link>
         </div>
         <div className='topbar-actions'>
           <StockSearch onSelectStock={handleSelectStock} />
-          <AuthNav symbol={selectedStock.symbol} returnTo={isList ? '/' : undefined} />
+          <AuthNav symbol={selectedStock.symbol} returnTo={isCalendar ? '/?view=calendar' : isList ? '/' : undefined} />
         </div>
       </header>
 
-      {isList ? <div className='dashboard-layout market-layout'>
-        <DomesticStocks trades={stream.trades} onSelectStock={handleSelectStock} />
+      {isCalendar || isList ? <div className='dashboard-layout market-layout'>
+        {isCalendar ? <CompanyCalendar /> : <DomesticStocks trades={stream.trades} onSelectStock={handleSelectStock} />}
         <aside className='insight-column' aria-label='관심 종목'>
           <WatchlistPanel onSelectStock={handleSelectStock} trades={stream.trades} />
         </aside>
