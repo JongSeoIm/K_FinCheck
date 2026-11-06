@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -31,6 +32,7 @@ public class KisRealtimeRelay {
     private final KisTradeParser parser;
     private final ObjectMapper mapper;
     private final KafkaTemplate<String, String> kafka;
+    private final ObjectProvider<QuoteOutboxPublisher> outbox;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private volatile WebSocket socket;
     private volatile boolean stopped;
@@ -41,14 +43,20 @@ public class KisRealtimeRelay {
     private int failures;
 
     public KisRealtimeRelay(KisConfig kis, StreamProperties properties, QuotePipeline pipeline,
-                            QuoteStore store, KisTradeParser parser, ObjectMapper mapper, KafkaTemplate<String, String> kafka) {
+                            QuoteStore store, KisTradeParser parser, ObjectMapper mapper, KafkaTemplate<String, String> kafka,
+                            ObjectProvider<QuoteOutboxPublisher> outbox) {
         this.kis = kis; this.properties = properties; this.pipeline = pipeline; this.store = store;
-        this.parser = parser; this.mapper = mapper; this.kafka = kafka;
+        this.parser = parser; this.mapper = mapper; this.kafka = kafka; this.outbox = outbox;
     }
 
     @Scheduled(fixedDelay = 5000, initialDelay = 2000)
     public synchronized void maintainConnection() {
         if (stopped || !properties.isRelayEnabled()) return;
+        var durable = outbox.getIfAvailable();
+        if (durable != null && !durable.canReceive()) {
+            if (socket != null) socket.abort();
+            socket = null; store.relayState("SPOOL_BLOCKED"); return;
+        }
         if (socket != null) {
             if (Duration.between(lastMessage, Instant.now()).getSeconds() <= 90) return;
             socket.abort(); socket = null;
@@ -57,9 +65,9 @@ public class KisRealtimeRelay {
         if (Instant.now().isBefore(nextAttempt)) return;
         store.relayState("CONNECTING");
         try {
-            // Do not open a provider subscription while the downstream broker is unavailable.
+            // With a durable spool, collection can continue while Kafka is temporarily unavailable.
             try {
-                kafka.partitionsFor(properties.getTopic());
+                if (durable == null) kafka.partitionsFor(properties.getTopic());
             } catch (org.apache.kafka.common.KafkaException unavailable) {
                 store.kafkaState("ERROR");
                 store.relayState("WAITING_KAFKA");
@@ -131,11 +139,16 @@ public class KisRealtimeRelay {
                         store.relayState("WAITING_TRADE");
                     }
                 } else {
-                    for (QuoteEvent event : parser.parse(frame)) pipeline.publish(event).get(10, TimeUnit.SECONDS);
+                    var durable = outbox.getIfAvailable();
+                    var events = parser.parse(frame);
+                    if (durable != null) durable.accept(events);
+                    else for (QuoteEvent event : events) pipeline.publish(event).get(10, TimeUnit.SECONDS);
                     store.relayState("RECEIVING");
                 }
             } catch (Exception e) {
-                ws.abort(); disconnected(ws); store.relayState("DATA_ERROR"); return null;
+                ws.abort(); disconnected(ws);
+                var durable = outbox.getIfAvailable();
+                store.relayState(durable != null && !durable.canReceive() ? "SPOOL_BLOCKED" : "DATA_ERROR"); return null;
             }
             ws.request(1); return null;
         }

@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.socket.config.annotation.*;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
 
 @Configuration
 @EnableScheduling
@@ -20,6 +22,15 @@ public class RealtimeConfig implements WebSocketConfigurer {
     @Bean
     public NewTopic quotesTopic(StreamProperties properties) {
         return TopicBuilder.name(properties.getTopic()).partitions(1).replicas(1).build();
+    }
+    @Bean
+    public DefaultErrorHandler quoteErrorHandler() {
+        // Never silently recover/skip a failed DB write after a fixed number of attempts.
+        var handler = new DefaultErrorHandler(new FixedBackOff(1000L, FixedBackOff.UNLIMITED_ATTEMPTS));
+        handler.setAckAfterHandle(false);
+        handler.setCommitRecovered(false);
+        handler.setClassifications(java.util.Map.of(Exception.class, true), true);
+        return handler;
     }
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {

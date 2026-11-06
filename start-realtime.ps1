@@ -1,6 +1,8 @@
 param(
     [int]$Port = 8080,
-    [string]$MavenCommand = 'mvn'
+    [string]$MavenCommand = 'mvn',
+    [switch]$UseExternalKafka,
+    [string]$KafkaBootstrapServers = 'localhost:9092'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,7 +11,7 @@ $backendDirectory = Join-Path $projectDirectory 'backend'
 
 if (-not (Get-Command $MavenCommand -ErrorAction SilentlyContinue)) {
     $mavenCandidates = @(Get-ChildItem -LiteralPath (Join-Path $env:USERPROFILE '.m2/wrapper/dists') -Filter mvn.cmd -Recurse -ErrorAction SilentlyContinue |
-        Where-Object FullName -Match 'apache-maven-3\.9\.' | Sort-Object FullName -Descending)
+        Where-Object FullName -Match 'apache-maven-3\.' | Sort-Object FullName -Descending)
     if ($mavenCandidates.Count -eq 0) { throw 'Maven을 설치하거나 -MavenCommand로 mvn.cmd 경로를 지정하세요.' }
     $MavenCommand = $mavenCandidates[0].FullName
 }
@@ -27,7 +29,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw '실시간 개발 환경 준비에 실패했습니다.' }
     $dependencyClasspath = [IO.File]::ReadAllText((Join-Path $backendDirectory 'target/realtime-classpath.txt'))
     $applicationClasspath = "target/classes;target/test-classes;$dependencyClasspath"
-    & (Join-Path $env:JAVA_HOME 'bin/java.exe') -cp $applicationClasspath com.kfincheck.realtime.LocalRealtimeApplication "--server.port=$Port"
+    if ($UseExternalKafka) {
+        & (Join-Path $env:JAVA_HOME 'bin/java.exe') -cp $applicationClasspath com.kfincheck.KFinCheckApplication `
+            '--spring.profiles.active=realtime' "--spring.kafka.bootstrap-servers=$KafkaBootstrapServers" "--server.port=$Port"
+    } else {
+        Write-Warning '내장 Kafka는 재시작 시 메시지가 사라집니다. Kafka 보존·복구 검증에는 -UseExternalKafka를 사용하세요.'
+        & (Join-Path $env:JAVA_HOME 'bin/java.exe') -cp $applicationClasspath com.kfincheck.realtime.LocalRealtimeApplication "--server.port=$Port"
+    }
     if ($LASTEXITCODE -ne 0) { throw '실시간 서버 실행이 종료되었습니다. 앞선 오류를 확인하세요.' }
 } finally {
     Pop-Location

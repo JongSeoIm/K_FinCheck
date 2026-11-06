@@ -19,11 +19,14 @@ import static org.awaitility.Awaitility.await;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.profiles.active=realtime", "stream.relay-enabled=false", "stream.topic=quotes-integration-test",
-        "stream.group-id=quotes-integration-test", "spring.kafka.consumer.auto-offset-reset=earliest"
+        "stream.group-id=quotes-integration-test", "spring.kafka.consumer.auto-offset-reset=earliest",
+        "stream.persistence.enabled=false", "stream.outbox.enabled=false"
 })
 @EmbeddedKafka(partitions = 1, topics = "quotes-integration-test", kraft = true)
 @DirtiesContext
 class RealtimePipelineTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.kfincheck.chat.ChatHistory chatHistory;
     @LocalServerPort int port;
     @Autowired QuotePipeline pipeline;
     @Autowired KisTradeParser parser;

@@ -23,6 +23,8 @@ dist/
 target/
 backend/target/
 *.class
+.realtime-spool/
+**/.realtime-spool/
 
 # Package Manager
 npm-debug.log*
@@ -54,4 +56,3 @@ application-local.properties
 # OS
 .DS_Store
 Thumbs.db
-

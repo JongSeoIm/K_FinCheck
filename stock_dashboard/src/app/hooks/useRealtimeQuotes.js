@@ -99,8 +99,10 @@ export default function useRealtimeQuotes(intervalSeconds = 1, mode = 'push') {
     SUBSCRIBING: '종목 구독 중', WAITING_TRADE: '체결 대기 · 장 운영시간 확인',
     RECEIVING: '실시간 수신 중', RECONNECTING: 'KIS 재연결 중',
     SUBSCRIPTION_ERROR: 'KIS 구독 오류', DATA_ERROR: '시세 처리 오류',
+    WAITING_KAFKA: '시세 전달 서버 연결 대기', SPOOL_BLOCKED: '시세 대기 저장소 확인 필요',
   }
-  const status = snapshot.kafka === 'ERROR' ? 'Kafka 전송 오류'
+  const status = snapshot.outbox === 'BLOCKED' ? '시세 대기 저장소 확인 필요'
+    : snapshot.kafka === 'ERROR' ? (snapshot.pendingQuotes > 0 ? `시세 전송 대기 · ${snapshot.pendingQuotes}건` : 'Kafka 전송 오류')
     : `${connection} · ${relayLabels[snapshot.relay] || '수신 상태 확인 중'}`
   return { ...snapshot, status, trades: snapshot.quotes || {} }
 }
