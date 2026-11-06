@@ -306,3 +306,28 @@ def test_failed_tool_has_no_visual():
 
 def test_article_rule_is_in_instructions():
     assert "기사 전문을 읽은 것처럼 말하지 않" in prompts.SYSTEM_PROMPT
+
+
+def _financial_with_metrics():
+    return {**FINANCIAL, "metrics": [
+        {"code": "OPERATING_MARGIN", "name": "영업이익률", "value": 4.23, "status": "OK"},
+        {"code": "DEBT_RATIO", "name": "부채비율", "value": None, "status": "NOT_CALCULABLE"},
+        {"code": "CURRENT_RATIO", "name": "유동비율", "value": None, "status": "MISSING"},
+    ]}
+
+
+def test_financial_evidence_includes_metrics_from_spring():
+    plan = classifier.classify("삼성전자 영업이익률 알려줘", COMPANIES[0], COMPANIES)
+    result = ToolResult(classifier.FINANCIAL_TOOL, "005930", True, _financial_with_metrics())
+    evidence = prompts._evidence(result, "삼성전자")
+    assert {"지표": "영업이익률", "값": "4.23%"} in evidence["재무지표"]
+    assert {"지표": "부채비율", "상태": "계산 불가"} in evidence["재무지표"]
+    assert {"지표": "유동비율", "상태": "자료 없음"} in evidence["재무지표"]
+    assert prompts.unverified_numbers("영업이익률은 4.23%입니다.", plan, [result], COMPANIES) == []
+    assert prompts.unverified_numbers("영업이익률은 9.99%입니다.", plan, [result], COMPANIES) == ["9.99%"]
+
+
+@pytest.mark.parametrize("question", ["삼성전자 영업이익률 어떻게 돼?", "삼성전자 부채비율 알려줘", "삼성전자 유동비율 알려줘"])
+def test_metric_questions_call_financial_tool(question):
+    plan = classifier.classify(question, COMPANIES[0], COMPANIES)
+    assert [c.name for c in plan.calls] == [classifier.FINANCIAL_TOOL]

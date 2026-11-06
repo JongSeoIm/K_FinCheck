@@ -61,7 +61,7 @@ Write-Host "`n=== 1. DB · 기존 1차 API ==="
 $r = Call GET '/api/stocks?query='
 Check '종목 목록 조회 (company 테이블)' ($r.Status -eq 200 -and (Symbols $r) -match '005930') "status=$($r.Status) $($r.Raw)"
 $r = Call GET '/api/stocks?query=%EC%82%BC%EC%84%B1'   # "삼성"
-Check '종목명 검색 "삼성" → 삼성전자' ($r.Status -eq 200 -and (Symbols $r) -eq '005930') $r.Raw
+Check '종목명 검색 "삼성" → 삼성전자·삼성SDI' ($r.Status -eq 200 -and (Symbols $r) -match '005930' -and (Symbols $r) -match '006400') $r.Raw
 $r = Call GET '/api/stocks/999999'
 Check '없는 종목 404' ($r.Status -eq 404) "status=$($r.Status)"
 $r = Call GET '/api/market/status'

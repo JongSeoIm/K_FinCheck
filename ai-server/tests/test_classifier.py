@@ -3,11 +3,13 @@ from datetime import datetime
 import pytest
 
 from classifier import (CONCEPT, DATA, FINANCIAL_TOOL, INFO_TOOL, KST, MOVEMENT, NEED_MORE_INFO, NEWS_TOOL, NO_DATA, OUT_OF_SCOPE,
-                        OUTLOOK, QUOTE_TOOL, Company, classify)
+                        OUTLOOK, QUOTE_TOOL, Company, classify, find_companies)
 
 SAMSUNG = Company("005930", "삼성전자", "KOSPI")
 HYNIX = Company("000660", "SK하이닉스", "KOSPI")
 COMPANIES = [SAMSUNG, HYNIX]
+ALL_COMPANIES = COMPANIES + [Company("005380", "현대차", "KOSPI"), Company("035420", "NAVER", "KOSPI"), Company("035720", "카카오", "KOSPI"),
+                             Company("000270", "기아", "KOSPI"), Company("051910", "LG화학", "KOSPI"), Company("006400", "삼성SDI", "KOSPI")]
 
 
 def tools_of(plan):
@@ -70,8 +72,8 @@ def test_unrelated_question_after_quote_is_not_follow_up(question):
 
 
 @pytest.mark.parametrize("question, word", [
-    ("현대차 얼마야?", "현대차"), ("테슬라 사도 돼?", "테슬라"), ("LG전자 왜 올랐어?", "LG전자"),
-    ("삼성바이오 주가 알려줘", "삼성바이오"), ("카카오 어때?", "카카오"), ("쏘카 주가 알려줘", "쏘카"),
+    ("현대모비스 얼마야?", "현대모비스"), ("테슬라 사도 돼?", "테슬라"), ("LG전자 왜 올랐어?", "LG전자"),
+    ("삼성바이오 주가 알려줘", "삼성바이오"), ("카카오뱅크 어때?", "카카오뱅크"), ("쏘카 주가 알려줘", "쏘카"),
 ])
 def test_unsupported_company_calls_no_tool(question, word):
     plan = classify(question, SAMSUNG, COMPANIES)
@@ -128,6 +130,39 @@ def test_alias_is_recognized():
     assert tools_of(plan) == [(NEWS_TOOL, "000660")]
 
 
+@pytest.mark.parametrize("question, symbol", [
+    ("현대차 주가 알려줘", "005380"), ("현대자동차 현재가", "005380"), ("네이버 실적 알려줘", "035420"), ("NAVER 주가", "035420"),
+    ("카카오 현재가", "035720"), ("기아 주가 알려줘", "000270"), ("기아는 얼마야?", "000270"), ("기아차 실적", "000270"),
+    ("LG화학 영업이익 알려줘", "051910"), ("엘지화학 주가", "051910"), ("삼성SDI 주가 알려줘", "006400"), ("삼성sdi 실적", "006400"),
+    ("삼성에스디아이 뉴스", "006400"), ("삼성전자 현재가", "005930"), ("삼성 주가", "005930"),
+])
+def test_added_stocks_are_recognized(question, symbol):
+    plan = classify(question, SAMSUNG, ALL_COMPANIES)
+    assert plan.kind == DATA, question
+    assert {c.symbol for c in plan.calls} == {symbol}, question
+
+
+@pytest.mark.parametrize("text, symbols", [
+    ("삼성SDI와 삼성전자", ["006400", "005930"]), ("카카오랑 네이버", ["035720", "035420"]), ("아기아빠 이야기아냐", []), ("nokia 소식", []),
+])
+def test_find_companies_keeps_order_and_ignores_word_parts(text, symbols):
+    assert [c.symbol for c in find_companies(text, ALL_COMPANIES)] == symbols
+
+
+@pytest.mark.parametrize("question, word", [
+    ("카카오뱅크 주가 알려줘", "카카오뱅크"), ("현대건설 실적", "현대건설"), ("LG전자 주가", "LG전자"), ("현대 주가 알려줘", "현대"), ("LG 실적 알려줘", "LG"),
+])
+def test_related_companies_are_not_added_stocks(question, word):
+    plan = classify(question, SAMSUNG, ALL_COMPANIES)
+    assert plan.kind == NEED_MORE_INFO and plan.calls == []
+    assert word in plan.message
+
+
+def test_compare_added_stocks():
+    plan = classify("현대차와 기아 영업이익 비교해줘", SAMSUNG, ALL_COMPANIES)
+    assert tools_of(plan) == sorted([(FINANCIAL_TOOL, "005380"), (FINANCIAL_TOOL, "000270")])
+
+
 def test_out_of_scope_has_no_llm():
     for q in ["오늘 점심 뭐 먹지?", "파이썬 for문 알려줘", "내일 날씨 어때?"]:
         plan = classify(q, SAMSUNG, COMPANIES)
@@ -136,9 +171,9 @@ def test_out_of_scope_has_no_llm():
 
 
 def test_unsupported_company_asks_again():
-    plan = classify("카카오 주가 알려줘", SAMSUNG, COMPANIES)
+    plan = classify("현대모비스 주가 알려줘", SAMSUNG, COMPANIES)
     assert plan.kind == NEED_MORE_INFO
-    assert "카카오" in plan.message
+    assert "현대모비스" in plan.message
 
 
 def test_finance_words_are_not_company_names():

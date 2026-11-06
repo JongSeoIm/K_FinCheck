@@ -30,6 +30,8 @@ SYSTEM_PROMPT = """당신은 국내 주식 정보 서비스 'K-FinCheck'의 금�
 - 주가 상승·하락 원인을 단정하지 않는다.
 - 현재가를 말할 때는 체결 시각을 함께 말한다. [조회 자료]에 체결시각이 없고 조회시각만 있으면 "체결 시각은 확인되지 않았고 조회 시각은 ~"처럼 구분해서 말한다.
 - 실적을 말할 때는 사업연도, 보고서 종류, 연결·별도 기준을 함께 말한다.
+- 체결 시각은 현재가를 말할 때만 쓴다. 실적·기사 답변에서는 체결 시각을 언급하지 않는다.
+- 영업이익률·부채비율·유동비율·매출 증감률은 [조회 자료]의 재무지표 값을 쓴다. 값 대신 상태가 적혀 있으면 그 상태를 그대로 말하고 0%로 말하지 않는다.
 - 분기·반기 보고서의 손익 수치는 [조회 자료]의 당기기간에 적힌 3개월 값이다. 상반기 전체나 1년 값이라고 말하지 않는다.
 - 뉴스를 말할 때는 기사 제목과 게시 시각을 함께 말한다.
 - 조회한 기사 자료는 제목과 검색 결과 설명뿐이다. 기사 전문을 읽은 것처럼 말하지 않고, 제목과 설명에 없는 내용을 덧붙이지 않는다.
@@ -118,6 +120,17 @@ def asked_year(plan: Plan) -> str | None:
     return next((c.year for c in plan.calls if c.name == FINANCIAL_TOOL and c.year), None)
 
 
+_METRIC_STATUS = {"NOT_CALCULABLE": "계산 불가", "MISSING": "자료 없음"}
+
+
+def _metric(metric: dict) -> dict:
+    """재무 지표는 Spring 이 계산한 값을 그대로 넘긴다"""
+    value = metric.get("value")
+    if metric.get("status") == "OK" and value is not None:
+        return {"지표": metric.get("name"), "값": f"{value:.2f}%"}
+    return {"지표": metric.get("name"), "상태": _METRIC_STATUS.get(metric.get("status"), "자료 없음")}
+
+
 def _evidence(result: ToolResult, name: str, hide_previous: bool = False) -> dict:
     """hide_previous: 사업연도를 지정한 질문은 전기 금액을 넘기지 않는다 ("작년"에 그 전해 금액으로 답하는 것을 막는다)"""
     data = result.data
@@ -153,6 +166,7 @@ def _evidence(result: ToolResult, name: str, hide_previous: bool = False) -> dic
             "당기기간": current_period, "전기기간": previous_period,
             "손익항목기준": data.get("incomeBasis"), "재무상태항목기준": data.get("balanceBasis"),
             "항목": items,
+            "재무지표": [_metric(m) for m in data.get("metrics") or []],
         }
     if result.name == NEWS_TOOL:
         return {

@@ -78,7 +78,7 @@ public class FinancialService {
 				.url(report.getUrl())
 				.unit(report.getUnit())
 				.items(FinancialMetrics.earnings(report.getItems()))
-				.metrics(FinancialMetrics.metrics(report.getItems()))
+				.metrics(report.getMetrics())
 				.build();
 	}
 
@@ -221,6 +221,7 @@ public class FinancialService {
 				.balanceBasis(FinancialAccounts.balanceBasis(report.getReportCode()))
 				.unit("원")
 				.items(items)
+				.metrics(FinancialMetrics.metrics(items))
 				.build();
 	}
 

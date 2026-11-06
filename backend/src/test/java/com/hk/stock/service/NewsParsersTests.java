@@ -70,9 +70,9 @@ class NewsParsersTests {
 	}
 
 	@Test
-	void 제목에_없어도_요약의_종목_문장이_주가_이야기면_종목_기사다() {
-		assertTrue(NewsParsers.isRelated("코스피, 장 초반 상승 전환",
-				"코스닥도 올랐다. 삼성전자는 2% 넘게 오른 23만 원 선에 거래 중입니다.", SAMSUNG));
+	void 제목에_없어도_요약의_종목_문장이_실적_이야기면_종목_기사다() {
+		assertTrue(NewsParsers.isRelated("반도체 업황 회복세",
+				"수출도 늘었다. 삼성전자는 3분기 영업이익이 크게 늘었다.", SAMSUNG));
 	}
 
 	@Test
@@ -95,8 +95,14 @@ class NewsParsersTests {
 	}
 
 	@Test
-	void 시황_기사의_종목_등락_문장은_종목_기사다() {
-		assertTrue(NewsParsers.isRelated("코스피, 장중 급등락 끝 0.6% 상승", "삼성전자는 0.68% 내린 21만8000원에 거래를 마쳤다.", SAMSUNG));
+	void 요약에_등락만_나오는_시황_기사는_기타다() {
+		assertFalse(NewsParsers.isRelated("코스피, 장중 급등락 끝 0.6% 상승", "삼성전자는 0.68% 내린 21만8000원에 거래를 마쳤다.", SAMSUNG));
+		assertFalse(NewsParsers.isRelated("코스피 5000선 붕괴", "코스닥도 올랐다. 삼성전자는 2% 넘게 오른 23만 원 선에 거래 중입니다.", SAMSUNG));
+	}
+
+	@Test
+	void 제목에_종목명이_있는_시황_기사는_종목_기사다() {
+		assertTrue(NewsParsers.isRelated("코스피 8% 폭락… 삼성전자 9.98% 하락", "", SAMSUNG));
 	}
 
 	@Test

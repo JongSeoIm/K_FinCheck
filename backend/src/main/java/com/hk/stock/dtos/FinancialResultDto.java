@@ -23,6 +23,7 @@ public class FinancialResultDto {
 	private String balanceBasis;	//재무상태 항목 금액의 기준
 	private String unit;			//원
 	private List<Item> items;
+	private List<AnnualEarningsDto.Metric> metrics;	//영업이익률·부채비율·유동비율·매출 증감률
 
 	@Data
 	@Builder

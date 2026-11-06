@@ -102,7 +102,7 @@ Write-Host "`n=== 3. 질문 분류 · 고정 안내 (LLM 호출 없음) ==="
 $r = Ask $s '오늘 점심 뭐 먹지?'
 Check '금융과 무관 → out_of_scope' ($r.Status -eq 200 -and $r.Json.status -eq 'out_of_scope') $r.Raw
 Info $r.Json.answer
-$r = Ask $s '카카오 주가 알려줘'
+$r = Ask $s '쏘카 주가 알려줘'
 Check '지원하지 않는 기업 → need_more_info' ($r.Json.status -eq 'need_more_info') $r.Raw
 Info $r.Json.answer
 $r = Ask $s '삼성전자랑 비교해줘'

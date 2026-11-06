@@ -4,7 +4,7 @@
 
 | Tool                  | 조회 내용                         | 실제 데이터 위치                               |
 | get_stock_quote       | 현재가, 등락률, 거래량, 체결 시각 | Spring QuoteStore 우선 → 없으면 KIS REST       |
-| get_financial_result  | 매출액, 영업이익, 당기순이익      | Spring → MariaDB (없으면 OpenDART 조회 후 저장) |
+| get_financial_result  | 매출액, 영업이익, 재무 지표       | Spring → MariaDB (없으면 OpenDART 조회 후 저장) |
 | get_company_news      | 관련 기사 제목, 게시 시각, 링크   | Spring → NAVER API HUB                         |
 | get_company_info      | 기업명, 종목 코드, 시장 구분      | Spring → MariaDB                               |
 
@@ -23,7 +23,10 @@ from classifier import FINANCIAL_TOOL, INFO_TOOL, NEWS_TOOL, QUOTE_TOOL, Company
 
 NEWS_COUNT = 5  # 답변 근거로 넘기는 기사 수
 # 기사 제목에서 종목을 찾는 줄임말 (Spring NewsService.ALIASES 와 같은 값)
-NEWS_ALIASES = {"005930": ["삼전", "만전자"], "000660": ["하이닉스", "하닉", "삼전닉스", "만닉스"]}
+NEWS_ALIASES = {
+    "005930": ["삼전", "만전자"], "000660": ["하이닉스", "하닉", "삼전닉스", "만닉스"],
+    "005380": ["현대자동차"], "035420": ["네이버"], "000270": ["기아차"], "051910": ["엘지화학"], "006400": ["삼성에스디아이"],
+}
 
 
 @dataclass

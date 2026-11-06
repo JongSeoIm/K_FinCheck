@@ -26,7 +26,7 @@ def test_ambiguous_rule_results_are_not_confident(question):
 
 
 @pytest.mark.parametrize("question", ["부채비율이 뭐야?", "삼성전자 현재가 알려줘", "삼성전자 최근 실적 알려줘", "삼성전자 왜 올랐어?",
-                                      "오늘 점심 뭐 먹지?", "카카오 주가 알려줘", "코스피 지수 얼마야?", "삼성카드 주가 알려줘"])
+                                      "오늘 점심 뭐 먹지?", "현대모비스 주가 알려줘", "코스피 지수 얼마야?", "삼성카드 주가 알려줘"])
 def test_clear_rule_results_are_confident(question):
     assert classify(question, SAMSUNG, COMPANIES).confident is True
 

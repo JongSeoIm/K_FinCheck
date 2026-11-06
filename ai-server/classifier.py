@@ -44,10 +44,18 @@ TOOL_INTENT = {QUOTE_TOOL: QUOTE, FINANCIAL_TOOL: FINANCIAL, NEWS_TOOL: NEWS, IN
 ALIASES = {
     "005930": ["삼성전자", "삼성", "삼전", "samsung"],
     "000660": ["sk하이닉스", "하이닉스", "에스케이하이닉스", "하닉", "skhynix", "hynix"],
+    "005380": ["현대차", "현대자동차", "hyundaimotor"],
+    "035420": ["naver", "네이버"],
+    "035720": ["카카오", "kakao"],
+    "000270": ["기아", "기아차", "기아자동차", "kia"],
+    "051910": ["lg화학", "엘지화학", "lgchem"],
+    "006400": ["삼성sdi", "삼성에스디아이", "sdi"],
 }
+# 다른 단어의 일부로 흔한 줄임말은 단어 전체일 때만 인정한다 ("아기아빠"의 기아, "nokia"의 kia)
+WORD_ONLY_NAMES = {"기아", "kia", "sdi"}
 
 QUOTE_WORDS = ["현재가", "주가", "시세", "가격", "얼마", "등락", "거래량", "시가총액", "몇 원", "몇원", "52주", "최고가", "최저가"]
-FINANCIAL_WORDS = ["실적", "매출", "영업이익", "순이익", "이익", "재무", "부채", "자산", "자본", "분기", "연간", "사업보고서",
+FINANCIAL_WORDS = ["실적", "매출", "영업이익", "순이익", "이익", "재무", "부채", "유동비율", "자산", "자본", "분기", "연간", "사업보고서",
                    "손익", "흑자", "적자", "어닝", "eps"]
 # 조사가 붙은 단어를 찾을 때 쓰는 조사 목록
 _PARTICLES = "의|이|가|은|는|을|를|도|만|와|과|랑|로|율|란|에"
@@ -120,8 +128,9 @@ FINANCE_PATTERN = re.compile("|".join(_finance_term_pattern(t) for t in FINANCE_
 # 우리가 지원하지 않는 주요 상장사. 조회 Tool 을 부르지 않고 지원 종목 안내로 답한다
 # ("삼성바이오"가 줄임말 '삼성' 때문에 삼성전자로 잡히지 않도록 삼성 계열사도 넣는다)
 _OTHER_COMPANIES = [
-    "카카오", "네이버", "현대차", "현대자동차", "현대모비스", "기아", "LG전자", "LG화학", "LG에너지솔루션", "LG엔솔",
-    "삼성바이오로직스", "삼성바이오", "삼성SDI", "삼성물산", "삼성생명", "삼성증권", "삼성화재", "삼성전기", "삼성중공업",
+    "카카오뱅크", "카카오페이", "카카오게임즈", "네이버파이낸셜", "네이버웹툰", "현대차증권", "현대모비스", "현대건설", "현대제철", "현대글로비스",
+    "LG전자", "LG에너지솔루션", "LG엔솔", "LG디스플레이", "LG이노텍", "LG생활건강",
+    "삼성바이오로직스", "삼성바이오", "삼성물산", "삼성생명", "삼성증권", "삼성화재", "삼성전기", "삼성중공업",
     "SK텔레콤", "SK이노베이션", "SK스퀘어", "KT", "포스코", "POSCO", "셀트리온", "한화", "두산", "크래프톤", "쿠팡", "토스",
     "에코프로", "KB금융", "신한지주", "하나금융", "대한항공", "테슬라", "애플", "엔비디아", "구글", "아마존", "마이크로소프트", "메타",
 ]
@@ -132,7 +141,9 @@ COMPANY_ASK_PATTERN = re.compile(r"(어때|어떤가|어떤지|어떨까|괜찮|
 # 줄임말 '삼성' 뒤에 조사·질문 단어가 아닌 말이 붙으면 삼성전자가 아닌 다른 회사다 ("삼성카드", "삼성자산운용")
 _SAMSUNG_WORD = re.compile(r"(?<![가-힣a-zA-Z0-9])삼성([가-힣a-zA-Z0-9]+)")
 _SAMSUNG_PARTICLE = re.compile(rf"(?:{_PARTICLES}|이랑|하고|에서|주)")
-_SAMSUNG_QUESTION = re.compile(r"(?:전자|주가|주식|현재가|시세|실적|매출|영업이익|뉴스|기사|왜|어때)")
+_SAMSUNG_QUESTION = re.compile(r"(?:전자|sdi|에스디아이|주가|주식|현재가|시세|실적|매출|영업이익|뉴스|기사|왜|어때)", re.I)
+# 회사 묶음 이름만 말하면 어느 종목인지 알 수 없다 ("현대 주가", "LG 실적")
+_GROUP_NAMES = {"현대", "lg", "엘지"}
 _WORD_PARTICLE = re.compile(rf"(?:이랑|하고|{_PARTICLES})$")
 # 지수·환율·금리처럼 조회 Tool 이 없는 값을 묻는 질문 ("코스피 지수 얼마야?", "금리 얼마야?")
 MARKET_VALUE_PATTERN = re.compile(
@@ -189,15 +200,22 @@ def _has_any(text: str, words: list[str]) -> bool:
 
 def find_companies(text: str, companies: list[Company]) -> list[Company]:
     """질문에 나온 지원 종목 (나온 순서대로, 중복 없이)"""
-    lowered = _norm(text).replace(" ", "")
-    found: list[tuple[int, Company]] = []
-    for company in companies:
-        names = [company.name.lower().replace(" ", ""), company.symbol] + ALIASES.get(company.symbol, [])
-        positions = [lowered.find(n.replace(" ", "")) for n in names if n and n.replace(" ", "") in lowered]
-        if positions:
-            found.append((min(positions), company))
-    found.sort(key=lambda item: item[0])
-    return [company for _, company in found]
+    spaced = _norm(text)
+    lowered = spaced.replace(" ", "")
+    names = [(n.replace(" ", ""), company) for company in companies
+             for n in [company.name.lower(), company.symbol] + ALIASES.get(company.symbol, []) if n]
+    positions: dict[str, tuple[int, Company]] = {}
+    # 긴 이름부터 찾고 지운다 ("삼성sdi"가 삼성전자의 줄임말 '삼성'에 걸리지 않도록)
+    for name, company in sorted(names, key=lambda item: len(item[0]), reverse=True):
+        if name in WORD_ONLY_NAMES:
+            match = re.search(rf"(?<![가-힣a-z0-9]){name}(?:{_PARTICLES}|이랑|하고|주가|주식|주)?(?![가-힣a-z0-9])", spaced)
+            position = len(spaced[:match.start()].replace(" ", "")) if match else -1
+        else:
+            position = lowered.find(name)
+            lowered = lowered.replace(name, "\0" * len(name))
+        if position >= 0 and (company.symbol not in positions or position < positions[company.symbol][0]):
+            positions[company.symbol] = (position, company)
+    return [company for _, company in sorted(positions.values(), key=lambda item: item[0])]
 
 
 def _unsupported_plan(word: str, companies: list[Company], intents: list[str]) -> Plan:
@@ -242,6 +260,8 @@ def _unknown_company(text: str, companies: list[Company]) -> str | None:
     for match in UNKNOWN_COMPANY_PATTERN.finditer(text):
         word = _PARTICLE_SUFFIX.sub("", match.group(1).strip())
         compact = word.lower().replace(" ", "")
+        if compact in _GROUP_NAMES:
+            return word
         if len(compact) < 2 or compact in GENERIC_WORDS or word in GENERIC_WORDS:
             continue
         if _has_any(compact, FINANCE_TERMS + QUOTE_WORDS + FINANCIAL_WORDS + NEWS_WORDS):

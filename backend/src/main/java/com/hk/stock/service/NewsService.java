@@ -38,7 +38,12 @@ public class NewsService {
 	//기사 제목에서 함께 찾을 종목 줄임말 (종목명·종목코드는 항상 포함)
 	private static final Map<String, List<String>> ALIASES = Map.of(
 			"005930", List.of("삼전", "만전자", "이재용"),
-			"000660", List.of("하이닉스", "하닉", "삼전닉스", "만닉스"));
+			"000660", List.of("하이닉스", "하닉", "삼전닉스", "만닉스"),
+			"005380", List.of("현대자동차"),
+			"035420", List.of("네이버"),
+			"000270", List.of("기아차"),
+			"051910", List.of("엘지화학"),
+			"006400", List.of("삼성에스디아이"));
 
 	private final NaverNewsProperties props;
 	private final StockService stockService;

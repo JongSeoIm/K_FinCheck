@@ -60,11 +60,10 @@ public final class NewsParsers {
 	//환율 이야기 문장의 '강세·하락'은 종목의 주가가 아니다
 	private static final Pattern CURRENCY_SENTENCE = Pattern.compile("환율|원화|달러");
 
-	//요약의 종목 문장이 그 종목의 주가·실적 이야기인지 판단하는 단어
-	//'%, 주식, 코스피, 배당'처럼 종목 이름이 스쳐 간 시장·환율 기사에도 흔한 단어는 넣지 않는다
-	private static final List<String> MARKET_WORDS = List.of(
-			"상승", "하락", "강세", "약세", "급등", "급락", "오른", "올라", "내린", "떨어", "원에 거래", "거래를 마쳤", "마감",
-			"목표가", "목표주가", "투자의견", "영업이익", "매출", "순이익", "순매수", "순매도", "공급계약", "수주",
+	//요약의 종목 문장이 그 기업의 실적·계약 이야기인지 판단하는 단어
+	//'상승·하락'처럼 시황 기사가 여러 종목을 나열할 때 쓰는 등락 단어는 넣지 않는다
+	private static final List<String> COMPANY_WORDS = List.of(
+			"목표가", "목표주가", "투자의견", "영업이익", "매출", "순이익", "공급계약", "수주",
 			"적자", "흑자", "점유율", "출하량", "판매량");
 
 	private NewsParsers() {
@@ -105,8 +104,8 @@ public final class NewsParsers {
 	 * 종목 기사 판단
 	 * 1. 제목이 의견 글·정치 기사 패턴이면 → 기타
 	 * 2. 제목에 종목명·줄임말이 있으면 → 종목 기사
-	 * 3. 요약에서 종목명이 나오는 문장에 주가·실적 단어가 있으면 → 종목 기사
-	 * 4. 그 외 (이름만 스친 기사) → 기타
+	 * 3. 요약에서 종목명이 나오는 문장에 실적·계약 단어가 있으면 → 종목 기사
+	 * 4. 그 외 (이름만 스친 기사, 요약에 등락만 나오는 시황 기사) → 기타
 	 */
 	static boolean isRelated(String headline, String summary, List<String> keywords) {
 		if (EXCLUDED_HEADLINE.matcher(headline).find()) return false;
@@ -115,7 +114,7 @@ public final class NewsParsers {
 		String body = SUBSIDIARY_NAME.matcher(summary).replaceAll("");
 		for (String sentence : body.split("(?<=[.!?…])\\s+|(?<=다\\.)")) {
 			if (CURRENCY_SENTENCE.matcher(sentence).find()) continue;
-			if (containsAny(sentence, keywords) && containsAny(sentence, MARKET_WORDS)) return true;
+			if (containsAny(sentence, keywords) && containsAny(sentence, COMPANY_WORDS)) return true;
 		}
 		return false;
 	}
