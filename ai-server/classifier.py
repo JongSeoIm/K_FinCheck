@@ -6,8 +6,8 @@ FastAPI 가 질문 유형을 판별하고 필요한 Tool 을 고른다. OpenAI �
   "부채비율이 뭐야?"            → Tool 없이 개념 답변
   "삼성전자 현재가 알려줘"       → get_stock_quote
   "삼성전자 최근 실적 알려줘"    → get_financial_result
-  "삼성전자 관련 뉴스 알려줘"    → get_company_news
-  "삼성전자 왜 올랐어?"          → get_stock_quote + get_company_news (+ 실적 단어가 있으면 get_financial_result)
+  "삼성전자 관련 뉴스 알려줘"    → get_company_disclosures (뉴스 기사는 AI 에 넣지 않는다. 화면 패널 안내 + 공시)
+  "삼성전자 왜 올랐어?"          → get_stock_quote + get_company_disclosures (+ 실적 단어가 있으면 get_financial_result)
 """
 
 import re
@@ -21,7 +21,7 @@ KST = timezone(timedelta(hours=9), "KST")
 TERM = "term"                # 금융 용어 설명
 QUOTE = "quote"              # 현재가·등락
 FINANCIAL = "financial"      # 기업 실적
-NEWS = "news"                # 관련 기사
+NEWS = "news"                # 관련 소식 (뉴스·기사·공시 질문)
 MOVEMENT = "movement"        # 주가 변동 원인
 OUTLOOK = "outlook"          # 전망·매수 여부
 COMPANY = "company"          # 기업 정보
@@ -36,9 +36,9 @@ NO_DATA = "no_data"                  # 조회할 Tool 이 없는 자료. LLM 호
 
 QUOTE_TOOL = "get_stock_quote"
 FINANCIAL_TOOL = "get_financial_result"
-NEWS_TOOL = "get_company_news"
+DISCLOSURE_TOOL = "get_company_disclosures"
 INFO_TOOL = "get_company_info"
-TOOL_INTENT = {QUOTE_TOOL: QUOTE, FINANCIAL_TOOL: FINANCIAL, NEWS_TOOL: NEWS, INFO_TOOL: COMPANY}
+TOOL_INTENT = {QUOTE_TOOL: QUOTE, FINANCIAL_TOOL: FINANCIAL, DISCLOSURE_TOOL: NEWS, INFO_TOOL: COMPANY}
 
 # 종목 줄임말 (종목명은 항상 포함)
 ALIASES = {
@@ -61,7 +61,7 @@ FINANCIAL_WORDS = ["실적", "매출", "영업이익", "순이익", "이익", "�
 _PARTICLES = "의|이|가|은|는|을|를|도|만|와|과|랑|로|율|란|에"
 # 다른 단어의 일부로 흔한 시세 단어는 단어 전체일 때만 인정한다 ("최고가 호텔"의 '고가'는 시세가 아니다)
 SHORT_QUOTE_PATTERN = re.compile(rf"(?<![가-힣])(?:종가|시가|고가|저가)(?:{_PARTICLES})?(?![가-힣])")
-NEWS_WORDS = ["뉴스", "기사", "소식", "이슈", "보도", "헤드라인"]
+NEWS_WORDS = ["뉴스", "기사", "소식", "이슈", "보도", "헤드라인", "공시"]
 # "회사야"·"회사면"의 '사야'·'사면'은 매수 질문이 아니다
 ADVICE_PATTERN = re.compile(
     r"((?<!회)사도|살까|(?<!회)사야|(?<!회)사면|팔까|팔아|팔면|매수해|매도해|매수할|매도할|매수하|매도하|들어가도|전망|오를까|내릴까|떨어질까|목표가"
@@ -174,7 +174,7 @@ class ToolCall:
     symbol: str
     year: str | None = None
     report: str | None = None
-    company: str = ""          # 기업명 (뉴스 Tool 이 제목에 이 기업이 나온 기사를 먼저 고를 때 사용)
+    company: str = ""          # 기업명 (공시 Tool 의 안내 문구에 사용)
 
 
 @dataclass
@@ -187,7 +187,7 @@ class Plan:
     confident: bool = True     # False: 규칙에 걸린 단어가 없어 기본값으로 판단함 (interpreter 대상)
 
 
-OUT_OF_SCOPE_MESSAGE = "저는 종목 시세, 실적, 관련 뉴스와 금융 용어 같은 주식·금융 질문만 도와드릴 수 있어요."
+OUT_OF_SCOPE_MESSAGE = "저는 종목 시세, 실적, 공시와 금융 용어 같은 주식·금융 질문만 도와드릴 수 있어요."
 
 
 def _norm(text: str) -> str:
@@ -349,7 +349,7 @@ def classify(question: str, current: Company, companies: list[Company], history:
     market_value = MARKET_VALUE_PATTERN.search(text) if not mentioned and not CONCEPT_PATTERN.search(lowered) else None
     if market_value:
         names = ", ".join(c.name for c in companies)
-        return Plan(kind=NO_DATA, message=f"{market_value.group(1)} 값은 지금 조회할 수 없어요. {names}의 현재가, 실적, 관련 뉴스는 확인할 수 있어요.")
+        return Plan(kind=NO_DATA, message=f"{market_value.group(1)} 값은 지금 조회할 수 없어요. {names}의 현재가, 실적, 공시는 확인할 수 있어요.")
 
     # 금융과 무관한 주제는 대화 중이어도 LLM 에 보내지 않고 안내 문구 ("오늘 날씨 어때?")
     if not mentioned and not finance_word and _has_any(lowered, UNRELATED_WORDS):
@@ -413,7 +413,7 @@ def classify(question: str, current: Company, companies: list[Company], history:
 
     if not intents:
         if mentioned:
-            # "삼성전자 어때?" → 지금 상황을 볼 수 있게 시세 + 뉴스
+            # "삼성전자 어때?" → 지금 상황을 볼 수 있게 시세 + 공시
             intents = [QUOTE, NEWS]
             confident = False
         else:
@@ -447,7 +447,7 @@ def _calls(intents: list[str], targets: list[Company], text: str) -> list[ToolCa
             elif intent == FINANCIAL:
                 calls.append(ToolCall(FINANCIAL_TOOL, company.symbol, year, report))
             elif intent == NEWS:
-                calls.append(ToolCall(NEWS_TOOL, company.symbol, company=company.name))
+                calls.append(ToolCall(DISCLOSURE_TOOL, company.symbol, company=company.name))
             elif intent == COMPANY:
                 calls.append(ToolCall(INFO_TOOL, company.symbol))
     # 같은 Tool·종목 중복 제거

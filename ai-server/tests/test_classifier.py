@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from classifier import (CONCEPT, DATA, FINANCIAL_TOOL, INFO_TOOL, KST, MOVEMENT, NEED_MORE_INFO, NEWS_TOOL, NO_DATA, OUT_OF_SCOPE,
+from classifier import (CONCEPT, DATA, FINANCIAL_TOOL, INFO_TOOL, KST, MOVEMENT, NEED_MORE_INFO, DISCLOSURE_TOOL, NO_DATA, OUT_OF_SCOPE,
                         OUTLOOK, QUOTE_TOOL, Company, classify, find_companies)
 
 SAMSUNG = Company("005930", "삼성전자", "KOSPI")
@@ -21,8 +21,8 @@ def tools_of(plan):
     ("부채비율이 뭐야?", []),
     ("삼성전자 현재가 알려줘", [(QUOTE_TOOL, "005930")]),
     ("삼성전자 최근 실적 알려줘", [(FINANCIAL_TOOL, "005930")]),
-    ("삼성전자 관련 뉴스 알려줘", [(NEWS_TOOL, "005930")]),
-    ("삼성전자 왜 올랐어?", sorted([(QUOTE_TOOL, "005930"), (NEWS_TOOL, "005930")])),
+    ("삼성전자 관련 뉴스 알려줘", [(DISCLOSURE_TOOL, "005930")]),
+    ("삼성전자 왜 올랐어?", sorted([(QUOTE_TOOL, "005930"), (DISCLOSURE_TOOL, "005930")])),
 ])
 def test_pdf_examples(question, expected):
     plan = classify(question, SAMSUNG, COMPANIES)
@@ -39,7 +39,7 @@ def test_concept_has_no_tools():
 def test_movement_with_earnings_adds_financial():
     plan = classify("삼성전자 실적 때문에 왜 떨어졌어?", SAMSUNG, COMPANIES)
     assert plan.question_type == MOVEMENT
-    assert tools_of(plan) == sorted([(QUOTE_TOOL, "005930"), (NEWS_TOOL, "005930"), (FINANCIAL_TOOL, "005930")])
+    assert tools_of(plan) == sorted([(QUOTE_TOOL, "005930"), (DISCLOSURE_TOOL, "005930"), (FINANCIAL_TOOL, "005930")])
 
 
 def test_without_company_uses_panel_stock():
@@ -54,7 +54,7 @@ def test_movement_without_company_and_period_asks_again():
     history = [{"role": "user", "content": "왜 올랐어?"}, {"role": "assistant", "content": plan.message}]
     answered = classify("오늘", HYNIX, COMPANIES, history)
     assert answered.question_type == MOVEMENT
-    assert tools_of(answered) == sorted([(QUOTE_TOOL, "000660"), (NEWS_TOOL, "000660")])
+    assert tools_of(answered) == sorted([(QUOTE_TOOL, "000660"), (DISCLOSURE_TOOL, "000660")])
 
 
 @pytest.mark.parametrize("question", [
@@ -98,7 +98,7 @@ def test_same_intent_about_unsupported_company_gets_same_answer(question):
 def test_same_intent_about_supported_company_is_outlook(question):
     plan = classify(question, SAMSUNG, COMPANIES)
     assert plan.kind == DATA and plan.question_type == OUTLOOK
-    assert tools_of(plan) == sorted([(QUOTE_TOOL, "005930"), (NEWS_TOOL, "005930")])
+    assert tools_of(plan) == sorted([(QUOTE_TOOL, "005930"), (DISCLOSURE_TOOL, "005930")])
 
 
 @pytest.mark.parametrize("question", ["노트북을 구매해도될까?", "아이폰 살까?", "가방 구입할까?", "운동화 사고 싶어", "회사 어때?"])
@@ -125,9 +125,14 @@ def test_year_over_year_is_not_last_year():
     assert classify("삼성전자 작년 실적 전년 대비 어때?", SAMSUNG, COMPANIES).calls[0].year == str(datetime.now(KST).year - 1)
 
 
+@pytest.mark.parametrize("question", ["삼성전자 관련 뉴스 알려줘", "삼성전자 기사 보여줘", "삼성전자 최근 공시 알려줘"])
+def test_news_and_disclosure_questions_use_disclosures(question):
+    assert tools_of(classify(question, SAMSUNG, COMPANIES)) == [(DISCLOSURE_TOOL, "005930")]
+
+
 def test_alias_is_recognized():
     plan = classify("하이닉스 뉴스 보여줘", SAMSUNG, COMPANIES)
-    assert tools_of(plan) == [(NEWS_TOOL, "000660")]
+    assert tools_of(plan) == [(DISCLOSURE_TOOL, "000660")]
 
 
 @pytest.mark.parametrize("question, symbol", [

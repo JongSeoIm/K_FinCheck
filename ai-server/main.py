@@ -2,7 +2,7 @@
 
 Spring 서버만 호출한다: POST /chat
   1. 질문 분류 (classifier) → 애매하면 OpenAI 로 해석 (interpreter) → 서버가 필요한 Tool 선택
-  2. Tool 호출 (tools, 각 5초 제한) → Spring API 로 시세·실적·뉴스·기업 정보 조회
+  2. Tool 호출 (tools, 각 5초 제한) → Spring API 로 시세·실적·공시·기업 정보 조회
   3. OpenAI 에 조회 결과 + 답변 지침 + 최근 대화(최대 10개)를 주고 답변 문장만 생성
   4. {"status","answer","sources"} 반환 (sources 는 Tool 결과로 직접 만든다)
 

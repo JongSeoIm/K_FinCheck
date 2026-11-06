@@ -5,8 +5,10 @@
 | Tool                  | 조회 내용                         | 실제 데이터 위치                               |
 | get_stock_quote       | 현재가, 등락률, 거래량, 체결 시각 | Spring QuoteStore 우선 → 없으면 KIS REST       |
 | get_financial_result  | 매출액, 영업이익, 재무 지표       | Spring → MariaDB (없으면 OpenDART 조회 후 저장) |
-| get_company_news      | 관련 기사 제목, 게시 시각, 링크   | Spring → NAVER API HUB                         |
+| get_company_disclosures | 공시 이름, 접수일, 원문 링크    | Spring → OpenDART (저장 안 함)                 |
 | get_company_info      | 기업명, 종목 코드, 시장 구분      | Spring → MariaDB                               |
+
+뉴스 검색 결과는 AI 에 넣지 않는다. 뉴스는 화면의 패널에서만 보여 준다.
 
 Tool 호출 제한 시간은 팀 결정대로 5초. 실패한 Tool 은 ok=False 로 돌려주고, 같은 값을 LLM 지식으로 대신하지 않는다.
 """
@@ -19,15 +21,7 @@ from typing import Any
 import httpx
 
 import config
-from classifier import FINANCIAL_TOOL, INFO_TOOL, NEWS_TOOL, QUOTE_TOOL, Company, ToolCall
-
-NEWS_COUNT = 5  # 답변 근거로 넘기는 기사 수
-# 기사 제목에서 종목을 찾는 줄임말 (Spring NewsService.ALIASES 와 같은 값)
-NEWS_ALIASES = {
-    "005930": ["삼전", "만전자"], "000660": ["하이닉스", "하닉", "삼전닉스", "만닉스"],
-    "005380": ["현대자동차"], "035420": ["네이버"], "000270": ["기아차"], "051910": ["엘지화학"], "006400": ["삼성에스디아이"],
-}
-
+from classifier import DISCLOSURE_TOOL, FINANCIAL_TOOL, INFO_TOOL, QUOTE_TOOL, Company, ToolCall
 
 @dataclass
 class ToolResult:
@@ -76,15 +70,11 @@ async def get_financial_result(client: httpx.AsyncClient, call: ToolCall) -> dic
     return financial
 
 
-async def get_company_news(client: httpx.AsyncClient, call: ToolCall) -> list[dict]:
-    news = (await _get(client, f"/api/stocks/{call.symbol}/news")).get("news") or []
-    related = [n for n in news if n.get("related")]
-    if not related:
-        raise ToolError(f"{call.company or call.symbol}의 관련 기사를 찾지 못했습니다.", no_data=True)
-    # 제목에 이 기업이 나온 기사를 먼저, 요약에만 나온 기사(시황 등)를 나중에 고른다
-    words = ([call.company] if call.company else []) + NEWS_ALIASES.get(call.symbol, [])
-    related.sort(key=lambda n: not any(w in (n.get("headline") or "") for w in words))
-    return related[:NEWS_COUNT]
+async def get_company_disclosures(client: httpx.AsyncClient, call: ToolCall) -> list[dict]:
+    disclosures = (await _get(client, f"/api/companies/{call.symbol}/disclosures")).get("disclosures") or []
+    if not disclosures:
+        raise ToolError(f"{call.company or call.symbol}의 최근 공시를 찾지 못했습니다.", no_data=True)
+    return disclosures
 
 
 async def get_company_info(client: httpx.AsyncClient, call: ToolCall) -> dict:
@@ -97,7 +87,7 @@ async def get_company_info(client: httpx.AsyncClient, call: ToolCall) -> dict:
 TOOLS = {
     QUOTE_TOOL: get_stock_quote,
     FINANCIAL_TOOL: get_financial_result,
-    NEWS_TOOL: get_company_news,
+    DISCLOSURE_TOOL: get_company_disclosures,
     INFO_TOOL: get_company_info,
 }
 

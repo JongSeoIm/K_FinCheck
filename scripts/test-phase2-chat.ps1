@@ -83,6 +83,12 @@ if (-not $dart) {
   Check '같은 공시 다시 조회 → 같은 접수번호 (DB 재사용)' ($again.Json.financial.rceptNo -eq $f.rceptNo) $again.Raw
 }
 
+if ($dart) {
+  $r = Call GET "$BaseUrl/api/companies/005930/disclosures"
+  $items = @($r.Json.disclosures)
+  Check '최근 공시 목록 (지분 보고 제외, 5건 이하)' ($r.Status -eq 200 -and $items.Count -le 5 -and -not ($items.reportName -match '소유상황보고서|대량보유상황보고서')) $r.Raw
+}
+
 Write-Host "`n=== 2. 로그인한 사용자만 챗봇 이용 ==="
 $r = Call POST "$BaseUrl/api/chat" @{ symbol = '005930'; conversationId = '00000000-0000-0000-0000-000000000000'; question = '삼성전자 현재가' }
 Check '로그인 없이 질문 401' ($r.Status -eq 401) "status=$($r.Status)"
@@ -116,7 +122,7 @@ Write-Host "`n=== 4. Tool 조회 + AI 답변 ==="
 $cases = @(
   @{ q = '부채비율이 뭐야?'; provider = $null },
   @{ q = '삼성전자 현재가 알려줘'; provider = 'KIS' },
-  @{ q = '삼성전자 관련 뉴스 알려줘'; provider = 'NAVER API HUB' },
+  @{ q = '삼성전자 관련 뉴스 알려줘'; provider = 'OpenDART' },
   @{ q = '삼성전자 최근 실적 알려줘'; provider = 'OpenDART' },
   @{ q = '삼성전자 왜 떨어졌어?'; provider = 'KIS' }
 )

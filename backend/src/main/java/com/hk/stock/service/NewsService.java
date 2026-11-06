@@ -1,7 +1,6 @@
 package com.hk.stock.service;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,8 +23,9 @@ import com.hk.stock.dtos.StockDto;
 /**
  * 종목 관련 뉴스 (네이버 클라우드 NAVER API HUB - 검색 API 뉴스)
  * - 실습(14_realtime_stocweb)처럼 API 키는 서버에서만 사용하고, 브라우저는 우리 서버만 호출한다.
- * - 종목명으로 최신순 검색 → 태그·중복 제거 → 종목 기사 / 기타로 나눠 각각 최대 NEWS_LIMIT 건
- * - 같은 종목은 naver.news.cache-seconds 동안 저장해 둔 결과를 돌려준다 (일일 호출 한도 보호)
+ * - 종목명으로 API 의 최신순(sort=date) 검색 결과를 받은 순서대로 돌려준다. 태그와 같은 기사만 정리한다.
+ * - 같은 종목은 naver.news.cache-seconds 동안 메모리에 둔 결과를 돌려준다 (일일 호출 한도 보호). DB 에는 저장하지 않는다.
+ * - AI 서버에는 넘기지 않는다.
  */
 @Service
 public class NewsService {
@@ -33,17 +33,6 @@ public class NewsService {
 	private static final Logger log = LoggerFactory.getLogger(NewsService.class);
 
 	public static final int NEWS_LIMIT = 10;
-	private static final int FETCH_SIZE = 100;	//걸러낸 뒤에도 종목 기사가 NEWS_LIMIT 건 남도록 최대치(100)로 받는다
-
-	//기사 제목에서 함께 찾을 종목 줄임말 (종목명·종목코드는 항상 포함)
-	private static final Map<String, List<String>> ALIASES = Map.of(
-			"005930", List.of("삼전", "만전자", "이재용"),
-			"000660", List.of("하이닉스", "하닉", "삼전닉스", "만닉스"),
-			"005380", List.of("현대자동차"),
-			"035420", List.of("네이버"),
-			"000270", List.of("기아차"),
-			"051910", List.of("엘지화학"),
-			"006400", List.of("삼성에스디아이"));
 
 	private final NaverNewsProperties props;
 	private final StockService stockService;
@@ -74,22 +63,16 @@ public class NewsService {
 			return cached.news;
 		}
 
-		List<NewsDto> news = NewsParsers.items(search(stock.getName()), keywords(stock), NEWS_LIMIT);
+		List<NewsDto> news = NewsParsers.items(search(stock.getName()));
 		cache.put(symbol, new Cached(news, System.currentTimeMillis()));
 		return news;
-	}
-
-	static List<String> keywords(StockDto stock) {
-		List<String> words = new ArrayList<>(List.of(stock.getName(), stock.getSymbol()));
-		words.addAll(ALIASES.getOrDefault(stock.getSymbol(), List.of()));
-		return words;
 	}
 
 	private JsonNode search(String query) {
 		try {
 			//API HUB는 JSON을 Content-Type: text/plain 으로 보내므로 문자열로 받은 뒤 직접 JSON으로 읽는다
 			byte[] raw = restClient.get()
-					.uri(props.getUrl() + "?query={q}&display={n}&sort=date&format=json", query, FETCH_SIZE)
+					.uri(props.getUrl() + "?query={q}&display={n}&sort=date&format=json", query, NEWS_LIMIT)
 					.header("X-NCP-APIGW-API-KEY-ID", props.getClientId())
 					.header("X-NCP-APIGW-API-KEY", props.getClientSecret())
 					.retrieve()

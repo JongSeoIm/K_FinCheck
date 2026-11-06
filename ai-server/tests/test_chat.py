@@ -22,8 +22,8 @@ FINANCIAL = {"symbol": "005930", "bsnsYear": "2026", "reportName": "3분기보�
              "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261114000001",
              "incomeBasis": "해당 분기 3개월 금액, 전기는 전년 같은 분기", "balanceBasis": "...",
              "items": [{"accountName": "매출액", "statement": "IS", "current": 86_000_000_000_000, "previous": 79_000_000_000_000}]}
-NEWS = [{"headline": "삼성전자 HBM 공급 확대", "summary": "요약", "source": "연합뉴스", "datetime": 1793750000,
-         "url": "https://news.example/1", "related": True}]
+DISCLOSURES = [{"rceptNo": "20261105000001", "reportName": "주요사항보고서(자기주식취득결정)", "filedAt": "2026-11-05", "submitter": "삼성전자",
+                "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261105000001"}]
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def client(monkeypatch):
 
 
 def fake_tools(monkeypatch, fail=()):
-    data = {"get_stock_quote": QUOTE, "get_financial_result": FINANCIAL, "get_company_news": NEWS,
+    data = {"get_stock_quote": QUOTE, "get_financial_result": FINANCIAL, "get_company_disclosures": DISCLOSURES,
             "get_company_info": {"symbol": "005930", "name": "삼성전자", "market": "KOSPI"}}
 
     async def run(calls):
@@ -147,40 +147,54 @@ def test_unsupported_company_has_no_tool_or_sources(client, monkeypatch):
     assert client.calls["llm"] == 0
 
 
-def test_every_article_given_to_llm_has_source(client, monkeypatch):
-    articles = [{**NEWS[0], "headline": f"기사{i}", "url": f"https://news.example/{i}"} for i in range(5)]
+def test_every_disclosure_given_to_llm_has_source(client, monkeypatch):
+    items = [{**DISCLOSURES[0], "reportName": f"공시{i}", "url": f"https://dart.example/{i}"} for i in range(5)]
 
     async def run(calls):
-        return [ToolResult(c.name, c.symbol, True, articles) for c in calls]
+        return [ToolResult(c.name, c.symbol, True, items) for c in calls]
 
     monkeypatch.setattr(tools, "run_tools", run)
-    assert [s["label"] for s in ask(client, "삼성전자 뉴스 알려줘")["sources"]] == [a["headline"] for a in articles]
+    assert [s["url"] for s in ask(client, "삼성전자 뉴스 알려줘")["sources"]] == [i["url"] for i in items]
 
 
-def test_news_tool_prefers_headline_and_drops_unrelated():
+def test_no_disclosure_is_no_data():
     import asyncio
 
-    news = [{"headline": "코스피 마감", "related": True}, {"headline": "무관한 기사", "related": False},
-            {"headline": "삼성전자 신제품", "related": True}]
-
     async def fake_get(client, path, params=None):
-        return {"news": news}
+        return {"disclosures": []}
 
-    call = classifier.ToolCall(classifier.NEWS_TOOL, "005930", company="삼성전자")
+    call = classifier.ToolCall(classifier.DISCLOSURE_TOOL, "005930", company="삼성전자")
     original, tools._get = tools._get, fake_get
     try:
-        picked = asyncio.run(tools.get_company_news(None, call))
+        with pytest.raises(tools.ToolError) as error:
+            asyncio.run(tools.get_company_disclosures(None, call))
     finally:
         tools._get = original
-    assert [n["headline"] for n in picked] == ["삼성전자 신제품", "코스피 마감"]
+    assert error.value.no_data and "삼성전자" in str(error.value)
 
 
-def test_news_source_has_time_and_link(client, monkeypatch):
+def test_naver_news_is_not_called_by_ai(client, monkeypatch):
+    assert not hasattr(tools, "get_company_news")
+    urls = []
+
+    async def fake_get(_client, path, params=None):
+        urls.append(path)
+        if path.endswith("/disclosures"):
+            return {"disclosures": DISCLOSURES}
+        return {"quote": QUOTE}
+
+    monkeypatch.setattr(tools, "_get", fake_get)
+    for question in ["삼성전자 관련 뉴스 알려줘", "삼성전자 왜 올랐어?", "삼성전자 사도 돼?"]:
+        ask(client, question)
+    assert urls and not any("/news" in path for path in urls)
+
+
+def test_disclosure_source_has_date_and_link(client, monkeypatch):
     fake_tools(monkeypatch)
     source = ask(client, "삼성전자 뉴스 알려줘")["sources"][0]
-    assert source["provider"] == "NAVER API HUB"
-    assert source["url"] == "https://news.example/1"
-    assert source["basisAt"].startswith("2026-")
+    assert source["provider"] == prompts.DISCLOSURE_PROVIDER
+    assert source["url"] == DISCLOSURES[0]["url"]
+    assert source["basisAt"] == "2026-11-05"
 
 
 def test_concept_has_no_sources(client, monkeypatch):
@@ -198,7 +212,7 @@ def test_out_of_scope_does_not_call_llm(client, monkeypatch):
 
 
 def test_partial_failure_uses_only_successful_data(client, monkeypatch):
-    fake_tools(monkeypatch, fail={"get_company_news"})
+    fake_tools(monkeypatch, fail={"get_company_disclosures"})
     res = ask(client, "삼성전자 왜 떨어졌어?")
     assert res["status"] == "answered"
     assert [s["provider"] for s in res["sources"]] == ["KIS"]
@@ -271,8 +285,8 @@ def test_visuals_are_built_from_tool_results(client, monkeypatch):
     assert body["visuals"][0]["price"] == 222000 and body["visuals"][0]["eventTime"] == QUOTE["eventTime"]
 
     body = ask(client, "삼성전자 관련 뉴스 알려줘")
-    assert body["visuals"][0]["type"] == "news"
-    assert body["visuals"][0]["items"][0]["url"] == "https://news.example/1"
+    assert body["visuals"][0]["type"] == "disclosure"
+    assert body["visuals"][0]["items"][0]["url"] == DISCLOSURES[0]["url"]
 
 
 def test_concept_answer_has_no_visuals(client, monkeypatch):
@@ -304,8 +318,9 @@ def test_failed_tool_has_no_visual():
     assert prompts.build_visuals([ToolResult("get_stock_quote", "005930", False, error="실패")], COMPANIES) == []
 
 
-def test_article_rule_is_in_instructions():
-    assert "기사 전문을 읽은 것처럼 말하지 않" in prompts.SYSTEM_PROMPT
+def test_news_rule_is_in_instructions():
+    assert "뉴스 기사는 조회하지 않는다" in prompts.SYSTEM_PROMPT
+    assert "관련 뉴스 패널" in prompts.SYSTEM_PROMPT
 
 
 def _financial_with_metrics():

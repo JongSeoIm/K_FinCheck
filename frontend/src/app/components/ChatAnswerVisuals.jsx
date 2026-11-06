@@ -97,15 +97,15 @@ function FinancialCompare({ cards }) {
   )
 }
 
-function NewsLinks({ data }) {
+function DisclosureLinks({ data }) {
   return (
     <section className='chat-visual'>
-      <header><strong>{data.name} 관련 기사</strong><span>{data.source}</span></header>
+      <header><strong>{data.name} 최근 공시</strong><span>{data.source}</span></header>
       <ul className='chat-news'>
         {data.items.map((item) => (
           <li key={item.url}>
             <a href={item.url} target='_blank' rel='noopener noreferrer'>{item.title} ↗</a>
-            <small>{item.press} · {formatClock(item.publishedAt)}</small>
+            <small>접수일 {item.filedAt}</small>
           </li>
         ))}
       </ul>
@@ -131,7 +131,7 @@ export default function ChatAnswerVisuals({ visuals }) {
         const key = `${item.type}-${item.symbol}`
         if (item.type === 'quote') return <QuoteCard key={key} data={item} />
         if (item.type === 'financial') return <FinancialCard key={key} data={item} />
-        if (item.type === 'news') return <NewsLinks key={key} data={item} />
+        if (item.type === 'disclosure') return <DisclosureLinks key={key} data={item} />
         if (item.type === 'company') return <CompanyCard key={key} data={item} />
         return null
       })}

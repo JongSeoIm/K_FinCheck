@@ -1,6 +1,7 @@
 package com.hk.stock.controller;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.hk.stock.dtos.AnnualEarningsDto;
 import com.hk.stock.dtos.CompanyDto;
+import com.hk.stock.dtos.DisclosureDto;
 import com.hk.stock.dtos.FinancialResultDto;
 import com.hk.stock.service.FinancialService;
 
@@ -48,6 +50,15 @@ public class CompanyController {
 			@RequestParam(required = false) String report) {
 		Map<String, FinancialResultDto> map = new HashMap<>();
 		map.put("financial", financialService.getFinancials(symbol, blankToNull(year), blankToNull(report)));
+		return map;
+	}
+
+	//최근 공시: /api/companies/005930/disclosures → {"disclosures":[...]}
+	@GetMapping("/{symbol}/disclosures")
+	public Map<String, List<DisclosureDto>> getDisclosures(
+			@PathVariable @Pattern(regexp = SYMBOL_REGEX, message = SYMBOL_MESSAGE) String symbol) {
+		Map<String, List<DisclosureDto>> map = new HashMap<>();
+		map.put("disclosures", financialService.getDisclosures(symbol));
 		return map;
 	}
 

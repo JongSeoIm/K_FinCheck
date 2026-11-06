@@ -25,13 +25,12 @@ const STATUS_LABEL = {
 }
 
 function suggestionsFor(name) {
-  return [`${name} 현재가 알려줘`, `${name} 최근 실적 알려줘`, `${name} 관련 뉴스 알려줘`, '부채비율이 뭐야?']
+  return [`${name} 현재가 알려줘`, `${name} 최근 실적 알려줘`, `${name} 최근 공시 알려줘`, '부채비율이 뭐야?']
 }
 
-// 기사 링크는 카드에 있으므로 뉴스 카드가 있는 답변의 출처 목록에서는 뺀다
+// 공시 링크는 카드에 있으므로 출처 목록에서는 뺀다
 function visibleSources(message) {
-  const hasNews = message.visuals?.some((item) => item.type === 'news')
-  return (message.sources || []).filter((source) => !hasNews || source.provider !== 'NAVER API HUB')
+  return (message.sources || []).filter((source) => source.provider !== 'OpenDART 공시')
 }
 
 // "2026-11-04T10:31:05+09:00" → "11월 4일 10:31", 날짜가 아니면 그대로 ("2026 사업연도")
@@ -396,7 +395,7 @@ export default function StockChatDrawer({ stock }) {
                 <div className='stock-chat-empty'>
                   <div className='stock-chat-empty-copy'>
                     <h3>종목을 보면서,<br />궁금한 건 바로 질문하세요.</h3>
-                    <p>현재가·실적·관련 뉴스는 실제 조회한 자료로,<br />금융 용어는 쉬운 말로 설명해 드려요.</p>
+                    <p>현재가·실적·공시는 실제 조회한 자료로,<br />금융 용어는 쉬운 말로 설명해 드려요.</p>
                   </div>
                   <div className='stock-chat-suggestions'>
                     {suggestionsFor(context.name).map((question) => (

@@ -8,10 +8,29 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hk.stock.dtos.DisclosureDto;
 
 class DartParsersTests {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
+
+	@Test
+	void 공시_목록은_지분_보고를_빼고_최신순_limit_개만_남긴다() throws Exception {
+		List<DisclosureDto> list = DartParsers.disclosures(objectMapper.readTree("""
+				{"status":"000","list":[
+				 {"rcept_no":"20261106000001","report_nm":"임원ㆍ주요주주특정증권등소유상황보고서","rcept_dt":"20261106","flr_nm":"홍길동"},
+				 {"rcept_no":"20261105000001","report_nm":"주식등의대량보유상황보고서(일반)","rcept_dt":"20261105","flr_nm":"국민연금공단"},
+				 {"rcept_no":"bad","report_nm":"번호 오류","rcept_dt":"20261105","flr_nm":"삼성전자"},
+				 {"rcept_no":"20261104000001","report_nm":"주요사항보고서(자기주식취득결정)","rcept_dt":"20261104","flr_nm":"삼성전자"},
+				 {"rcept_no":"20261103000001","report_nm":"분기보고서 (2026.09)","rcept_dt":"20261103","flr_nm":"삼성전자"}
+				]}
+				"""), 1);
+
+		assertThat(list).hasSize(1);
+		assertThat(list.get(0).getReportName()).isEqualTo("주요사항보고서(자기주식취득결정)");
+		assertThat(list.get(0).getFiledAt()).isEqualTo("2026-11-04");
+		assertThat(list.get(0).getUrl()).isEqualTo("https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261104000001");
+	}
 
 	//OpenDART fnlttSinglAcnt 응답 형식 (값은 예시)
 	private static final String SAMPLE = """

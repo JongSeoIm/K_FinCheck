@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.hk.stock.dtos.DisclosureDto;
 
 //OpenDART 단일회사 주요계정(fnlttSinglAcnt) 응답 → 행 목록 (테스트하기 쉽도록 HTTP 호출과 분리)
 public final class DartParsers {
@@ -25,6 +26,26 @@ public final class DartParsers {
 	public static String message(JsonNode body) {
 		String message = body.path("message").asText("");
 		return message.isEmpty() ? body.path("result").path("message").asText("") : message;
+	}
+
+	//공시 목록(list.json) → 최신순 limit 개. 임원·주주의 지분 변동 보고는 빼고 기업 공시만 남긴다
+	public static List<DisclosureDto> disclosures(JsonNode body, int limit) {
+		List<DisclosureDto> list = new ArrayList<>();
+		for (JsonNode item : body.path("list")) {
+			String rceptNo = item.path("rcept_no").asText("");
+			String name = item.path("report_nm").asText("").replaceAll("\\s+", " ").strip();
+			if (!rceptNo.matches("\\d{14}") || name.isEmpty() || isShareholdingReport(name)) continue;
+			String date = item.path("rcept_dt").asText("");
+			list.add(new DisclosureDto(rceptNo, name,
+					date.length() == 8 ? date.substring(0, 4) + "-" + date.substring(4, 6) + "-" + date.substring(6) : date,
+					item.path("flr_nm").asText(""), "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" + rceptNo));
+			if (list.size() == limit) break;
+		}
+		return list;
+	}
+
+	private static boolean isShareholdingReport(String name) {
+		return name.contains("특정증권등소유상황보고서") || name.contains("주식등의대량보유상황보고서");
 	}
 
 	public static List<Row> rows(JsonNode body) {

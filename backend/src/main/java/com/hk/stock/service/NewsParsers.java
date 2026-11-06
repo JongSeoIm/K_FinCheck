@@ -4,13 +4,11 @@ import java.net.URI;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.hk.stock.dtos.NewsDto;
@@ -19,7 +17,7 @@ import com.hk.stock.dtos.NewsDto;
  * 네이버 뉴스 검색 응답 → NewsDto 변환 (실습 lib/news.js 의 normalizeNewsItems 와 같은 규칙)
  * - 제목·요약의 HTML 태그(<b> 등)와 &quot; 같은 문자 엔티티를 지우고 길이를 제한한다.
  * - http/https 주소만 사용하고, 같은 주소·같은 제목은 한 번만 남긴다.
- * - 종목 기사와 기타 기사(이름만 언급·의견 글·정치 기사)로 나누고, 각각 최신순 limit 개만 돌려준다.
+ * - 분류하거나 다시 정렬하지 않고 받은 순서대로 돌려준다.
  */
 public final class NewsParsers {
 
@@ -49,36 +47,13 @@ public final class NewsParsers {
 			Map.entry("businesspost.co.kr", "비즈니스포스트"), Map.entry("bizwatch.co.kr", "비즈니스워치"), Map.entry("ebn.co.kr", "EBN"),
 			Map.entry("naver.com", "네이버뉴스"));
 
-	//제목에 있으면 "기타"로 보내는 패턴: 기고·칼럼·사설·상담 같은 의견 글, 정치 기사
-	private static final Pattern EXCLUDED_HEADLINE = Pattern.compile(
-			"기고|칼럼|사설|오피니언|시론|기자수첩|상담실|"
-			+ "野|與|여당|야당|국민의힘|국힘|민주당|시정연설|지도부|국정감사|국감|의원");
-
-	//계열사 이름은 종목명으로 보지 않는다 ("삼성전자서비스, 에어컨 AS 1위")
-	private static final Pattern SUBSIDIARY_NAME = Pattern.compile("삼성전자(서비스|판매|로지텍)");
-
-	//환율 이야기 문장의 '강세·하락'은 종목의 주가가 아니다
-	private static final Pattern CURRENCY_SENTENCE = Pattern.compile("환율|원화|달러");
-
-	//요약의 종목 문장이 그 기업의 실적·계약 이야기인지 판단하는 단어
-	//'상승·하락'처럼 시황 기사가 여러 종목을 나열할 때 쓰는 등락 단어는 넣지 않는다
-	private static final List<String> COMPANY_WORDS = List.of(
-			"목표가", "목표주가", "투자의견", "영업이익", "매출", "순이익", "공급계약", "수주",
-			"적자", "흑자", "점유율", "출하량", "판매량");
-
 	private NewsParsers() {
 	}
 
-	/**
-	 * 기사를 "종목 기사"(related=true)와 "기타"(related=false)로 나눠 각각 최신순 limit 개까지 돌려준다.
-	 * @param keywords 종목명·줄임말·종목코드 (예: 삼성전자, 삼전, 005930)
-	 */
-	public static List<NewsDto> items(JsonNode body, List<String> keywords, int limit) {
-		List<NewsDto> related = new ArrayList<>();
-		List<NewsDto> others = new ArrayList<>();
+	public static List<NewsDto> items(JsonNode body) {
+		List<NewsDto> news = new ArrayList<>();
 		Set<String> seenUrls = new HashSet<>();
 		Set<String> seenHeadlines = new HashSet<>();
-
 		for (JsonNode item : body.path("items")) {
 			String headline = plainText(item.path("title").asText(""), 240);
 			String original = safeHttpUrl(item.path("originallink").asText(""));
@@ -86,50 +61,10 @@ public final class NewsParsers {
 			if (headline.isEmpty() || url.isEmpty()) continue;
 			//같은 주소 또는 같은 제목이면 중복 기사로 판단
 			if (!seenUrls.add(url) || !seenHeadlines.add(headline)) continue;
-
-			String summary = plainText(item.path("description").asText(""), 600);
-			boolean isRelated = isRelated(headline, summary, keywords);
-			NewsDto news = new NewsDto(url, headline, summary, source(url),
-					epochSeconds(item.path("pubDate").asText("")), url, isRelated);
-			(isRelated ? related : others).add(news);
+			news.add(new NewsDto(url, headline, plainText(item.path("description").asText(""), 600), source(url),
+					epochSeconds(item.path("pubDate").asText("")), url));
 		}
-
-		List<NewsDto> result = new ArrayList<>(latest(related, limit));
-		result.addAll(latest(others, limit));
-		result.sort(Comparator.comparingLong(NewsDto::getDatetime).reversed());
-		return result;
-	}
-
-	/**
-	 * 종목 기사 판단
-	 * 1. 제목이 의견 글·정치 기사 패턴이면 → 기타
-	 * 2. 제목에 종목명·줄임말이 있으면 → 종목 기사
-	 * 3. 요약에서 종목명이 나오는 문장에 실적·계약 단어가 있으면 → 종목 기사
-	 * 4. 그 외 (이름만 스친 기사, 요약에 등락만 나오는 시황 기사) → 기타
-	 */
-	static boolean isRelated(String headline, String summary, List<String> keywords) {
-		if (EXCLUDED_HEADLINE.matcher(headline).find()) return false;
-		if (containsAny(SUBSIDIARY_NAME.matcher(headline).replaceAll(""), keywords)) return true;
-		//네이버 요약은 검색어 주변 문장을 잘라 준 것이라, 종목명이 있는 문장만 본다
-		String body = SUBSIDIARY_NAME.matcher(summary).replaceAll("");
-		for (String sentence : body.split("(?<=[.!?…])\\s+|(?<=다\\.)")) {
-			if (CURRENCY_SENTENCE.matcher(sentence).find()) continue;
-			if (containsAny(sentence, keywords) && containsAny(sentence, COMPANY_WORDS)) return true;
-		}
-		return false;
-	}
-
-	private static boolean containsAny(String text, List<String> words) {
-		String lower = text.toLowerCase(Locale.ROOT);
-		for (String word : words) {
-			if (lower.contains(word.toLowerCase(Locale.ROOT))) return true;
-		}
-		return false;
-	}
-
-	private static List<NewsDto> latest(List<NewsDto> list, int limit) {
-		list.sort(Comparator.comparingLong(NewsDto::getDatetime).reversed());
-		return list.size() > limit ? list.subList(0, limit) : list;
+		return news;
 	}
 
 	static String plainText(String value, int maxLength) {

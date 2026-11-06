@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 import llm
 from classifier import (COMPANY, COMPARE, CONCEPT, DATA, FINANCIAL, FINANCIAL_TOOL, INFO_TOOL, KST, MOVEMENT, NEED_MORE_INFO,
-                        NEWS, NEWS_TOOL, OUT_OF_SCOPE, OUT_OF_SCOPE_MESSAGE, OUTLOOK, QUOTE, QUOTE_TOOL, TERM, Company, Plan,
+                        NEWS, DISCLOSURE_TOOL, OUT_OF_SCOPE, OUT_OF_SCOPE_MESSAGE, OUTLOOK, QUOTE, QUOTE_TOOL, TERM, Company, Plan,
                         ToolCall, _unsupported_plan)
 
 log = logging.getLogger("ai-server")
@@ -33,7 +33,7 @@ question_type
 - term: 금융 용어·개념·투자 일반 설명
 - quote: 현재가·등락·거래량
 - financial: 매출·이익·재무 상태 등 기업 실적 ("돈 잘 벌어?", "장사 잘 돼?" 포함)
-- news: 관련 기사·소식
+- news: 관련 기사·소식·공시
 - movement: 주가가 오르거나 내린 이유
 - outlook: 전망, 매수·매도 여부, 투자해도 되는지
 - company: 어떤 회사인지, 시장 구분, 종목 코드
@@ -107,9 +107,9 @@ def to_plan(result: Interpretation, fallback: Plan, current: Company, companies:
     tools = {
         "quote": (QUOTE, [QUOTE_TOOL]),
         "financial": (FINANCIAL, [FINANCIAL_TOOL]),
-        "news": (NEWS, [NEWS_TOOL]),
-        "movement": (MOVEMENT, [QUOTE_TOOL, NEWS_TOOL]),
-        "outlook": (OUTLOOK, [QUOTE_TOOL, NEWS_TOOL]),
+        "news": (NEWS, [DISCLOSURE_TOOL]),
+        "movement": (MOVEMENT, [QUOTE_TOOL, DISCLOSURE_TOOL]),
+        "outlook": (OUTLOOK, [QUOTE_TOOL, DISCLOSURE_TOOL]),
         "company": (COMPANY, [INFO_TOOL]),
     }
     question_type, names = tools[kind]
@@ -125,7 +125,7 @@ def _compare_plan(result: Interpretation, named: list[Company], companies: list[
         names = "와 ".join(c.name for c in named)
         return Plan(kind=NEED_MORE_INFO, question_type=COMPARE,
                     message=f"{names}를 어떤 지표로 비교할까요? 현재가, 매출, 영업이익처럼 보고 싶은 지표를 알려 주세요.")
-    tool = {"quote": QUOTE_TOOL, "financial": FINANCIAL_TOOL, "news": NEWS_TOOL}[result.compare_metric]
+    tool = {"quote": QUOTE_TOOL, "financial": FINANCIAL_TOOL, "news": DISCLOSURE_TOOL}[result.compare_metric]
     return Plan(kind=DATA, question_type=COMPARE, targets=named, calls=_tool_calls([tool], named, result))
 
 
@@ -138,7 +138,7 @@ def _tool_calls(names: list[str], targets: list[Company], result: Interpretation
         for name in names:
             if name == FINANCIAL_TOOL:
                 calls.append(ToolCall(name, company.symbol, year, report))
-            elif name == NEWS_TOOL:
+            elif name == DISCLOSURE_TOOL:
                 calls.append(ToolCall(name, company.symbol, company=company.name))
             else:
                 calls.append(ToolCall(name, company.symbol))

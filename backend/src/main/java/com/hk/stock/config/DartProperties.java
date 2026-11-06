@@ -10,6 +10,7 @@ import lombok.Data;
 public class DartProperties {
 	private String apiKey;
 	private String url = "https://opendart.fss.or.kr/api/fnlttSinglAcnt.json";	//단일회사 주요계정
+	private String listUrl = "https://opendart.fss.or.kr/api/list.json";	//공시 목록
 	//아직 공시되지 않은 보고서(조회 결과 없음)를 다시 묻기 전까지 기다리는 시간(초)
 	private int missCacheSeconds = 21600;
 

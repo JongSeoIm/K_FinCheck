@@ -7,7 +7,7 @@ import pytest
 
 import interpreter
 import llm
-from classifier import (COMPARE, CONCEPT, DATA, FINANCIAL, FINANCIAL_TOOL, INFO_TOOL, KST, NEED_MORE_INFO, NEWS_TOOL, OUT_OF_SCOPE,
+from classifier import (COMPARE, CONCEPT, DATA, FINANCIAL, FINANCIAL_TOOL, INFO_TOOL, KST, NEED_MORE_INFO, DISCLOSURE_TOOL, OUT_OF_SCOPE,
                         OUTLOOK, QUOTE_TOOL, Company, classify)
 from interpreter import Interpretation
 
@@ -73,11 +73,11 @@ def test_other_company_is_not_looked_up(stub):
     assert "쏘카" in plan.message
 
 
-def test_outlook_uses_quote_and_news(stub):
+def test_outlook_uses_quote_and_disclosures(stub):
     stub["result"] = Interpretation(question_type="outlook", symbols=["000660"])
     plan = refine("하이닉스 지금 들어갈 타이밍이야?")
     assert plan.question_type == OUTLOOK
-    assert tools_of(plan) == sorted([(QUOTE_TOOL, "000660"), (NEWS_TOOL, "000660")])
+    assert tools_of(plan) == sorted([(QUOTE_TOOL, "000660"), (DISCLOSURE_TOOL, "000660")])
 
 
 def test_out_of_scope_and_concept(stub):

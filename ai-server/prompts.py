@@ -4,7 +4,7 @@ import json
 import re
 from datetime import datetime
 
-from classifier import (COMPANY, COMPARE, FINANCIAL, FINANCIAL_TOOL, INFO_TOOL, KST, MOVEMENT, NEWS, NEWS_TOOL,
+from classifier import (COMPANY, COMPARE, DISCLOSURE_TOOL, FINANCIAL, FINANCIAL_TOOL, INFO_TOOL, KST, MOVEMENT, NEWS,
                         OUTLOOK, QUOTE, QUOTE_TOOL, TERM, Company, Plan)
 from tools import ToolResult
 
@@ -16,7 +16,7 @@ SYSTEM_PROMPT = """당신은 국내 주식 정보 서비스 'K-FinCheck'의 금�
 - 대학생 또는 주식 초보자가 이해할 수 있는 쉬운 표현을 사용한다.
 - Markdown 기호(#, *, -, **, 표, 코드 블록)를 쓰지 않고 일반 문장으로 답한다. 문단 구분은 빈 줄로만 한다.
 - 개념 질문은 정의, 계산 방식, 짧은 예시 순서로 설명한다.
-- 현재가·실적·기사 질문은 반드시 [조회 자료]에 있는 값만 사용한다.
+- 현재가·실적·공시 질문은 반드시 [조회 자료]에 있는 값만 사용한다.
 - 수치에는 단위와 기준 시점을 함께 쓴다.
 - 조회하지 못한 값은 추측하거나 임의로 만들지 않는다. [조회 실패] 항목이 있으면 그 자료는 지금 확인할 수 없다고 짧게 알린다.
 - 금액과 비율은 이번 [조회 자료]에 적힌 값만 쓴다. 이전 대화나 알고 있는 지식의 수치를 쓰지 않고, 직접 계산한 차이·비율도 쓰지 않는다.
@@ -26,15 +26,15 @@ SYSTEM_PROMPT = """당신은 국내 주식 정보 서비스 'K-FinCheck'의 금�
 
 [추가 규칙]
 - Tool 조회에 실패한 수치는 LLM 지식으로 대신 답하지 않는다.
-- 조회되지 않은 기사나 실적을 만들어내지 않는다.
+- 조회되지 않은 공시나 실적을 만들어내지 않는다.
 - 주가 상승·하락 원인을 단정하지 않는다.
 - 현재가를 말할 때는 체결 시각을 함께 말한다. [조회 자료]에 체결시각이 없고 조회시각만 있으면 "체결 시각은 확인되지 않았고 조회 시각은 ~"처럼 구분해서 말한다.
 - 실적을 말할 때는 사업연도, 보고서 종류, 연결·별도 기준을 함께 말한다.
-- 체결 시각은 현재가를 말할 때만 쓴다. 실적·기사 답변에서는 체결 시각을 언급하지 않는다.
+- 체결 시각은 현재가를 말할 때만 쓴다. 실적·공시 답변에서는 체결 시각을 언급하지 않는다.
 - 영업이익률·부채비율·유동비율·매출 증감률은 [조회 자료]의 재무지표 값을 쓴다. 값 대신 상태가 적혀 있으면 그 상태를 그대로 말하고 0%로 말하지 않는다.
 - 분기·반기 보고서의 손익 수치는 [조회 자료]의 당기기간에 적힌 3개월 값이다. 상반기 전체나 1년 값이라고 말하지 않는다.
-- 뉴스를 말할 때는 기사 제목과 게시 시각을 함께 말한다.
-- 조회한 기사 자료는 제목과 검색 결과 설명뿐이다. 기사 전문을 읽은 것처럼 말하지 않고, 제목과 설명에 없는 내용을 덧붙이지 않는다.
+- 뉴스 기사는 조회하지 않는다. 기사 제목이나 내용을 말하거나 지어내지 않고, 뉴스를 물으면 기사는 화면의 관련 뉴스 패널에서 볼 수 있다고 안내한다.
+- 공시를 말할 때는 공시 이름과 접수일을 함께 말한다. 공시 이름에 없는 세부 내용을 덧붙이지 않는다.
 - 질문이 금융과 무관하면 "주식·금융 질문만 도와드릴 수 있어요"라고 한 문장으로 안내한다.
 - 조회 대상이 아닌 다른 기업을 물으면 지원 종목만 조회할 수 있다고 안내한다.
 """
@@ -44,8 +44,8 @@ LENGTH_GUIDE = {
     TERM: "금융 용어 설명: 2~4문장. 정의, 계산 방식, 간단한 예시 순서.",
     QUOTE: "현재가·등락 질문: 2~5문장. 현재가, 전일 대비, 등락률과 체결 시각을 표시.",
     FINANCIAL: "기업 실적 질문: 3~6문장. 매출액·영업이익·당기순이익 수치, 전년 대비 변화, 사업연도·보고서 종류·연결/별도 기준을 표시.",
-    NEWS: "관련 기사 질문: 3~6문장. 기사 제목과 요약을 바탕으로 핵심 내용을 정리하고 게시 시각을 표시.",
-    MOVEMENT: "주가 변동 원인: 4~8문장. 실제 등락을 먼저 말하고, 확인된 뉴스·실적만으로 설명한다. 사실과 해석을 구분한다. "
+    NEWS: "뉴스·공시 질문: 2~5문장. 뉴스를 물었으면 기사는 화면의 관련 뉴스 패널에서 볼 수 있다고 먼저 안내하고, 조회한 최근 공시의 이름과 접수일을 알려준다.",
+    MOVEMENT: "주가 변동 원인: 4~8문장. 실제 등락을 먼저 말하고, 조회한 공시·실적만으로 설명한다. 사실과 해석을 구분하고, 자료로 원인을 확인할 수 없으면 그렇다고 말한다. 뉴스는 화면의 패널에서 볼 수 있다고 안내한다. "
               "조회한 등락은 전일 대비 값이므로 더 긴 기간을 물으면 그 기간의 등락은 확인할 수 없다고 밝힌다.",
     OUTLOOK: "전망·매수 여부: 단정하지 않는다. 확인된 자료를 정리하고 판단할 때 주의할 점을 설명한다. 매수·매도를 권하지 않는다.",
     COMPANY: "기업 정보 질문: 2~4문장. 기업명, 종목 코드, 시장 구분을 알려준다.",
@@ -55,13 +55,15 @@ NO_DATA_GUIDE = "자료가 없는 질문: 1~3문장. 부족한 자료와 확인 
 
 OUT_OF_SCOPE_STATUS = "out_of_scope"
 UNAVAILABLE_MESSAGE = "지금은 필요한 자료를 확인할 수 없어요. 잠시 후 다시 질문해 주세요."
-NO_DATA_GUIDE_MESSAGE = "최근 실적, 현재가, 관련 뉴스를 물어봐 주세요."
+NO_DATA_GUIDE_MESSAGE = "최근 실적, 현재가, 공시를 물어봐 주세요. 뉴스는 화면의 관련 뉴스 패널에서 볼 수 있어요."
 UNVERIFIED_MESSAGE = "조회 자료로 확인되지 않는 수치가 답변에 섞여 있어 표시하지 않았어요. 질문을 조금 바꿔서 다시 물어봐 주세요."
+
+DISCLOSURE_PROVIDER = "OpenDART 공시"
 
 TOOL_LABEL = {
     QUOTE_TOOL: "현재가",
     FINANCIAL_TOOL: "실적",
-    NEWS_TOOL: "관련 뉴스",
+    DISCLOSURE_TOOL: "공시",
     INFO_TOOL: "기업 정보",
 }
 
@@ -88,12 +90,6 @@ def change_rate(current: int | None, previous: int | None) -> float | None:
     if current is None or previous in (None, 0):
         return None
     return round((current - previous) / abs(previous) * 100, 1)
-
-
-def _iso_from_unix(seconds: int | float | None) -> str | None:
-    if not seconds:
-        return None
-    return datetime.fromtimestamp(seconds, KST).isoformat(timespec="minutes")
 
 
 def _name(symbol: str, companies: list[Company]) -> str:
@@ -168,15 +164,10 @@ def _evidence(result: ToolResult, name: str, hide_previous: bool = False) -> dic
             "항목": items,
             "재무지표": [_metric(m) for m in data.get("metrics") or []],
         }
-    if result.name == NEWS_TOOL:
+    if result.name == DISCLOSURE_TOOL:
         return {
-            "종류": "관련 뉴스", "기업": name, "제공처": "NAVER API HUB",
-            "기사": [{
-                "제목": n.get("headline"),
-                "요약": (n.get("summary") or "")[:200],
-                "언론사": n.get("source"),
-                "게시시각": _iso_from_unix(n.get("datetime")),
-            } for n in data],
+            "종류": "최근 공시", "기업": name, "제공처": "OpenDART",
+            "공시": [{"공시이름": d.get("reportName"), "접수일": d.get("filedAt"), "제출인": d.get("submitter")} for d in data],
         }
     if result.name == INFO_TOOL:
         return {"종류": "기업 정보", "기업명": data.get("name"), "종목코드": data.get("symbol"), "시장": data.get("market")}
@@ -250,14 +241,14 @@ def build_sources(results: list[ToolResult], companies: list[Company]) -> list[d
                 "basisAt": f"{d.get('bsnsYear')} 사업연도",
                 "url": d.get("url"),
             })
-        elif r.name == NEWS_TOOL:
-            # LLM 에 넘긴 기사는 모두 출처에 표시한다 (게시 시각·원문 링크)
-            for n in r.data:
+        elif r.name == DISCLOSURE_TOOL:
+            # LLM 에 넘긴 공시는 모두 출처에 표시한다 (접수일·원문 링크)
+            for d in r.data:
                 sources.append({
-                    "provider": "NAVER API HUB",
-                    "label": n.get("headline"),
-                    "basisAt": _iso_from_unix(n.get("datetime")),
-                    "url": n.get("url"),
+                    "provider": DISCLOSURE_PROVIDER,
+                    "label": f"{name} {d.get('reportName')}",
+                    "basisAt": d.get("filedAt"),
+                    "url": d.get("url"),
                 })
         # get_company_info 는 우리 DB 기본 정보라 외부 출처를 표시하지 않는다
     return sources
@@ -308,11 +299,10 @@ def build_visuals(results: list[ToolResult], companies: list[Company]) -> list[d
                 "year": d.get("bsnsYear"), "report": d.get("reportName"), "fs": d.get("fsName"), "url": d.get("url"),
                 "period": current_period, "previousPeriod": previous_period, "rows": rows,
             })
-        elif r.name == NEWS_TOOL:
+        elif r.name == DISCLOSURE_TOOL:
             visuals.append({
-                "type": "news", "name": name, "symbol": r.symbol, "source": "NAVER API HUB",
-                "items": [{"title": n.get("headline"), "press": n.get("source"), "publishedAt": _iso_from_unix(n.get("datetime")),
-                           "url": n.get("url")} for n in d],
+                "type": "disclosure", "name": name, "symbol": r.symbol, "source": "OpenDART",
+                "items": [{"title": n.get("reportName"), "filedAt": n.get("filedAt"), "url": n.get("url")} for n in d],
             })
         elif r.name == INFO_TOOL:
             visuals.append({"type": "company", "name": d.get("name"), "symbol": d.get("symbol"), "market": d.get("market")})

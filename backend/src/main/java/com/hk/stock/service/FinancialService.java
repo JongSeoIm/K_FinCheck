@@ -18,6 +18,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.hk.stock.config.DartProperties;
 import com.hk.stock.dtos.AnnualEarningsDto;
 import com.hk.stock.dtos.CompanyDto;
+import com.hk.stock.dtos.DisclosureDto;
 import com.hk.stock.dtos.FinancialReportDto;
 import com.hk.stock.dtos.FinancialResultDto;
 import com.hk.stock.dtos.FinancialValueDto;
@@ -44,6 +45,8 @@ public class FinancialService {
 	private static final List<String> NEWEST_FIRST = List.of("11011", "11014", "11012", "11013");
 	//OpenDART 재무 정보는 2015년 사업연도부터 제공된다
 	private static final int FIRST_DART_YEAR = 2015;
+	private static final int DISCLOSURE_DAYS = 90;
+	private static final int DISCLOSURE_LIMIT = 5;
 
 	private final FinancialMapper mapper;
 	private final DartClient dartClient;
@@ -63,6 +66,15 @@ public class FinancialService {
 		CompanyDto company = mapper.getCompany(symbol);
 		if (company == null) throw new StockNotFoundException(symbol);
 		return company;
+	}
+
+	//최근 공시 목록 (AI 답변 근거). 저장하지 않고 조회할 때마다 OpenDART 에서 받는다
+	public List<DisclosureDto> getDisclosures(String symbol) {
+		CompanyDto company = getCompany(symbol);
+		if (company.getDartCorpCode() == null || company.getDartCorpCode().isBlank()) {
+			throw new FinancialNotFoundException(company.getName() + "의 DART 기업 고유번호가 등록되지 않았습니다.");
+		}
+		return dartClient.fetchDisclosures(company.getDartCorpCode(), LocalDate.now(MarketHours.KST), DISCLOSURE_DAYS, DISCLOSURE_LIMIT);
 	}
 
 	//기업 정보 화면: 가장 최근 사업보고서의 실적·전년 대비·재무 지표

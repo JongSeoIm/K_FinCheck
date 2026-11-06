@@ -410,18 +410,7 @@ a:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 .news-toolbar > span { color: var(--text-sub); font-size: 10px; white-space: nowrap; }
-.news-categories { display: flex; flex-wrap: wrap; align-items: center; }
-.news-categories button {
-  padding: 2px 3px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font-size: 11px;
-}
-.news-categories button:hover { text-decoration: underline; }
-.news-categories button.active { color: var(--focus); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-.news-categories button:focus-visible { outline: 0; box-shadow: 0 2px 0 var(--focus); }
-.news-separator { padding: 0 4px; color: #999; }
+.news-provider { color: var(--text-sub); font-size: 10px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .news-scroll {
   max-height: 590px;
   overflow-y: auto;
@@ -442,7 +431,6 @@ a:focus-visible {
 .news-copy a:hover { text-decoration: underline; }
 .news-copy p { margin: 4px 0; color: var(--text-sub); font-size: 11px; }
 .news-link-label { color: var(--focus); font-size: 10px; }
-.news-list > li.news-note { display: block; padding: 10px 0; color: var(--text-faint); font-size: 11px; }
 .empty-copy { margin: 0; padding: 12px; color: var(--text-sub); }
 .news-error { padding: 14px; }
 .news-error strong { color: var(--bad); font-size: 13px; }
