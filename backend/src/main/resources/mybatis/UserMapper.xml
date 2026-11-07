@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.hk.stock.mapper.UserMapper">
+
+	<!-- 가입 후 생성된 회원 번호를 userId 에 채운다 -->
+	<insert id="insertUser" parameterType="userDto" useGeneratedKeys="true" keyProperty="userId" keyColumn="user_id">
+		INSERT INTO app_user (login_id, password_hash, nickname)
+		VALUES (#{loginId}, #{passwordHash}, #{nickname})
+	</insert>
+
+	<select id="getUserByLoginId" parameterType="String" resultType="userDto">
+		SELECT user_id, login_id, password_hash, nickname, created_at
+		FROM app_user
+		WHERE login_id = #{loginId}
+	</select>
+
+	<select id="getUserById" parameterType="Long" resultType="userDto">
+		SELECT user_id, login_id, password_hash, nickname, created_at
+		FROM app_user
+		WHERE user_id = #{userId}
+	</select>
+
+</mapper>

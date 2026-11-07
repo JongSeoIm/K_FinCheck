@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.hk.stock.mapper.FinancialMapper">
+
+	<select id="getCompany" parameterType="String" resultType="companyDto">
+		SELECT stock_code AS symbol, company_name AS name, market_type AS market, dart_corp_code
+		FROM company
+		WHERE stock_code = #{symbol}
+	</select>
+
+	<!-- 같은 공시(접수번호 + 연결/별도)는 한 번만 저장한다 (UNIQUE uk_financial_report) -->
+	<insert id="insertReport" parameterType="financialReportDto">
+		INSERT IGNORE INTO financial_report (receipt_no, stock_code, business_year, report_code, fs_div)
+		VALUES (#{receiptNo}, #{stockCode}, #{businessYear}, #{reportCode}, #{fsDiv})
+	</insert>
+
+	<select id="getReport" resultType="financialReportDto">
+		SELECT report_id, stock_code, receipt_no, business_year, report_code, fs_div, collected_at
+		FROM financial_report
+		WHERE receipt_no = #{receiptNo}
+		  AND fs_div = #{fsDiv}
+	</select>
+
+	<!-- 정정 공시가 있으면 접수번호가 큰(나중) 공시가 먼저 -->
+	<select id="findReports" resultType="financialReportDto">
+		SELECT report_id, stock_code, receipt_no, business_year, report_code, fs_div, collected_at
+		FROM financial_report
+		WHERE stock_code = #{stockCode}
+		  AND business_year = #{businessYear}
+		  AND report_code = #{reportCode}
+		ORDER BY receipt_no DESC
+	</select>
+
+	<!-- 같은 공시의 같은 계정은 한 줄만 (UNIQUE uk_financial_value). 다시 수집하면 값을 갱신한다 -->
+	<insert id="insertValue" parameterType="financialValueDto">
+		INSERT INTO financial_value (report_id, account_code, account_name, source_account_id, source_account_name, current_amount, previous_amount, currency, value_status)
+		VALUES (#{reportId}, #{accountCode}, #{accountName}, #{sourceAccountId}, #{sourceAccountName}, #{currentAmount}, #{previousAmount}, #{currency}, #{valueStatus})
+		ON DUPLICATE KEY UPDATE
+			account_name = VALUES(account_name), source_account_id = VALUES(source_account_id), source_account_name = VALUES(source_account_name), current_amount = VALUES(current_amount), previous_amount = VALUES(previous_amount),
+			currency = VALUES(currency), value_status = VALUES(value_status)
+	</insert>
+
+	<update id="touchReport" parameterType="Long">
+		UPDATE financial_report SET collected_at = CURRENT_TIMESTAMP WHERE report_id = #{reportId}
+	</update>
+
+	<select id="getValues" parameterType="Long" resultType="financialValueDto">
+		SELECT value_id, report_id, account_code, account_name, source_account_id, source_account_name, current_amount, previous_amount, currency, value_status
+		FROM financial_value
+		WHERE report_id = #{reportId}
+	</select>
+
+</mapper>
