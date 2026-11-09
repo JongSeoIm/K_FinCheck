@@ -181,6 +181,10 @@ a:focus-visible {
 .topbar-navigation { display: flex; align-items: center; gap: 28px; min-width: 0; }
 .topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 24px; margin-left: auto; min-width: 0; }
 .topbar-actions .global-search { width: min(350px, 42vw); }
+@media (min-width: 1001px) {
+  .topbar-actions { width: max(300px, calc((100% - 12px) / 4)); flex-shrink: 0; }
+  .topbar-actions .global-search { width: auto; flex: 1; min-width: 0; }
+}
 .recent-stock-link { font-size: 14px; font-weight: 400; color: var(--muted); }
 .recent-stock-link.active { color: var(--text); font-weight: 600; }
 .recent-stock-link.unavailable { color: #999; cursor: default; }
@@ -326,8 +330,8 @@ a:focus-visible {
   justify-content: space-between;
   gap: 12px;
 }
-.stream-mode, .range-tabs { display: flex; align-items: center; gap: 9px; }
-.stream-mode button, .range-tabs button {
+.range-tabs { display: flex; align-items: center; gap: 9px; }
+.range-tabs button {
   padding: 3px 0;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -336,13 +340,12 @@ a:focus-visible {
   cursor: pointer;
   font-size: 12px;
 }
-.stream-mode button:hover, .range-tabs button:hover { color: #1769aa; }
-.stream-mode button.active, .range-tabs button.active {
+.range-tabs button:hover { color: #1769aa; }
+.range-tabs button.active {
   border-bottom-color: #1769aa;
   color: #1769aa;
   font-weight: 700;
 }
-.tab-separator { color: #888; font-size: 12px; line-height: 1; }
 .stream-status {
   display: flex;
   gap: 16px;

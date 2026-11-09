@@ -33,7 +33,7 @@ class RealtimePipelineTest {
     @Autowired ObjectMapper mapper;
     @Autowired KafkaListenerEndpointRegistry registry;
 
-    @Test void parsedTradeTravelsThroughRealKafkaAndReachesPushAndPolling() throws Exception {
+    @Test void parsedTradeTravelsThroughRealKafkaAndReachesPushAndInternalSnapshot() throws Exception {
         await().atMost(Duration.ofSeconds(20)).until(() -> registry.getListenerContainers().stream()
                 .anyMatch(c -> c.getAssignedPartitions() != null && !c.getAssignedPartitions().isEmpty()));
         BlockingQueue<String> messages = new LinkedBlockingQueue<>();

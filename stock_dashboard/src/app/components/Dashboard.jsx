@@ -28,9 +28,8 @@ export default function Dashboard({ initialStock }) {
   const selectedStock = marketStocks.find(stock => stock.symbol === params.get('symbol')) || initialStock || marketStocks[0]
   const recentSymbol = useRecentStock(isDetail ? selectedStock.symbol : null)
   const recentStock = marketStocks.find(stock => stock.symbol === recentSymbol)
-  const [streamMode, setStreamMode] = useState('push')
   const [intervalSeconds, setIntervalSeconds] = useState(60)
-  const stream = useRealtimeQuotes(intervalSeconds, streamMode)
+  const stream = useRealtimeQuotes(intervalSeconds)
 
   const handleSelectStock = (stock) => {
     const normalizedStock = {
@@ -74,11 +73,6 @@ export default function Dashboard({ initialStock }) {
           <section className='panel chart-panel'>
             <div className='panel-heading'>
               <h2>주가 차트</h2>
-              <div className='stream-mode' aria-label='시세 전달 방식'>
-                <button type='button' className={streamMode === 'push' ? 'active' : ''} onClick={() => setStreamMode('push')}>Push</button>
-                <span className='tab-separator' aria-hidden='true'>·</span>
-                <button type='button' className={streamMode === 'poll' ? 'active' : ''} onClick={() => setStreamMode('poll')}>Polling</button>
-              </div>
             </div>
             <StockChart
               symbol={selectedStock.symbol}

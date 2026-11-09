@@ -30,13 +30,5 @@ services:
       interval: 10s
       timeout: 10s
       retries: 6
-
-  redis:
-    image: redis:7.4-alpine
-    profiles: ["cache"]
-    ports:
-      - "127.0.0.1:6379:6379"
-    command: ["redis-server", "--save", "", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
-
 volumes:
   kafka_data:

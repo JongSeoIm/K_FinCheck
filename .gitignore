@@ -56,3 +56,10 @@ application-local.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Local work artifacts
+.tmp/
+tmp/
+outputs/
+scratch/
+HANDOFF.md

@@ -4,9 +4,6 @@ stream:
   symbols: ["005930", "000660"]
   topic: stock-quotes-v1
   group-id: k-fincheck-quotes
-  cache:
-    enabled: ${STREAM_CACHE_ENABLED:false}
-    namespace: ${STREAM_CACHE_NAMESPACE:kfincheck-local}
   outbox:
     enabled: ${STREAM_OUTBOX_ENABLED:true}
     directory: ${STREAM_OUTBOX_DIRECTORY:.realtime-spool}
@@ -19,12 +16,6 @@ stream:
     source: KIS_WEBSOCKET_KRX
 
 spring:
-  data:
-    redis:
-      host: ${REDIS_HOST:127.0.0.1}
-      port: ${REDIS_PORT:6379}
-      connect-timeout: 150ms
-      timeout: 150ms
   task:
     scheduling:
       pool:

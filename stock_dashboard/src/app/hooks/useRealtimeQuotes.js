@@ -6,7 +6,7 @@ import useStockStore from '../store/useStockStore'
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
 const empty = { quotes: {}, candles: {}, supportedSymbols: [], relay: 'DISABLED', kafka: 'WAITING' }
 
-export default function useRealtimeQuotes(intervalSeconds = 1, mode = 'push') {
+export default function useRealtimeQuotes(intervalSeconds = 1) {
   const [snapshot, setSnapshot] = useState(empty)
   const [connection, setConnection] = useState('연결 준비')
 
@@ -17,8 +17,6 @@ export default function useRealtimeQuotes(intervalSeconds = 1, mode = 'push') {
     let watchdog
     let attempt = 0
     let lastMessage = Date.now()
-    const controller = new AbortController()
-    const url = `${BACKEND_URL}/api/realtime/snapshot?interval=${intervalSeconds}`
 
     function apply(data) {
       if (disposed || data.type !== 'snapshot' || data.intervalSeconds !== intervalSeconds) return
@@ -27,23 +25,6 @@ export default function useRealtimeQuotes(intervalSeconds = 1, mode = 'push') {
         if (Number.isFinite(quote.price) && useStockStore.getState().prices[symbol] !== quote.price) {
           useStockStore.getState().setPrice(symbol, quote.price)
         }
-      }
-    }
-
-    async function fetchSnapshot() {
-      const response = await fetch(url, { signal: controller.signal, cache: 'no-store' })
-      if (!response.ok) throw new Error('실시간 서버 연결 필요')
-      apply(await response.json())
-    }
-
-    async function poll() {
-      try {
-        await fetchSnapshot()
-        if (!disposed) setConnection('Polling')
-      } catch (error) {
-        if (!disposed && error.name !== 'AbortError') setConnection('실시간 서버 연결 필요')
-      } finally {
-        if (!disposed) timer = setTimeout(poll, 2000)
       }
     }
 
@@ -76,23 +57,19 @@ export default function useRealtimeQuotes(intervalSeconds = 1, mode = 'push') {
 
     timer = setTimeout(() => {
       setSnapshot(empty)
-      if (mode === 'poll') poll()
-      else {
-        connect()
-        watchdog = setInterval(() => {
-          if (socket?.readyState === WebSocket.OPEN && Date.now() - lastMessage > 10000) socket.close()
-        }, 5000)
-      }
+      connect()
+      watchdog = setInterval(() => {
+        if (socket?.readyState === WebSocket.OPEN && Date.now() - lastMessage > 10000) socket.close()
+      }, 5000)
     }, 0)
 
     return () => {
       disposed = true
-      controller.abort()
       clearTimeout(timer)
       clearInterval(watchdog)
       if (socket) { socket.onclose = null; socket.close() }
     }
-  }, [intervalSeconds, mode])
+  }, [intervalSeconds])
 
   const relayLabels = {
     DISABLED: '실시간 미시작', CONFIG_REQUIRED: 'KIS 설정 필요', CONNECTING: 'KIS 연결 중',
