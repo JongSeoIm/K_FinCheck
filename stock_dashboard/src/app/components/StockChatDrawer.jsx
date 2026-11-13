@@ -36,7 +36,7 @@ export default function StockChatDrawer({ stock }) {
   const storageKey = `kfc-chat-room-${conversationKey}`
   const suggestions = ['현재가와 등락률 알려줘',
     ...(['005930', '000660'].includes(context.symbol) ? ['최근 연간 실적 알려줘'] : []),
-    ...(['005930', '000660', '035420', '035720', '005380', '000270', '051910', '006400'].includes(context.symbol) ? ['관련 뉴스 요약해줘'] : []),
+    ...(['005930', '000660', '035420', '035720', '005380', '000270', '051910', '006400'].includes(context.symbol) ? ['관련 산업 정책 알려줘'] : []),
   ]
 
   useEffect(() => () => clearTimeout(closeTimer.current), [])
@@ -269,8 +269,8 @@ export default function StockChatDrawer({ stock }) {
                     {message.sources?.length > 0 && <ul className='stock-chat-sources' aria-label='답변 출처'>
                       {message.sources.map((source, sourceIndex) => <li key={`${source.provider}-${sourceIndex}`}>
                         {source.url
-                          ? <a href={source.url} target='_blank' rel='noreferrer'>{source.provider} · {source.label}</a>
-                          : <span>{source.provider} · {source.label}</span>}
+                          ? <a href={source.url} target='_blank' rel='noreferrer'>{source.provider === 'KOREA_KR' ? '정책브리핑' : source.provider} · {source.label}</a>
+                          : <span>{source.provider === 'KOREA_KR' ? '정책브리핑' : source.provider} · {source.label}</span>}
                         {source.basisAt && <small>{formatChatTime(source.basisAt)}</small>}
                       </li>)}
                     </ul>}

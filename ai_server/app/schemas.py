@@ -32,14 +32,14 @@ class ChatRequest(BaseModel):
 
 
 class SourceReference(BaseModel):
-    provider: Literal["KIS", "OpenDART", "NAVER"]
+    provider: Literal["KIS", "OpenDART", "MOTIR", "KOREA_KR"]
     label: str
     basis_at: str | None = None
     url: str | None = None
 
 
 class AnswerPresentation(BaseModel):
-    type: Literal["quote", "financial", "financial_comparison", "news", "composite"]
+    type: Literal["quote", "financial", "financial_comparison", "policy", "composite"]
     data: dict
 
 

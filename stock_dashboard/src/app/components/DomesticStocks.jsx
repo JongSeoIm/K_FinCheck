@@ -81,7 +81,7 @@ export default function DomesticStocks({ trades, onSelectStock }) {
         {Array.from({ length: pageCount }, (_, i) => i + 1).map(value => <button key={value} type='button'
           aria-current={page === value ? 'page' : undefined} onClick={() => setPage(value)}>{value}</button>)}
       </nav>}
-      <div className='market-list-footer'><span>종목을 선택하면 차트·실적·뉴스를 확인할 수 있습니다.</span>
+      <div className='market-list-footer'><span>종목을 선택하면 차트·실적·산업 정책을 확인할 수 있습니다.</span>
         {visible.some(stock => quotes.errors[stock.symbol] && !trades[stock.symbol])
           ? <button type='button' onClick={quotes.retry} disabled={quotes.loading}>시세 다시 조회</button>
           : <span>KIS 시세 · 조회되지 않은 값은 — 표시</span>}

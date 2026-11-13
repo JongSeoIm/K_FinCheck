@@ -15,6 +15,7 @@ class Settings:
     ai_mode: str
     openai_api_key: str | None
     openai_model: str | None
+    openai_embedding_model: str
     spring_base_url: str
 
     @property
@@ -31,5 +32,6 @@ def get_settings() -> Settings:
         ai_mode=mode,
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
         openai_model=os.getenv("OPENAI_MODEL") or None,
+        openai_embedding_model=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
         spring_base_url=os.getenv("SPRING_BASE_URL", "http://127.0.0.1:8080").rstrip("/"),
     )

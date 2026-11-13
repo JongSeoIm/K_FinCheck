@@ -17,7 +17,7 @@ import useRealtimeQuotes from '../hooks/useRealtimeQuotes'
 import useRecentStock from '../hooks/useRecentStock'
 import { marketStocks } from '../lib/market'
 
-const LazyNewsFeed = lazy(() => import('./NewsFeed'))
+const LazyPolicyFeed = lazy(() => import('./PolicyFeed'))
 
 export default function Dashboard({ initialStock }) {
   const router = useRouter()
@@ -85,12 +85,12 @@ export default function Dashboard({ initialStock }) {
             />
           </section>
 
-          <section className='panel news-panel'>
+          <section className='panel policy-panel'>
             <div className='panel-heading'>
-              <h2>{selectedStock.name || selectedStock.symbol} 관련 뉴스</h2>
+              <h2>{selectedStock.name || selectedStock.symbol} 산업·정책 동향</h2>
             </div>
-            <Suspense fallback={<NewsSkeleton />}>
-              <LazyNewsFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />
+            <Suspense fallback={<PolicySkeleton />}>
+              <LazyPolicyFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />
             </Suspense>
           </section>
         </section>
@@ -119,9 +119,9 @@ export default function Dashboard({ initialStock }) {
   )
 }
 
-function NewsSkeleton() {
+function PolicySkeleton() {
   return (
-    <div className='skeleton-list' aria-label='뉴스를 불러오는 중'>
+    <div className='skeleton-list' aria-label='산업·정책 자료를 불러오는 중'>
       {[1, 2, 3].map((item) => <span key={item} className='skeleton-row' />)}
     </div>
   )

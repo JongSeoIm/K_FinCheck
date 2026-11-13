@@ -62,20 +62,27 @@ export default function ChatAnswerData({ presentation }) {
   }
   if (presentation.type === 'composite' && Array.isArray(data.sections)) return (
     <div className='chat-composite'>
-      {data.sections.filter(section => ['quote', 'financial', 'news'].includes(section.type)).map((section, index) =>
+      {data.sections.filter(section => ['quote', 'financial', 'policy'].includes(section.type)).map((section, index) =>
         <ChatAnswerData key={`${section.type}-${index}`} presentation={section} />)}
       {data.notes?.length > 0 && <div className='chat-composite-notes' role='status'>
         {data.notes.map((note, index) => <span className='chat-data-label' key={index}>{note}</span>)}
       </div>}
     </div>
   )
-  if (presentation.type === 'news' && Array.isArray(data.articles)) return (
-    <div className='chat-news'>
-      <span className='chat-data-label'>{data.name} · 검색 결과 기준</span>
-      <ul className='chat-news-list' aria-label='관련 기사'>
-        {data.articles.filter(article => safeLink(article.link)).map(article => <li key={article.link}>
-          <a href={article.link} target='_blank' rel='noopener noreferrer'>{article.title}<span aria-hidden='true'> ↗</span></a>
-          <span className='chat-data-label'>{article.publishedAt ? `게시 ${formatChatTime(article.publishedAt)}` : '게시 시각 미제공'}</span>
+  if (presentation.type === 'policy' && Array.isArray(data.documents)) return (
+    <div className='chat-policy'>
+      <span className='chat-data-label'>{data.name} · 산업통상부 보도·참고자료</span>
+      <ul className='chat-policy-list' aria-label='관련 산업·정책 자료'>
+        {data.documents.filter(document => safeLink(document.link)).map(document => <li key={document.link}>
+          {document.tags?.length > 0 && <div className='policy-tags' aria-label='자료 분류'>
+            {document.tags.map(tag => <span className='policy-tag' key={tag}>{tag}</span>)}
+          </div>}
+          <a href={document.link} target='_blank' rel='noopener noreferrer'>{document.title}<span aria-hidden='true'> ↗</span></a>
+          <span className='chat-data-label'>
+            {document.relationType === 'DIRECT' ? '기업 직접 언급' : '산업 간접 관련'}
+            {' · '}{document.policyStatus === 'IN_EFFECT' ? '본문에 시행 표현 포함' : document.policyStatus === 'PLANNED' ? '본문에 시행 예정 표현 포함' : document.policyStatus === 'CONFIRMED' ? '본문에 확정 표현 포함' : '발표 자료'}
+            {document.publishedAt ? ` · 발표 ${document.publishedAt}` : ''}
+          </span>
         </li>)}
       </ul>
     </div>

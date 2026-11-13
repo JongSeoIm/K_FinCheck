@@ -521,7 +521,7 @@ a:focus-visible {
 .surprise-badge.beat { color: var(--green); }
 .surprise-badge.miss { color: var(--red); }
 
-.news-toolbar {
+.policy-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -529,38 +529,28 @@ a:focus-visible {
   padding: 9px 14px;
   border-bottom: 1px solid var(--line);
 }
-.news-toolbar > span { color: var(--muted); font-size: 11px; white-space: nowrap; }
-.news-categories { display: flex; flex-wrap: wrap; }
-.news-categories button {
-  padding: 2px 3px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
-}
-.news-categories button:hover { text-decoration: underline; }
-.news-categories button.active { color: var(--blue); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-.news-categories button:focus-visible { outline: 0; box-shadow: 0 2px 0 var(--blue); }
-.news-separator { padding: 0 4px; color: #999; }
-.news-scroll {
+.policy-toolbar > span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.policy-scroll {
   max-height: 590px;
   overflow-y: auto;
 }
-.news-list { margin: 0; padding: 0 14px; list-style: none; }
-.news-list li {
+.policy-list { margin: 0; padding: 0 14px; list-style: none; }
+.policy-list li {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: 10px;
   padding: 13px 0;
   border-bottom: 1px solid var(--line-light);
 }
-.news-list li:last-child { border-bottom: 0; }
-.news-index, .news-copy small { color: var(--muted); font-size: 11px; }
-.news-copy a { font-weight: 700; text-decoration: none; }
-.news-copy a:hover { text-decoration: underline; }
-.news-copy p { line-height: 1.6; margin: 4px 0; color: var(--muted); font-size: 12px; }
-.news-link-label { color: var(--blue); font-size: 11px; }
-.news-list > li.inline-warning { display: block; padding: 8px 0; border: 0; }
+.policy-list li:last-child { border-bottom: 0; }
+.policy-index, .policy-copy small { color: var(--muted); font-size: 11px; }
+.policy-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
+.policy-tag { padding: 2px 5px; border: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.2; }
+.policy-copy a { font-weight: 700; text-decoration: none; }
+.policy-copy a:hover { text-decoration: underline; }
+.policy-copy p { line-height: 1.6; margin: 4px 0; color: var(--muted); font-size: 12px; }
+.policy-link-label { color: var(--blue); font-size: 11px; }
+.policy-list > li.inline-warning { display: block; padding: 8px 0; border: 0; }
 
 .skeleton-list { display: grid; gap: 8px; padding: 12px; }
 .skeleton-row, .skeleton-block { display: block; height: 42px; background: #ddd; }
@@ -588,8 +578,8 @@ a:focus-visible {
   .chart-area { height: 260px; }
   .insight-column { grid-template-columns: 1fr; }
   .watchlist-panel { grid-column: auto; }
-  .news-list li { grid-template-columns: 22px minmax(0, 1fr); }
-  .news-link-label { display: none; }
+  .policy-list li { grid-template-columns: 22px minmax(0, 1fr); }
+  .policy-link-label { display: none; }
 }
 
 /* 주기 선택 탭 UI (1분 ⌄ · 일 · 주 · 월 · 년 - 두 번째 사진과 동일한 텍스트 밑줄 스타일) */

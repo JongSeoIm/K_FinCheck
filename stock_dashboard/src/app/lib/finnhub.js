@@ -42,10 +42,6 @@ export async function getEarnings(symbol) {
   return []
 }
 
-export async function getCompanyNews(symbol, from, to) {
-  return []
-}
-
 export async function getStockCandles(symbol, resolution, from, to) {
   return { s: 'ok', c: [], h: [], l: [], o: [], v: [], t: [] }
 }

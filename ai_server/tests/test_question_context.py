@@ -4,7 +4,7 @@ from app.service import ChatService
 from app.schemas import StockContext
 from app.quote_tool import resolve_stock
 from tests.test_service import RecordingProvider, request
-from tests.test_composite import QuoteTool, NewsTool, FinancialTool
+from tests.test_composite import QuoteTool, PolicyTool, FinancialTool
 
 
 class ContextTest(unittest.IsolatedAsyncioTestCase):
@@ -61,7 +61,7 @@ class ContextTest(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_company_does_not_call_tool(self):
         provider = RecordingProvider()
         service = ChatService(provider, quote_tool=QuoteTool())
-        for q in ["애플 현재가 알려줘", "테슬라 실적 알려줘", "애플 관련 뉴스 알려줘", "그럼 애플은?"]:
+        for q in ["애플 현재가 알려줘", "테슬라 실적 알려줘", "애플 관련 정책 알려줘", "그럼 애플은?"]:
             result = await service.ask(request(q))
             self.assertIsNone(result.presentation)
             self.assertEqual([], provider.histories)
@@ -74,7 +74,7 @@ class ContextTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_financial_word_does_not_bypass_historical_period(self):
         provider = RecordingProvider()
-        service = ChatService(provider, quote_tool=QuoteTool(), news_tool=NewsTool(), financial_tool=FinancialTool())
+        service = ChatService(provider, quote_tool=QuoteTool(), policy_tool=PolicyTool(), financial_tool=FinancialTool())
         for q in ["삼성전자 지난주 왜 하락했어? 실적도 알려줘", "삼성전자 어제 하락 이유와 2024년 실적 알려줘"]:
             result = await service.ask(request(q))
             self.assertIsNone(result.presentation)

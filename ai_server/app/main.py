@@ -12,7 +12,10 @@ from app.schemas import ChatRequest, ChatResponse, HealthResponse
 from app.service import ChatService
 from app.quote_tool import StockQuoteTool
 from app.financial_tool import FinancialResultTool
-from app.news_tool import CompanyNewsTool
+from app.policy_tool import IndustryPolicyTool
+from app.policy_relevance import (
+    MockPolicyAnalyzer, OpenAIPolicyAnalyzer, PolicyRelevanceRequest, PolicyRelevanceResponse,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -25,11 +28,14 @@ def build_service(settings: Settings) -> ChatService:
         if not settings.openai_configured:
             raise RuntimeError("OPENAI_API_KEY와 OPENAI_MODEL 설정이 필요합니다.")
         provider = OpenAIChatProvider(settings.openai_api_key, settings.openai_model)
-    return ChatService(provider=provider, memory=ConversationMemory(max_messages=10), quote_tool=StockQuoteTool(settings.spring_base_url), financial_tool=FinancialResultTool(settings.spring_base_url), news_tool=CompanyNewsTool(settings.spring_base_url))
+    return ChatService(provider=provider, memory=ConversationMemory(max_messages=10), quote_tool=StockQuoteTool(settings.spring_base_url), financial_tool=FinancialResultTool(settings.spring_base_url), policy_tool=IndustryPolicyTool(settings.spring_base_url))
 
 
 settings = get_settings()
 chat_service = build_service(settings)
+policy_analyzer = (MockPolicyAnalyzer() if settings.ai_mode == "mock" else
+                   OpenAIPolicyAnalyzer(settings.openai_api_key, settings.openai_model,
+                                        settings.openai_embedding_model))
 app = FastAPI(title="K-FinCheck AI Server", version="0.1.0")
 
 
@@ -54,4 +60,22 @@ async def chat(request: ChatRequest) -> ChatResponse:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="AI 서비스를 사용할 수 없습니다.",
+        ) from None
+
+
+@app.post("/api/policy/relevance", response_model=PolicyRelevanceResponse)
+async def policy_relevance(request: PolicyRelevanceRequest) -> PolicyRelevanceResponse:
+    try:
+        return await policy_analyzer.analyze(request)
+    except OpenAIError:
+        logger.exception("OpenAI 정책 관련성 분석에 실패했습니다.")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="정책 관련성을 분석하지 못했습니다.",
+        ) from None
+    except (RuntimeError, ValueError):
+        logger.exception("정책 관련성 분석 처리에 실패했습니다.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="정책 관련성을 분석하지 못했습니다.",
         ) from None

@@ -6,7 +6,7 @@
 - 강사님 backend_hkboard_springboot_restAPI12 예제와 동일하게 MyBatis Starter 3.0.5와 MariaDB JDBC 드라이버를 사용한다. 드라이버 버전은 Spring Boot 의존성 관리에 따른다.
 - 기본 주소는 `127.0.0.1:3306`, DB는 `k_fincheck`, 계정은 `k_fincheck_app`이다.
 - 접속 정보는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 환경변수로 설정하거나 Git 제외 로컬 설정으로 지정할 수 있다.
-- 기존 시세·실적·뉴스 설정은 유지한다. SQL 자동 초기화는 꺼져 있어 실행 시 테이블을 생성·변경·삭제하지 않는다.
+- 기존 시세·실적·산업 정책 설정은 유지한다. SQL 자동 초기화는 꺼져 있어 실행 시 테이블을 생성·변경·삭제하지 않는다.
 
 ## 로컬 비밀번호 입력
 

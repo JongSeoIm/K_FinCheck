@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1320" viewBox="0 0 2200 1320">
+  <defs>
+    <style>
+      .title { font: 700 29px 'Malgun Gothic', sans-serif; fill: #263249; }
+      .subtitle { font: 20px 'Malgun Gothic', sans-serif; fill: #516079; }
+      .box-title { font: 700 25px 'Malgun Gothic', sans-serif; fill: #2c3850; }
+      .box-text { font: 18px 'Malgun Gothic', sans-serif; fill: #61708a; }
+      .small { font: 16px 'Malgun Gothic', sans-serif; fill: #65738b; }
+      .arrow { fill: none; stroke: #8a97aa; stroke-width: 2.2; marker-end: url(#arrow); }
+      .dashed { fill: none; stroke: #b8c3d3; stroke-width: 2; stroke-dasharray: 9 8; }
+      .rule { stroke: #8d99aa; stroke-width: 1.5; }
+    </style>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#8a97aa"/>
+    </marker>
+  </defs>
+  <rect width="2200" height="1320" fill="#ffffff"/>
+
+  <text class="title" x="55" y="74">사용자 화면</text>
+  <text class="subtitle" x="55" y="112">Next.js · React</text>
+  <line class="rule" x1="55" y1="132" x2="350" y2="132"/>
+
+  <rect class="dashed" x="420" y="36" width="410" height="1210"/>
+  <text class="title" x="446" y="74">서비스 서버</text>
+  <text class="subtitle" x="446" y="112">Spring Boot</text>
+  <line class="rule" x1="446" y1="132" x2="804" y2="132"/>
+
+  <text class="title" x="920" y="74">메시지 · DB</text>
+  <text class="subtitle" x="920" y="112">Kafka · MariaDB</text>
+  <line class="rule" x1="920" y1="132" x2="1245" y2="132"/>
+
+  <rect class="dashed" x="1320" y="36" width="360" height="1210"/>
+  <text class="title" x="1346" y="74">AI 서버</text>
+  <text class="subtitle" x="1346" y="112">Python · FastAPI</text>
+  <line class="rule" x1="1346" y1="132" x2="1654" y2="132"/>
+
+  <text class="title" x="1770" y="74">외부 제공처</text>
+  <text class="subtitle" x="1770" y="112">시세 · 공시 · 정책 · 답변 생성</text>
+  <line class="rule" x1="1770" y1="132" x2="2140" y2="132"/>
+
+  <!-- user screen -->
+  <g>
+    <rect x="55" y="210" width="295" height="130" fill="#fbf7e9" stroke="#cdb36d" stroke-width="1.6"/>
+    <text class="box-title" x="202" y="260" text-anchor="middle">시세 · 차트</text>
+    <text class="box-text" x="202" y="296" text-anchor="middle">현재가 · 선 / 캔들</text>
+    <text class="box-text" x="202" y="325" text-anchor="middle">WebSocket Push</text>
+  </g>
+  <g>
+    <rect x="55" y="420" width="295" height="145" fill="#fbf7e9" stroke="#cdb36d" stroke-width="1.6"/>
+    <text class="box-title" x="202" y="470" text-anchor="middle">종목 정보</text>
+    <text class="box-text" x="202" y="506" text-anchor="middle">실적 · 투자의견</text>
+    <text class="box-text" x="202" y="535" text-anchor="middle">회원 · 관심 종목</text>
+  </g>
+  <g>
+    <rect x="55" y="650" width="295" height="155" fill="#fbf7e9" stroke="#cdb36d" stroke-width="1.6"/>
+    <text class="box-title" x="202" y="700" text-anchor="middle">산업 · 정책 동향</text>
+    <text class="box-text" x="202" y="736" text-anchor="middle">직접 · 간접 관련 구분</text>
+    <text class="box-text" x="202" y="765" text-anchor="middle">공식 원문 출처</text>
+  </g>
+  <g>
+    <rect x="55" y="1015" width="295" height="145" fill="#fbf7e9" stroke="#cdb36d" stroke-width="1.6"/>
+    <text class="box-title" x="202" y="1065" text-anchor="middle">AI 대화</text>
+    <text class="box-text" x="202" y="1101" text-anchor="middle">질문 · 답변 · 출처</text>
+    <text class="box-text" x="202" y="1130" text-anchor="middle">대화 복원</text>
+  </g>
+
+  <!-- spring -->
+  <g>
+    <rect x="447" y="175" width="356" height="120" fill="#ffffff" stroke="#9ca9bb" stroke-width="1.6"/>
+    <text class="box-title" x="625" y="222" text-anchor="middle">시세 수신 · 발행</text>
+    <text class="box-text" x="625" y="258" text-anchor="middle">WebSocket Client · Kafka Producer</text>
+  </g>
+  <g>
+    <rect x="447" y="335" width="356" height="145" fill="#ffffff" stroke="#9ca9bb" stroke-width="1.6"/>
+    <text class="box-title" x="625" y="382" text-anchor="middle">시세 처리 · 전달</text>
+    <text class="box-text" x="625" y="418" text-anchor="middle">Kafka Consumer → MariaDB</text>
+    <text class="box-text" x="625" y="449" text-anchor="middle">QuoteStore → WebSocket Push</text>
+  </g>
+  <g>
+    <rect x="447" y="525" width="356" height="145" fill="#ffffff" stroke="#9ca9bb" stroke-width="1.6"/>
+    <text class="box-title" x="625" y="572" text-anchor="middle">공통 조회 · 관리 API</text>
+    <text class="box-text" x="625" y="608" text-anchor="middle">시세 · 실적 · 투자의견</text>
+    <text class="box-text" x="625" y="639" text-anchor="middle">회원 · 관심 종목 · DB 조회</text>
+  </g>
+  <g>
+    <rect x="447" y="715" width="356" height="165" fill="#ffffff" stroke="#9ca9bb" stroke-width="1.6"/>
+    <text class="box-title" x="625" y="762" text-anchor="middle">정책 수집 · 관련도 API</text>
+    <text class="box-text" x="625" y="798" text-anchor="middle">허용 문서 수집 · 백필</text>
+    <text class="box-text" x="625" y="829" text-anchor="middle">키워드 후보 · AI 판정</text>
+    <text class="box-text" x="625" y="860" text-anchor="middle">종목별 정책 조회</text>
+  </g>
+  <g>
+    <rect x="447" y="1015" width="356" height="145" fill="#ffffff" stroke="#9ca9bb" stroke-width="1.6"/>
+    <text class="box-title" x="625" y="1065" text-anchor="middle">인증 · 대화 관리</text>
+    <text class="box-text" x="625" y="1101" text-anchor="middle">로그인 · 대화방 소유권</text>
+    <text class="box-text" x="625" y="1130" text-anchor="middle">최근 메시지 · 대화 저장</text>
+  </g>
+
+  <!-- data -->
+  <g>
+    <rect x="920" y="335" width="325" height="115" fill="#fbf7e9" stroke="#9ca9bb" stroke-width="1.6"/>
+    <text class="box-title" x="1082" y="382" text-anchor="middle">Kafka</text>
+    <text class="box-text" x="1082" y="418" text-anchor="middle">실시간 시세 메시지 전달</text>
+  </g>
+  <g>
+    <rect x="920" y="900" width="325" height="220" fill="#354158" stroke="#354158" stroke-width="1.6"/>
+    <text x="1082" y="955" text-anchor="middle" style="font:700 25px 'Malgun Gothic';fill:#fff">MariaDB</text>
+    <text x="1082" y="995" text-anchor="middle" style="font:18px 'Malgun Gothic';fill:#e5e9f0">회원 · 관심 종목 · 대화</text>
+    <text x="1082" y="1028" text-anchor="middle" style="font:18px 'Malgun Gothic';fill:#e5e9f0">공시 실적 · 기업 일정</text>
+    <text x="1082" y="1061" text-anchor="middle" style="font:18px 'Malgun Gothic';fill:#e5e9f0">최신 시세 · 분봉 · 처리 이력</text>
+    <text x="1082" y="1094" text-anchor="middle" style="font:18px 'Malgun Gothic';fill:#e5e9f0">정책 문서 · 관련도 · 백필 상태</text>
+  </g>
+
+  <!-- AI -->
+  <g>
+    <rect x="1346" y="735" width="308" height="150" fill="#ffffff" stroke="#9ca9bb" stroke-width="1.6"/>
+    <text class="box-title" x="1500" y="782" text-anchor="middle">정책 관련도 판정</text>
+    <text class="box-text" x="1500" y="818" text-anchor="middle">임베딩 유사도</text>
+    <text class="box-text" x="1500" y="849" text-anchor="middle">기업 · 산업 문맥 확인</text>
+  </g>
+  <g>
+    <rect x="1346" y="1015" width="308" height="145" fill="#ffffff" stroke="#9ca9bb" stroke-width="1.6"/>
+    <text class="box-title" x="1500" y="1065" text-anchor="middle">질문 해석 · 답변 처리</text>
+    <text class="box-text" x="1500" y="1101" text-anchor="middle">질문 분류 · Tool 선택</text>
+    <text class="box-text" x="1500" y="1130" text-anchor="middle">자료 기반 답변 · 출처 정리</text>
+  </g>
+
+  <!-- external -->
+  <g>
+    <rect x="1770" y="175" width="370" height="120" fill="#edf6f3" stroke="#8eaea5" stroke-width="1.6"/>
+    <text class="box-title" x="1955" y="222" text-anchor="middle">KIS WebSocket</text>
+    <text class="box-text" x="1955" y="258" text-anchor="middle">실시간 체결</text>
+  </g>
+  <g>
+    <rect x="1770" y="365" width="370" height="120" fill="#edf6f3" stroke="#8eaea5" stroke-width="1.6"/>
+    <text class="box-title" x="1955" y="412" text-anchor="middle">KIS REST API</text>
+    <text class="box-text" x="1955" y="448" text-anchor="middle">현재가 · 과거 차트 · 투자의견</text>
+  </g>
+  <g>
+    <rect x="1770" y="535" width="370" height="120" fill="#edf6f3" stroke="#8eaea5" stroke-width="1.6"/>
+    <text class="box-title" x="1955" y="582" text-anchor="middle">OpenDART</text>
+    <text class="box-text" x="1955" y="618" text-anchor="middle">기업 공시 · 재무 수치 · 일정</text>
+  </g>
+  <g>
+    <rect x="1770" y="705" width="370" height="120" fill="#edf6f3" stroke="#8eaea5" stroke-width="1.6"/>
+    <text class="box-title" x="1955" y="752" text-anchor="middle">산업통상부 RSS</text>
+    <text class="box-text" x="1955" y="788" text-anchor="middle">산업 · 정책 공식 보도자료</text>
+  </g>
+  <g>
+    <rect x="1770" y="855" width="370" height="120" fill="#edf6f3" stroke="#8eaea5" stroke-width="1.6"/>
+    <text class="box-title" x="1955" y="902" text-anchor="middle">정책브리핑</text>
+    <text class="box-text" x="1955" y="938" text-anchor="middle">공공누리 허용 정책자료</text>
+  </g>
+  <g>
+    <rect x="1770" y="1040" width="370" height="120" fill="#edf6f3" stroke="#8eaea5" stroke-width="1.6"/>
+    <text class="box-title" x="1955" y="1087" text-anchor="middle">OpenAI API</text>
+    <text class="box-text" x="1955" y="1123" text-anchor="middle">질문 해석 보조 · 답변 생성</text>
+  </g>
+
+  <!-- arrows -->
+  <path class="arrow" d="M1770 235 H803"/>
+  <path class="arrow" d="M803 235 V392 H920"/>
+  <path class="arrow" d="M920 405 H803"/>
+  <path class="arrow" d="M447 405 H350"/>
+  <path class="arrow" d="M803 432 H810 V920 H920"/>
+  <path class="arrow" d="M350 492 H447"/>
+  <path class="arrow" d="M803 575 H1695 V425 H1770"/>
+  <path class="arrow" d="M803 615 H1670 V595 H1770"/>
+  <path class="arrow" d="M803 640 H820 V960 H920"/>
+  <path class="arrow" d="M350 730 H447"/>
+  <path class="arrow" d="M1770 765 H1600 V680 H780 V755 H803"/>
+  <path class="arrow" d="M1770 915 H1580 V660 H760 V795 H803"/>
+  <path class="arrow" d="M803 820 H830 V1000 H920"/>
+  <path class="arrow" d="M803 735 H1150 V780 H1346"/>
+  <path class="arrow" d="M350 1085 H447"/>
+  <path class="arrow" d="M803 1060 H840 V875 H1280 V1060 H1346"/>
+  <path class="arrow" d="M1654 1085 H1770"/>
+  <path class="arrow" d="M803 1125 H920"/>
+
+  <text class="small" x="55" y="1283">실선: 데이터 · 요청 · 응답 방향　/　점선 테두리: 하나의 서버 프로그램 범위</text>
+  <text class="small" x="2140" y="1283" text-anchor="end">조선비즈 RSS 일회성 요약은 다음 구현 범위로 현재 구성에서 제외</text>
+</svg>
