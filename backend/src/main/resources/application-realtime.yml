@@ -1,0 +1,40 @@
+stream:
+  enabled: true
+  relay-enabled: ${KIS_RELAY_ENABLED:true}
+  symbols: ["005930", "000660"]
+  topic: stock-quotes-v1
+  group-id: k-fincheck-quotes
+  outbox:
+    enabled: ${STREAM_OUTBOX_ENABLED:true}
+    directory: ${STREAM_OUTBOX_DIRECTORY:.realtime-spool}
+    max-bytes: 268435456
+    max-records: 100000
+    retry-delay-ms: 1000
+  persistence:
+    # Enable only after manually applying database/migrations/002_realtime_persistence_draft.sql.
+    enabled: ${STREAM_PERSISTENCE_ENABLED:false}
+    source: KIS_WEBSOCKET_KRX
+
+spring:
+  task:
+    scheduling:
+      pool:
+        size: 2
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 3000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 3000
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: record

@@ -1,0 +1,26 @@
+# 로컬 개발 환경용 KIS 설정 예시
+# 이 파일을 application-local.yml로 복사한 후 실제 발급받은 키를 입력하세요.
+# application-local.yml 파일은 .gitignore에 등록되어 Git에 포함되지 않습니다.
+
+kis:
+  base-url: https://openapi.koreainvestment.com:9443
+  app-key: 
+  app-secret: 
+
+# OpenDART 인증키는 백엔드 로컬 설정에만 입력합니다.
+
+opendart:
+  api-key: 
+
+# NAVER API HUB 검색 서비스에서 발급한 인증 정보 (구 Developers 키와 다름)
+naver-news:
+  client-id: 
+  client-secret: 
+# 프로젝트 전용 DB 계정. 실제 비밀번호는 application-local.yml에만 입력합니다.
+spring:
+  datasource:
+    url: jdbc:mariadb://localhost:3306/k_fincheck?connectTimeout=3000&socketTimeout=5000
+    username: 
+    password:
+
+

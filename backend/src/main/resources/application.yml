@@ -1,0 +1,57 @@
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
+
+spring:
+  application:
+    name: k-fincheck-backend
+  datasource:
+    url: ${DB_URL:jdbc:mariadb://127.0.0.1:3306/k_fincheck?connectTimeout=3000&socketTimeout=5000}
+    username: ${DB_USERNAME:k_fincheck_app}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.mariadb.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 0
+      connection-timeout: 5000
+      initialization-fail-timeout: -1
+  sql:
+    init:
+      mode: never
+  config:
+    import:
+      - optional:application-local.yml
+
+mybatis:
+  mapper-locations: classpath:mappers/**/*.xml
+  configuration:
+    default-statement-timeout: 5
+
+ai-server:
+  base-url: ${AI_SERVER_BASE_URL:http://127.0.0.1:8000}
+  connect-timeout: 2s
+  read-timeout: 60s  # 사업보고서 첫 색인(원문 다운로드·벡터화)이 오래 걸릴 수 있어 늘림
+
+kis:
+  base-url: https://openapi.koreainvestment.com:9443
+  app-key: YOUR_APP_KEY
+  app-secret: YOUR_APP_SECRET
+
+
+# 일봉·공시 미리 저장 (MarketDataCollector). false 면 조회할 때 없는 날짜만 받아 저장한다.
+market-data:
+  collect:
+    enabled: ${MARKET_DATA_COLLECT_ENABLED:true}
+
+# AI 비용 관리 (ChatUsageGuard). 0 이면 해당 제한을 끈다.
+chat:
+  limit:
+    per-minute: ${CHAT_LIMIT_PER_MINUTE:5}
+    per-day: ${CHAT_LIMIT_PER_DAY:100}
+    daily-tokens: ${CHAT_LIMIT_DAILY_TOKENS:200000}
+    monthly-tokens: ${CHAT_LIMIT_MONTHLY_TOKENS:0}  # 서비스 전체 월 토큰 상한, 0 이면 끔

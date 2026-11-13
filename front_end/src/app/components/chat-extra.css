@@ -1,9 +1,0 @@
-.stock-chat-sources { margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line, #ddd); display: grid; gap: 4px; list-style: none; }
-.stock-chat-sources li { font-size: 11px; color: var(--muted, #666); line-height: 1.5; }
-.stock-chat-sources a { color: #1769aa; text-decoration: underline; text-underline-offset: 2px; }
-.stock-chat-sources strong { color: inherit; font-weight: 600; }
-.stock-chat-message.error p { color: #b00020; }
-.stock-chat-login { display: grid; gap: 12px; padding: 24px 4px; }
-.stock-chat-login button { justify-self: start; height: 38px; padding: 0 16px; border: 1px solid #333; background: #333; color: #fff; cursor: pointer; }
-.stock-chat-reset { border: 0; background: none; padding: 0; margin-right: 12px; font-size: 12px; color: var(--muted, #666); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.stock-chat-reset:disabled { opacity: 0.4; cursor: default; }
