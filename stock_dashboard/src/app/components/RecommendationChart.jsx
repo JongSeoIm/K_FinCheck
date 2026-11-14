@@ -63,7 +63,9 @@ function TargetPriceSummary({ symbol, items, price }) {
           <YAxis domain={['auto', 'auto']} width={75} tickFormatter={value => prices.format(value)} tick={{ fontSize: 11 }} />
           <Line dataKey='close' stroke='#707783' strokeWidth={2} dot={false} isAnimationActive={false} />
           {targets.map(target => <Line key={target.key} dataKey={target.key} stroke={target.color}
-            strokeWidth={2} strokeDasharray='4 4' dot={{ r: 3 }} isAnimationActive={false} />)}
+            strokeWidth={2} strokeDasharray='4 4'
+            dot={{ r: 4, fill: target.color, stroke: '#fff', strokeWidth: 1.5, strokeDasharray: 'none' }}
+            isAnimationActive={false} />)}
           <TargetLabels targets={targets} />
         </LineChart>
       </ResponsiveContainer>
