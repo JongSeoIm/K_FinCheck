@@ -12,7 +12,7 @@ from app.schemas import StockContext
 
 def is_financial_question(message: str) -> bool:
     compact = message.replace(" ", "")
-    return any(word in compact for word in ("실적", "매출", "영업이익", "순이익")) and not any(
+    return any(word in compact for word in ("실적", "매출", "영업이익", "순이익", "적자", "흑자", "영업손실", "순손실")) and not any(
         word in compact for word in ("뭐야", "뜻", "정의", "계산법", "계산방법")
     )
 

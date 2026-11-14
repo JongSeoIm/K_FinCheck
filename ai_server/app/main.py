@@ -16,26 +16,53 @@ from app.policy_tool import IndustryPolicyTool
 from app.policy_relevance import (
     MockPolicyAnalyzer, OpenAIPolicyAnalyzer, PolicyRelevanceRequest, PolicyRelevanceResponse,
 )
+from app.disclosure_tool import CompanyDisclosureTool
+from app.rag import EmbeddingCache, OpenAIEmbedder
+from app.report_rag import BusinessReportRag, BusinessReportTool, ReportStore, SpringReportStore
 
 
 logger = logging.getLogger(__name__)
 
 
+def build_embedder(settings: Settings, client=None) -> OpenAIEmbedder | None:
+    """OpenAI 모드이고 RAG 임베딩을 켰을 때만 만든다. 아니면 글자 비교로 대신한다."""
+    if settings.ai_mode != "openai" or not settings.openai_configured or not settings.rag_enabled:
+        return None
+    if client is None:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=settings.openai_api_key)
+    return OpenAIEmbedder(client, settings.embedding_model, EmbeddingCache(settings.embedding_cache_path))
+
+
+def build_report_rag(settings: Settings, embedder: OpenAIEmbedder | None = None) -> BusinessReportRag:
+    store = (ReportStore(settings.report_store_path) if settings.report_store == "sqlite"
+             else SpringReportStore(settings.spring_base_url))
+    return BusinessReportRag(BusinessReportTool(settings.spring_base_url), store,
+                             embedder if embedder is not None else build_embedder(settings))
+
+
 def build_service(settings: Settings) -> ChatService:
+    embedder = None
     if settings.ai_mode == "mock":
         provider = MockChatProvider()
     else:
         if not settings.openai_configured:
             raise RuntimeError("OPENAI_API_KEY와 OPENAI_MODEL 설정이 필요합니다.")
-        provider = OpenAIChatProvider(settings.openai_api_key, settings.openai_model)
-    return ChatService(provider=provider, memory=ConversationMemory(max_messages=10), quote_tool=StockQuoteTool(settings.spring_base_url), financial_tool=FinancialResultTool(settings.spring_base_url), policy_tool=IndustryPolicyTool(settings.spring_base_url))
+        provider = OpenAIChatProvider(settings.openai_api_key, settings.openai_model, settings.openai_interpret_model)
+        embedder = build_embedder(settings, provider.client)
+    return ChatService(provider=provider, memory=ConversationMemory(max_messages=10),
+                       quote_tool=StockQuoteTool(settings.spring_base_url),
+                       financial_tool=FinancialResultTool(settings.spring_base_url),
+                       policy_tool=IndustryPolicyTool(settings.spring_base_url),
+                       report_rag=build_report_rag(settings, embedder),
+                       disclosure_tool=CompanyDisclosureTool(settings.spring_base_url))
 
 
 settings = get_settings()
 chat_service = build_service(settings)
 policy_analyzer = (MockPolicyAnalyzer() if settings.ai_mode == "mock" else
                    OpenAIPolicyAnalyzer(settings.openai_api_key, settings.openai_model,
-                                        settings.openai_embedding_model))
+                                        settings.embedding_model))
 app = FastAPI(title="K-FinCheck AI Server", version="0.1.0")
 
 

@@ -25,6 +25,22 @@ export function formatChatTime(value) {
 export default function ChatAnswerData({ presentation }) {
   const data = presentation?.data
   if (!data) return null
+  if (presentation.type === 'disclosure' && Array.isArray(data.items)) return (
+    <ul className='stock-chat-sources' aria-label='공시 목록'>
+      {data.items.map(item => <li key={item.url}>
+        {safeLink(item.url) ? <a href={item.url} target='_blank' rel='noopener noreferrer'>{item.title} ↗</a> : item.title}
+        <small>{[item.date, item.filer].filter(Boolean).join(' · ')}</small>
+      </li>)}
+    </ul>
+  )
+  if (presentation.type === 'report' && Array.isArray(data.chunks)) return (
+    <details>
+      <summary>사업보고서 근거</summary>
+      <ul>{data.chunks.map((chunk, index) => <li key={index}>
+        <strong>{chunk.section}</strong><p>{chunk.content ?? chunk.text}</p>
+      </li>)}</ul>
+    </details>
+  )
   if (presentation.type === 'financial_comparison' && Array.isArray(data.reports)) {
     const labels = ['매출액', '영업이익', '당기순이익']
     const years = data.years || data.reports.map(report => report.businessYear)

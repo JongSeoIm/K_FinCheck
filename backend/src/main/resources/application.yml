@@ -27,6 +27,13 @@ spring:
     import:
       - optional:application-local.yml
 
+chat:
+  limit:
+    per-minute: ${CHAT_LIMIT_PER_MINUTE:5}
+    per-day: ${CHAT_LIMIT_PER_DAY:100}
+    daily-tokens: ${CHAT_LIMIT_DAILY_TOKENS:200000}
+    monthly-tokens: ${CHAT_LIMIT_MONTHLY_TOKENS:0}
+
 mybatis:
   mapper-locations: classpath:mappers/**/*.xml
   configuration:

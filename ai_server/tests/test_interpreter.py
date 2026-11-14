@@ -1,4 +1,10 @@
 import unittest
+from datetime import datetime
+from app.market_date import KST
+
+
+def market_clock():
+    return datetime(2026, 11, 13, 10, 0, tzinfo=KST)
 
 from app.question_interpreter import QuestionInterpretation, validated_question
 from app.schemas import StockContext
@@ -27,7 +33,7 @@ class InterpretingProvider(RecordingProvider):
 class InterpreterTest(unittest.IsolatedAsyncioTestCase):
     async def test_alias_nouns_and_common_typos_skip_interpretation(self):
         provider = InterpretingProvider()
-        service = ChatService(provider, quote_tool=QuoteTool(), financial_tool=FinancialTool())
+        service = ChatService(provider, clock=market_clock, quote_tool=QuoteTool(), financial_tool=FinancialTool())
         for text, expected in [("삼전 현재가", "quote"), ("삼전 주까", "quote"), ("하닉 실적", "financial")]:
             response = await service.ask(request(text))
             self.assertEqual(expected, response.presentation.type)
@@ -35,13 +41,13 @@ class InterpreterTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_unknown_expression_uses_interpretation_once(self):
         provider = InterpretingProvider()
-        response = await ChatService(provider, quote_tool=QuoteTool()).ask(request("삼성젼자 주가"))
+        response = await ChatService(provider, clock=market_clock, quote_tool=QuoteTool()).ask(request("삼성젼자 주가"))
         self.assertEqual("005930", response.presentation.data["symbol"])
         self.assertEqual(1, len(provider.interpretations))
 
     async def test_ambiguous_company_and_model_uncertainty_skip_generation(self):
         provider = InterpretingProvider(interpretation(needs_clarification=True))
-        service = ChatService(provider, quote_tool=QuoteTool())
+        service = ChatService(provider, clock=market_clock, quote_tool=QuoteTool())
         for text in ["삼성", "삼성젼자 주가"]:
             response = await service.ask(request(text))
             self.assertIsNone(response.presentation)
@@ -52,13 +58,13 @@ class InterpreterTest(unittest.IsolatedAsyncioTestCase):
             async def interpret(self, *args):
                 raise ValueError("parse failed")
         provider = FailedProvider()
-        result = await ChatService(provider, quote_tool=QuoteTool()).ask(request("삼성젼자 주가"))
+        result = await ChatService(provider, clock=market_clock, quote_tool=QuoteTool()).ask(request("삼성젼자 주가"))
         self.assertIsNone(result.presentation)
         self.assertEqual([], provider.histories)
 
     async def test_unrelated_question_does_not_use_interpreter_after_chat(self):
         provider = InterpretingProvider()
-        service = ChatService(provider, quote_tool=QuoteTool())
+        service = ChatService(provider, clock=market_clock, quote_tool=QuoteTool())
         await service.ask(request("삼전 현재가"))
         result = await service.ask(request("오늘 저녁 뭐 먹을까?"))
         self.assertEqual("out_of_scope", result.status)

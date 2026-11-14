@@ -8,10 +8,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class ChatService {
     private final AiServerClient client;
     private final ChatHistory history;
+    private final ChatUsageGuard usage;
 
-    public ChatService(AiServerClient client, ChatHistory history) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public ChatService(AiServerClient client, ChatHistory history, ChatUsageGuard usage) {
         this.client = client;
         this.history = history;
+        this.usage = usage;
+    }
+
+    /** 호출 제한·사용량 기록 없이 만든다(단위 테스트용). */
+    public ChatService(AiServerClient client, ChatHistory history) {
+        this(client, history, ChatUsageGuard.unlimited());
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -27,11 +35,14 @@ public class ChatService {
         if (name.isEmpty() || name.length() > 100) throw bad("기업명이 올바르지 않습니다.");
         var room = history.owned(userId, conversationId, true);
         if (!room.symbol().equals(symbol)) throw bad("대화의 종목이 일치하지 않습니다.");
+        usage.check(userId);  // 분당·일별 호출, 일일 토큰 한도. 넘으면 429 이고 AI 서버를 부르지 않는다.
         var response = client.ask(new ChatModels.AiRequest(userId, conversationId, message,
                 new ChatModels.Stock(room.symbol(), room.name()), history.context(conversationId)));
         if (response == null) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI 서버의 응답이 비어 있습니다.");
-        history.appendPair(conversationId, message, response);
-        return response;
+        usage.record(userId, conversationId, response);
+        var visible = response.withoutUsage();
+        history.appendPair(conversationId, message, visible);
+        return visible;
     }
 
     private static String trim(String value) { return value == null ? "" : value.trim(); }

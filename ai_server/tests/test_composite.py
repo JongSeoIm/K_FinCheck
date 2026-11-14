@@ -7,7 +7,9 @@ from tests.test_service import RecordingProvider, request
 
 
 class QuoteTool:
-    async def get_stock_quote(self, stock):
+    async def get_stock_quote(self, stock, basis=None):
+        if basis is not None and not basis.live:
+            raise ValueError("테스트 시세는 현재가만 제공")
         return {"name": stock.name, "symbol": stock.symbol, "price": 70000, "changeRate": 1.2,
                 "method": "REST", "time_kind": "조회 시각", "basis_at": "2026-11-03T10:00:00Z"}
 

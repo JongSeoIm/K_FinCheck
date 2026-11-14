@@ -3,13 +3,25 @@ from __future__ import annotations
 from urllib.parse import urlsplit
 import httpx
 
-from app.schemas import StockContext
+from app.schemas import SourceReference, StockContext
 
 
 POLICY_TERMS = (
     "정책", "산업 동향", "산업동향", "규제", "지원책", "지원 정책", "지원정책",
     "보조금", "세액공제", "관세", "수출 통제", "수출통제", "산업 지원",
 )
+
+
+def policy_sources(documents: list[dict]) -> list[SourceReference]:
+    sources = []
+    for document in documents:
+        is_briefing = document.get("source") == "KOREA_KR"
+        publisher = document.get("publisher") if is_briefing else None
+        title = document["title"]
+        sources.append(SourceReference(provider="KOREA_KR" if is_briefing else "MOTIR",
+                                       label=f"{publisher} · {title}" if publisher else title,
+                                       basis_at=document.get("publishedAt"), url=document["link"]))
+    return sources
 
 
 def is_policy_question(message: str) -> bool:

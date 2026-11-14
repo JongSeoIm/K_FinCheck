@@ -50,7 +50,7 @@ export default function StockChatDrawer({ stock }) {
         const records = room ? await accountApi(`/api/chat/conversations/${room.conversationId}/messages`) : []
         if (cancelled) return
         setRooms(list); setActiveRoom(room); setMessages(records.map(record => ({
-          role: record.role, text: record.text, sources: record.response?.sources || [], presentation: record.response?.presentation,
+          role: record.role, text: record.text, sources: record.response?.sources || [], presentation: record.response?.presentation, basis: record.response?.basis,
         })))
         setNotice('')
       } catch (error) { if (!cancelled) setNotice(error.message) }
@@ -67,7 +67,7 @@ export default function StockChatDrawer({ stock }) {
       if (useAuthStore.getState().user?.userId !== user.userId) return
       setActiveRoom(room); localStorage.setItem(storageKey, room.conversationId)
       setMessages(records.map(record => ({ role: record.role, text: record.text,
-        sources: record.response?.sources || [], presentation: record.response?.presentation })))
+        sources: record.response?.sources || [], presentation: record.response?.presentation, basis: record.response?.basis })))
       setHistoryOpen(false); setDeleteId(null)
     } catch (error) { setNotice(error.message) }
     finally { setLoading(false) }
@@ -182,7 +182,7 @@ export default function StockChatDrawer({ stock }) {
       if (useAuthStore.getState().user?.userId !== user.userId) return
       if (!currentView()) return
       setMessages(current => current.map(message => message.id === replyId
-        ? { id: replyId, role: 'assistant', text: response.answer, sources: response.sources || [], presentation: response.presentation }
+        ? { id: replyId, role: 'assistant', text: response.answer, sources: response.sources || [], presentation: response.presentation, basis: response.basis }
         : message))
       try {
         const list = await accountApi(`/api/chat/conversations?symbol=${context.symbol}`)
@@ -262,6 +262,7 @@ export default function StockChatDrawer({ stock }) {
                     className={`stock-chat-message ${message.role}${message.error ? ' error' : ''}${message.pending ? ' pending' : ''}`}
                     aria-label={message.pending ? '답변 생성 중' : undefined}>
                     <p>{message.text}</p>
+                    {message.basis && <small>{message.basis}</small>}
                     <ChatAnswerData presentation={message.presentation} />
                     {message.sources?.length > 0 && <ul className='stock-chat-sources' aria-label='답변 출처'>
                       {message.sources.map((source, sourceIndex) => <li key={`${source.provider}-${sourceIndex}`}>

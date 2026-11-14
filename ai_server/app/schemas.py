@@ -39,7 +39,7 @@ class SourceReference(BaseModel):
 
 
 class AnswerPresentation(BaseModel):
-    type: Literal["quote", "financial", "financial_comparison", "policy", "composite"]
+    type: Literal["quote", "financial", "financial_comparison", "policy", "composite", "report", "disclosure"]
     data: dict
 
 
@@ -49,6 +49,8 @@ class ChatResponse(BaseModel):
     sources: list[SourceReference] = Field(default_factory=list)
     presentation: AnswerPresentation | None = None
     context_message: str | None = None
+    basis: str | None = None
+    usage: dict | None = None
 
 
 class HealthResponse(BaseModel):
