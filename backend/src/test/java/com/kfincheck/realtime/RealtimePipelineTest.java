@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClient;
 import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
@@ -33,7 +34,8 @@ class RealtimePipelineTest {
     @Autowired ObjectMapper mapper;
     @Autowired KafkaListenerEndpointRegistry registry;
 
-    @Test void parsedTradeTravelsThroughRealKafkaAndReachesPushAndInternalSnapshot() throws Exception {
+    @Test void eightSymbolsTravelThroughRealKafkaAndReachPushAndInternalSnapshot() throws Exception {
+        var symbols = List.of("005930", "000660", "035420", "035720", "005380", "000270", "051910", "006400");
         await().atMost(Duration.ofSeconds(20)).until(() -> registry.getListenerContainers().stream()
                 .anyMatch(c -> c.getAssignedPartitions() != null && !c.getAssignedPartitions().isEmpty()));
         BlockingQueue<String> messages = new LinkedBlockingQueue<>();
@@ -49,19 +51,25 @@ class RealtimePipelineTest {
                         }
                     }).get(5, TimeUnit.SECONDS);
             try {
-                QuoteEvent event = parser.parse("0|H0STCNT0|001|" + KisTradeParserTest.row("143000", "70100", "2", "100", "10")).getFirst();
-                pipeline.publish(event).get(10, TimeUnit.SECONDS);
+                for (String symbol : symbols) {
+                    String row = KisTradeParserTest.row("143000", "70100", "2", "100", "10").replaceFirst("^005930", symbol);
+                    QuoteEvent event = parser.parse("0|H0STCNT0|001|" + row).getFirst();
+                    pipeline.publish(event).get(10, TimeUnit.SECONDS);
+                }
                 JsonNode received = null;
                 long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
                 while (System.nanoTime() < deadline) {
                     String message = messages.poll(1, TimeUnit.SECONDS);
                     if (message == null) continue;
                     JsonNode candidate = mapper.readTree(message);
-                    if (candidate.path("quotes").has("005930")) { received = candidate; break; }
+                    if (symbols.stream().allMatch(candidate.path("quotes")::has)) { received = candidate; break; }
                 }
                 assertThat(received).isNotNull();
-                assertThat(received.path("quotes").path("005930").path("price").asLong()).isEqualTo(70100);
-                assertThat(received.path("candles").path("005930").get(0).path("close").asLong()).isEqualTo(70100);
+                assertThat(received.path("supportedSymbols")).extracting(JsonNode::asText).containsExactlyElementsOf(symbols);
+                for (String symbol : symbols) {
+                    assertThat(received.path("quotes").path(symbol).path("price").asLong()).isEqualTo(70100);
+                    assertThat(received.path("candles").path(symbol).get(0).path("close").asLong()).isEqualTo(70100);
+                }
                 JsonNode polled = RestClient.create("http://localhost:" + port).get()
                         .uri("/api/realtime/snapshot?interval=60").retrieve().body(JsonNode.class);
                 assertThat(polled.path("quotes")).isEqualTo(received.path("quotes"));

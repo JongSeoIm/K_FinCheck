@@ -4,12 +4,14 @@ import { lazy, Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import EarningsPanel from './EarningsPanel'
+import DividendPanel from './DividendPanel'
 import DomesticStocks from './DomesticStocks'
 import CompanyCalendar from './CompanyCalendar'
 import RecommendationChart from './RecommendationChart'
 import StockChart from './StockChart'
 import StockChatDrawer from './StockChatDrawer'
 import StockInfo from './StockInfo'
+import StockNewsFeed from './StockNewsFeed'
 import StockSearch from './StockSearch'
 import WatchlistPanel from './WatchlistPanel'
 import AuthNav from './AuthNav'
@@ -18,6 +20,11 @@ import useRecentStock from '../hooks/useRecentStock'
 import { marketStocks } from '../lib/market'
 
 const LazyPolicyFeed = lazy(() => import('./PolicyFeed'))
+const detailTabs = [
+  { id: 'chart', label: '차트·시세' },
+  { id: 'info', label: '종목정보' },
+  { id: 'policy', label: '공시·정책' },
+]
 
 export default function Dashboard({ initialStock }) {
   const router = useRouter()
@@ -29,7 +36,9 @@ export default function Dashboard({ initialStock }) {
   const recentSymbol = useRecentStock(isDetail ? selectedStock.symbol : null)
   const recentStock = marketStocks.find(stock => stock.symbol === recentSymbol)
   const [intervalSeconds, setIntervalSeconds] = useState(60)
+  const [detailTab, setDetailTab] = useState('chart')
   const stream = useRealtimeQuotes(intervalSeconds)
+  const chatStock = recentStock || selectedStock
 
   const handleSelectStock = (stock) => {
     const normalizedStock = {
@@ -39,6 +48,18 @@ export default function Dashboard({ initialStock }) {
     }
 
     router.push(`/?symbol=${encodeURIComponent(normalizedStock.symbol)}`)
+  }
+
+  const handleTabKeyDown = (event, index) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    let nextIndex = index
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + detailTabs.length) % detailTabs.length
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % detailTabs.length
+    if (event.key === 'Home') nextIndex = 0
+    if (event.key === 'End') nextIndex = detailTabs.length - 1
+    setDetailTab(detailTabs[nextIndex].id)
+    event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[nextIndex]?.focus()
   }
 
   return (
@@ -63,6 +84,7 @@ export default function Dashboard({ initialStock }) {
       {isCalendar || isList ? <div className='dashboard-layout market-layout'>
         {isCalendar ? <CompanyCalendar /> : <DomesticStocks trades={stream.trades} onSelectStock={handleSelectStock} />}
         <aside className='insight-column' aria-label='관심 종목'>
+          <StockChatDrawer stock={chatStock} />
           <WatchlistPanel onSelectStock={handleSelectStock} trades={stream.trades} />
         </aside>
       </div> : (
@@ -70,29 +92,63 @@ export default function Dashboard({ initialStock }) {
         <section className='primary-column' aria-label='선택 종목 정보'>
           <StockInfo key={selectedStock.symbol} stock={selectedStock} liveQuote={stream.trades[selectedStock.symbol]} />
 
-          <section className='panel chart-panel'>
-            <div className='panel-heading'>
-              <h2>주가 차트</h2>
-            </div>
-            <StockChart
-              symbol={selectedStock.symbol}
-              liveQuote={stream.trades[selectedStock.symbol]}
-              liveCandles={stream.candles?.[selectedStock.symbol]}
-              streamInterval={stream.intervalSeconds}
-              streamStatus={stream.status}
-              supported={stream.supportedSymbols.includes(selectedStock.symbol)}
-              onIntervalChange={setIntervalSeconds}
-            />
-          </section>
+          <nav className='detail-tabs' role='tablist' aria-label='종목 상세 메뉴'>
+            {detailTabs.map((tab, index) => <button
+              id={`detail-tab-${tab.id}`}
+              key={tab.id}
+              type='button'
+              role='tab'
+              aria-selected={detailTab === tab.id}
+              aria-controls={`detail-panel-${tab.id}`}
+              tabIndex={detailTab === tab.id ? 0 : -1}
+              onClick={() => setDetailTab(tab.id)}
+              onKeyDown={event => handleTabKeyDown(event, index)}
+            >{tab.label}</button>)}
+          </nav>
 
-          <section className='panel policy-panel'>
-            <div className='panel-heading'>
-              <h2>{selectedStock.name || selectedStock.symbol} 산업·정책 동향</h2>
-            </div>
-            <Suspense fallback={<PolicySkeleton />}>
-              <LazyPolicyFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />
-            </Suspense>
-          </section>
+          {detailTab === 'chart' && <section id='detail-panel-chart' className='panel chart-panel detail-tab-panel'
+            role='tabpanel' aria-labelledby='detail-tab-chart'>
+              <div className='panel-heading'><h2>주가 차트</h2></div>
+              <StockChart
+                symbol={selectedStock.symbol}
+                liveQuote={stream.trades[selectedStock.symbol]}
+                liveCandles={stream.candles?.[selectedStock.symbol]}
+                streamInterval={stream.intervalSeconds}
+                streamStatus={stream.status}
+                supported={stream.supportedSymbols.includes(selectedStock.symbol)}
+                onIntervalChange={setIntervalSeconds}
+              />
+          </section>}
+
+          {detailTab === 'info' && <section id='detail-panel-info' className='detail-info-grid detail-tab-panel'
+            role='tabpanel' aria-labelledby='detail-tab-info'>
+              <section className='panel compact-panel'>
+                <div className='panel-heading'><h2>증권사 목표주가</h2></div>
+                <RecommendationChart key={selectedStock.symbol} symbol={selectedStock.symbol} liveQuote={stream.trades[selectedStock.symbol]} />
+              </section>
+              <section className='panel compact-panel'>
+                <div className='panel-heading'><h2>기업 실적</h2></div>
+                <EarningsPanel symbol={selectedStock.symbol} />
+              </section>
+              <section className='panel compact-panel'>
+                <div className='panel-heading'><h2>배당 내역</h2></div>
+                <DividendPanel key={selectedStock.symbol} symbol={selectedStock.symbol} />
+              </section>
+          </section>}
+
+          {detailTab === 'policy' && <section id='detail-panel-policy' className='detail-info-grid detail-tab-panel'
+            role='tabpanel' aria-labelledby='detail-tab-policy'>
+              <section className='panel policy-panel'>
+                <div className='panel-heading'><h2>{selectedStock.name || selectedStock.symbol} 산업·정책 동향</h2></div>
+                <Suspense fallback={<PolicySkeleton />}>
+                  <LazyPolicyFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />
+                </Suspense>
+              </section>
+              <section className='panel'>
+                <div className='panel-heading'><h2>최신 기사</h2></div>
+                <StockNewsFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />
+              </section>
+          </section>}
         </section>
 
         <aside className='insight-column' aria-label='추가 종목 정보'>
@@ -102,16 +158,6 @@ export default function Dashboard({ initialStock }) {
             onSelectStock={handleSelectStock}
             trades={stream.trades}
           />
-
-          <section className='panel compact-panel'>
-            <div className='panel-heading'><h2>증권사 투자의견</h2></div>
-            <RecommendationChart key={selectedStock.symbol} symbol={selectedStock.symbol} liveQuote={stream.trades[selectedStock.symbol]} />
-          </section>
-
-          <section className='panel compact-panel'>
-            <div className='panel-heading'><h2>최근 실적</h2></div>
-            <EarningsPanel symbol={selectedStock.symbol} />
-          </section>
         </aside>
       </div>
       )}

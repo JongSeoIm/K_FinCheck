@@ -268,7 +268,7 @@ public class IndustryPolicyService {
                         || profile.keywords().stream().anyMatch(keyword -> containsTerm(normalized, keyword)));
     }
 
-    private static boolean containsTerm(String text, String term) {
+    static boolean containsTerm(String text, String term) {
         String normalized = term.toLowerCase(Locale.ROOT);
         if (!normalized.matches("[a-z0-9]+")) return text.contains(normalized);
         return java.util.regex.Pattern.compile("(?<![a-z0-9])" + java.util.regex.Pattern.quote(normalized)

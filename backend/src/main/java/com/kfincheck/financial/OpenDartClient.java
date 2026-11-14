@@ -46,6 +46,10 @@ public class OpenDartClient {
     }
 
     public JsonNode annualReport(String corpCode, int year) {
+        return financialReport(corpCode, year, "11011");
+    }
+
+    public JsonNode financialReport(String corpCode, int year, String reportCode) {
         if (config.getApiKey() == null || config.getApiKey().isBlank()) {
             throw new FinancialException(HttpStatus.SERVICE_UNAVAILABLE, "KEY_NOT_CONFIGURED",
                     "OpenDART 인증키 설정이 필요합니다.");
@@ -55,7 +59,7 @@ public class OpenDartClient {
             body = client.get().uri(uri -> uri.path("/api/fnlttSinglAcntAll.json")
                     .queryParam("crtfc_key", config.getApiKey())
                     .queryParam("corp_code", corpCode).queryParam("bsns_year", year)
-                    .queryParam("reprt_code", "11011").queryParam("fs_div", "CFS").build())
+                    .queryParam("reprt_code", reportCode).queryParam("fs_div", "CFS").build())
                     .retrieve().body(JsonNode.class);
         } catch (Exception ignored) {
             // 원본 예외에는 인증키가 담긴 요청 URL이 포함될 수 있으므로 전달하거나 기록하지 않는다.
@@ -65,7 +69,8 @@ public class OpenDartClient {
         String status = body == null ? "" : body.path("status").asText();
         if ("013".equals(status)) {
             throw new FinancialException(HttpStatus.NOT_FOUND, "NO_REPORT",
-                    "해당 연도의 연결 사업보고서가 없습니다.");
+                    "11011".equals(reportCode) ? "해당 연도의 연결 사업보고서가 없습니다."
+                            : "해당 분기의 연결 실적 공시가 없습니다.");
         }
         if (!"000".equals(status)) {
             String message = switch (status) {

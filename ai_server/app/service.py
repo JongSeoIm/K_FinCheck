@@ -112,8 +112,6 @@ class ChatService:
                 years = financial_years(request.message)
             except ValueError as error:
                 return ChatResponse(status="answered", answer=str(error))
-            if stock.symbol not in {"005930", "000660"}:
-                return ChatResponse(status="answered", answer="현재 연간 실적은 삼성전자와 SK하이닉스를 지원합니다.")
             if len(years) > 1:
                 collected = await collect_financial_comparison(self._financial_tool, stock, years)
                 if collected is None:

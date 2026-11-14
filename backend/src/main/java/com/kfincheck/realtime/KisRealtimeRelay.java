@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kfincheck.config.KisConfig;
 import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -25,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 @ConditionalOnProperty(name = "stream.enabled", havingValue = "true")
 public class KisRealtimeRelay {
+    private static final Logger log = LoggerFactory.getLogger(KisRealtimeRelay.class);
     private final KisConfig kis;
     private final StreamProperties properties;
     private final QuotePipeline pipeline;
@@ -119,6 +122,7 @@ public class KisRealtimeRelay {
 
     private class Listener implements WebSocket.Listener {
         private final StringBuilder buffer = new StringBuilder();
+        private boolean receivedTrade;
         @Override public void onOpen(WebSocket ws) { ws.request(1); }
         @Override public CompletionStage<?> onText(WebSocket ws, CharSequence text, boolean last) {
             lastMessage = Instant.now();
@@ -136,14 +140,22 @@ public class KisRealtimeRelay {
                             approval = null; ws.abort(); disconnected(ws);
                             store.relayState("SUBSCRIPTION_ERROR"); return null;
                         }
-                        store.relayState("WAITING_TRADE");
+                        String symbol = response.path("header").path("tr_key").asText();
+                        if ("H0STCNT0".equals(response.path("header").path("tr_id").asText())
+                                && properties.getSymbols().contains(symbol)) {
+                            log.info("KIS 체결 구독 승인: {}", symbol);
+                        }
+                        if (!receivedTrade) store.relayState("WAITING_TRADE");
                     }
                 } else {
                     var durable = outbox.getIfAvailable();
                     var events = parser.parse(frame);
                     if (durable != null) durable.accept(events);
                     else for (QuoteEvent event : events) pipeline.publish(event).get(10, TimeUnit.SECONDS);
-                    store.relayState("RECEIVING");
+                    if (!events.isEmpty()) {
+                        receivedTrade = true;
+                        store.relayState("RECEIVING");
+                    }
                 }
             } catch (Exception e) {
                 ws.abort(); disconnected(ws);

@@ -13,7 +13,7 @@ public interface FinancialMapper {
     record Value(String accountCode, String accountName, BigDecimal currentAmount, BigDecimal previousAmount,
                  String currency, String valueStatus, String sourceAccountId, String sourceAccountName) { }
 
-    Header latest(@Param("stock") String stock, @Param("year") int year);
+    Header latest(@Param("stock") String stock, @Param("year") int year, @Param("reportCode") String reportCode);
     Header byReceipt(@Param("receipt") String receipt, @Param("fsDiv") String fsDiv);
     List<Value> values(long reportId);
     int upsertCompany(@Param("stock") String stock, @Param("name") String name, @Param("corp") String corp);

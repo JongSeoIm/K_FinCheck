@@ -37,8 +37,6 @@ async def collect_composite(request, quote_tool, financial_tool, policy_tool):
     if is_financial_question(request.message):
         try:
             year = financial_year(request.message)
-            if stock.symbol not in {"005930", "000660"}:
-                raise ValueError("실적 조회는 삼성전자·SK하이닉스의 연결 연간 실적만 지원합니다.")
             needed["financial"] = financial_tool
         except ValueError as error:
             notes.append(str(error))

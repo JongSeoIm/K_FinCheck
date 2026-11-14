@@ -34,10 +34,7 @@ export default function StockChatDrawer({ stock }) {
   const viewKey = useRef('')
   const conversationKey = user ? `${user.userId}:${context.symbol}` : `guest:${context.symbol}`
   const storageKey = `kfc-chat-room-${conversationKey}`
-  const suggestions = ['현재가와 등락률 알려줘',
-    ...(['005930', '000660'].includes(context.symbol) ? ['최근 연간 실적 알려줘'] : []),
-    ...(['005930', '000660', '035420', '035720', '005380', '000270', '051910', '006400'].includes(context.symbol) ? ['관련 산업 정책 알려줘'] : []),
-  ]
+  const suggestions = ['현재가와 등락률 알려줘', '최근 연간 실적 알려줘', '관련 산업 정책 알려줘']
 
   useEffect(() => () => clearTimeout(closeTimer.current), [])
 
@@ -211,7 +208,7 @@ export default function StockChatDrawer({ stock }) {
   return (
     <>
       <button className='stock-ai-launcher' type='button' onClick={show} aria-haspopup='dialog'>
-        <span>이 종목 AI에게 물어보기</span><span aria-hidden='true'>↗</span>
+        <span>AI에게 물어보기</span><span aria-hidden='true'>↗</span>
       </button>
       {mounted && createPortal(
         <dialog ref={dialogRef} className={`stock-chat-drawer${closing ? ' is-closing' : ''}`}

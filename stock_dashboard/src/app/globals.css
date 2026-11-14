@@ -176,6 +176,36 @@ a:focus-visible {
   gap: 12px;
   min-width: 0;
 }
+.detail-tabs {
+  display: flex;
+  gap: 28px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.detail-tabs button {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+}
+.detail-tabs button[aria-selected='true'] { color: var(--text); font-weight: 700; }
+.detail-tabs button[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  background: var(--text);
+}
+.detail-tabs button:focus-visible { outline: 2px solid #777; outline-offset: 4px; }
+.detail-tab-panel { min-width: 0; }
+.detail-info-grid { display: grid; gap: 12px; }
 
 /* 국내 주식 목록과 공통 탐색 */
 .topbar-navigation { display: flex; align-items: center; gap: 28px; min-width: 0; }
@@ -225,7 +255,6 @@ a:focus-visible {
 .market-pagination { display: flex; justify-content: center; gap: 18px; padding: 10px 16px 20px; }
 .market-pagination button { background: transparent; border: 0; padding: 4px; color: var(--muted); cursor: pointer; }
 .market-pagination button[aria-current] { color: var(--text); font-weight: 700; border-bottom: 2px solid var(--text); }
-.market-layout > .insight-column { margin-top: 10px; }
 @media (max-width: 600px) {
   .topbar-navigation { gap: 20px; }
   .market-nav-link { font-size: 16px; }
@@ -384,48 +413,44 @@ a:focus-visible {
 .count-badge { font-weight: 700; }
 .empty-state { padding: 14px; }
 .opinion-panel { padding: 14px; font-size: 14px; }
-.opinion-meta, .opinion-footnote, .opinion-message { margin: 0; color: var(--muted); line-height: 1.6; }
-.opinion-meta { margin-bottom: 12px; }
+.opinion-footnote, .opinion-message { margin: 0; color: var(--muted); line-height: 1.6; }
 .opinion-basis { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
-.opinion-current-quote { display: grid; grid-template-columns: 1fr auto; gap: 7px 12px; padding: 12px; border: 1px solid #e2e2e2; background: #f7f7f7; }
-.opinion-current-quote > span { color: var(--muted); }
-.opinion-current-quote > strong { font-size: 18px; font-variant-numeric: tabular-nums; }
-.opinion-current-quote small { grid-column: 1 / -1; font-size: 13px; line-height: 1.6; color: var(--muted); }
-.broker-opinion-scroll { margin-top: 12px; padding: 0 12px; border: 1px solid #e2e2e2; background: #fff; }
-.broker-opinion-window { position: relative; margin: 12px 0; overflow: hidden; }
-.broker-opinion-fade { position: absolute; left: 0; right: 0; height: 28px; pointer-events: none; }
-.broker-opinion-fade-top { top: 0; background: linear-gradient(to bottom, #fff, transparent); }
-.broker-opinion-fade-bottom { bottom: 0; background: linear-gradient(to bottom, transparent, #fff); }
-.broker-opinion-list { list-style: none; margin: 0; padding: 0; max-height: 370px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
-.broker-opinion-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
-.broker-opinion-list:focus-visible { outline: 1px solid #aaa; outline-offset: -1px; }
-.broker-opinion { padding: 15px 0; border-bottom: 1px solid var(--line-light); }
-.broker-opinion-heading, .broker-opinion-body { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; }
-.broker-opinion-heading time { font-size: 13px; color: var(--muted); }
-.broker-opinion-body { margin-top: 9px; font-size: 14px; }
-.broker-opinion-body > span { color: var(--muted); }
-.broker-opinion-body strong { color: var(--text); font-weight: 600; }
-.broker-opinion-difference { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.opinion-chart { display: block; width: 100%; height: auto; overflow: visible; }
-.opinion-grid { stroke: var(--line-light); stroke-width: 1; }
-.opinion-axis { fill: var(--muted); font-size: 13px; }
-.opinion-value { fill: var(--text); font-size: 15px; font-weight: 700; }
-.opinion-label { fill: var(--text); font-size: 14px; }
-.opinion-bar-0 { fill: #8fa69b; }
-.opinion-bar-1 { fill: #bbb6ac; }
-.opinion-bar-2 { fill: #b29b9b; }
-.opinion-details { margin-top: 10px; }
-.opinion-details summary { width: fit-content; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.target-price-chart { height: 240px; }
+.target-price-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+.target-price-values > div { padding: 10px 12px; border: 1px solid var(--line); }
+.target-price-values > .target-price-average { background: #f4f7f5; }
+.target-price-values dd { margin: 4px 0 0; font-variant-numeric: tabular-nums; }
+.target-price-values strong { display: block; font-size: 18px; }
+.target-price-values small { color: var(--muted); }
+.opinion-detail-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-top: 10px; }
+.broker-opinion-scroll { min-height: 162px; contain: size; overflow: auto; border: 1px solid var(--line); }
+.broker-opinion-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.broker-opinion-table th, .broker-opinion-table td { padding: 7px 8px; line-height: 17px; text-align: left; border-bottom: 1px solid var(--line-light); }
+.broker-opinion-table thead th { position: sticky; top: 0; background: #f7f7f7; }
+.broker-opinion-table th:last-child, .broker-opinion-table td:last-child { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.broker-opinion-table time { white-space: nowrap; color: var(--muted); }
+.opinion-distribution { display: flex; flex-direction: column; padding: 12px; border: 1px solid var(--line); }
+.opinion-distribution h3 { margin: 0 0 8px; font-size: 13px; }
+.opinion-distribution .opinion-footnote { margin-top: 6px; font-size: 11px; }
+.opinion-ratios { display: grid; flex: 1; gap: 12px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.opinion-ratios li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.opinion-ratios strong { min-width: 76px; text-align: right; font-variant-numeric: tabular-nums; }
+.opinion-ratio-track { height: 6px; background: var(--line-light); }
+.opinion-ratio-track > span { display: block; height: 100%; }
+.opinion-bar-0 { background: #8fa69b; }
+.opinion-bar-1 { background: #bbb6ac; }
+.opinion-bar-2 { background: #b29b9b; }
+@media (max-width: 720px) {
+  .opinion-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .broker-opinion-scroll { min-height: 0; max-height: 162px; contain: none; }
+}
 .opinion-footnote { margin-top: 12px; font-size: 13px; }
 .opinion-fine-print { font-size: 9pt; color: #767676; }
-.opinion-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
-.opinion-table th, .opinion-table td { padding: 12px 3px; border-bottom: 1px solid var(--line-light); text-align: left; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.opinion-table th { color: var(--muted); font-weight: 400; }
-.opinion-table th:first-child { width: 40%; }
-.opinion-table th:nth-child(2) { width: 20%; }
-.opinion-table td time { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
-.opinion-table th:last-child, .opinion-table td:last-child { text-align: right; }
-.opinion-table td:last-child { font-weight: 700; }
 .opinion-retry { margin-top: 10px; border: 0; padding: 0; background: transparent; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; }
 .empty-state strong { font-size: 13px; }
 .empty-state p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
@@ -551,6 +576,10 @@ a:focus-visible {
 .policy-copy p { line-height: 1.6; margin: 4px 0; color: var(--muted); font-size: 12px; }
 .policy-link-label { color: var(--blue); font-size: 11px; }
 .policy-list > li.inline-warning { display: block; padding: 8px 0; border: 0; }
+.stock-news-list { margin: 0; padding: 0 14px; list-style: none; }
+.stock-news-list > li { padding: 10px 0; border-bottom: 1px solid var(--line-light); overflow-wrap: anywhere; }
+.stock-news-list > li:last-child { border-bottom: 0; }
+.stock-news-list small { display: block; margin-top: 4px; }
 
 .skeleton-list { display: grid; gap: 8px; padding: 12px; }
 .skeleton-row, .skeleton-block { display: block; height: 42px; background: #ddd; }
@@ -577,6 +606,8 @@ a:focus-visible {
   .chart-stats div:nth-child(-n+2) { border-bottom: 1px solid var(--line-light); }
   .chart-area { height: 260px; }
   .insight-column { grid-template-columns: 1fr; }
+  .detail-tabs { gap: 22px; overflow-x: auto; }
+  .detail-tabs button { min-height: 46px; white-space: nowrap; }
   .watchlist-panel { grid-column: auto; }
   .policy-list li { grid-template-columns: 22px minmax(0, 1fr); }
   .policy-link-label { display: none; }
@@ -655,15 +686,16 @@ a:focus-visible {
   font-weight: 700;
 }
 
-/* OpenDART 연간 실적: 기존 우측 패널 안에서만 표시한다. */
+/* OpenDART 연간 실적 */
 .financial-panel { padding: 12px; }
+.financial-modes { display: flex; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line-light); }
+.financial-modes button { padding: 9px 0; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); cursor: pointer; }
+.financial-modes button[aria-pressed='true'] { border-bottom-color: var(--text); color: var(--text); font-weight: 700; }
 .financial-meta { line-height: 1.5; color: var(--muted); font-size: 11px; margin-bottom: 9px; }
 .financial-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
-.financial-table th, .financial-table td { padding: 10px 0; border-bottom: 1px solid var(--line-light); text-align: right; font-variant-numeric: tabular-nums; }
+.financial-table th, .financial-table td { padding: 8px 4px; border-bottom: 1px solid var(--line-light); text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .financial-table th:first-child { width: 28%; text-align: left; font-weight: 500; }
-.financial-table th:nth-child(2) { width: 40%; }
 .financial-table thead th { color: var(--muted); font-size: 11px; font-weight: 400; }
-.financial-table td small { line-height: 1.5; display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
 .financial-source { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: space-between; margin-top: 10px; color: var(--muted); font-size: 11px; }
 .financial-source a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .financial-state { padding: 16px 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
@@ -671,17 +703,15 @@ a:focus-visible {
 .financial-state button { border: 1px solid var(--line); background: transparent; color: inherit; padding: 4px 8px; cursor: pointer; }
 .financial-caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* 항목별 전년/당해 비교: 색은 증감률에만 사용한다. */
-.financial-table .financial-value-row > * { border-bottom: 0; padding-bottom: 7px; }
-.financial-table .financial-chart-row > td { padding: 0 0 12px; }
-.financial-growth { white-space: nowrap; font-size: 13px; font-weight: 700; }
-.financial-comparison { display: grid; gap: 5px; }
-.financial-bar-row { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 11px; text-align: left; }
-.financial-bar-track { position: relative; height: 5px; }
-.financial-bar, .financial-bar-baseline { display: block; position: absolute; top: 0; height: 100%; }
-.financial-bar-baseline { width: 1px; background: var(--line); }
-.financial-bar-previous { background: #cbd0d3; }
-.financial-bar-current { background: #555b5e; }
+.financial-growth { font-size: 13px; font-weight: 700; }
+
+.dividend-bars { display: flex; gap: 4px; margin: 12px 0; font-size: 11px; text-align: center; }
+.dividend-bar-column { flex: 1; min-width: 0; }
+.dividend-bar-track { display: flex; align-items: flex-end; justify-content: center; height: 96px; margin-top: 20px; border-bottom: 1px solid var(--line-light); }
+.dividend-bar { position: relative; width: min(48px, 64%); min-height: 1px; background: #4267a1; }
+.dividend-bar span { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); white-space: nowrap; padding-bottom: 2px; }
+.dividend-bar-date { display: block; margin-top: 4px; color: var(--muted); }
+.dividend-table-wrap { max-height: 240px; overflow-y: auto; }
 
 /* 관심 종목 및 시세 상태 */
 .watch-name { min-width: 0; }
