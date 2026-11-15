@@ -25,6 +25,10 @@ const detailTabs = [
   { id: 'info', label: '종목정보' },
   { id: 'policy', label: '공시·정책' },
 ]
+const policyTabs = [
+  { id: 'trends', label: '산업·정책 동향' },
+  { id: 'news', label: '최신 기사' },
+]
 
 export default function Dashboard({ initialStock }) {
   const router = useRouter()
@@ -37,6 +41,7 @@ export default function Dashboard({ initialStock }) {
   const recentStock = marketStocks.find(stock => stock.symbol === recentSymbol)
   const [intervalSeconds, setIntervalSeconds] = useState(60)
   const [detailTab, setDetailTab] = useState('chart')
+  const [policyTab, setPolicyTab] = useState('trends')
   const stream = useRealtimeQuotes(intervalSeconds)
   const chatStock = recentStock || selectedStock
 
@@ -50,15 +55,15 @@ export default function Dashboard({ initialStock }) {
     router.push(`/?symbol=${encodeURIComponent(normalizedStock.symbol)}`)
   }
 
-  const handleTabKeyDown = (event, index) => {
+  const handleTabKeyDown = (event, index, tabs, selectTab) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
     let nextIndex = index
-    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + detailTabs.length) % detailTabs.length
-    if (event.key === 'ArrowRight') nextIndex = (index + 1) % detailTabs.length
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length
     if (event.key === 'Home') nextIndex = 0
-    if (event.key === 'End') nextIndex = detailTabs.length - 1
-    setDetailTab(detailTabs[nextIndex].id)
+    if (event.key === 'End') nextIndex = tabs.length - 1
+    selectTab(tabs[nextIndex].id)
     event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[nextIndex]?.focus()
   }
 
@@ -102,7 +107,7 @@ export default function Dashboard({ initialStock }) {
               aria-controls={`detail-panel-${tab.id}`}
               tabIndex={detailTab === tab.id ? 0 : -1}
               onClick={() => setDetailTab(tab.id)}
-              onKeyDown={event => handleTabKeyDown(event, index)}
+              onKeyDown={event => handleTabKeyDown(event, index, detailTabs, setDetailTab)}
             >{tab.label}</button>)}
           </nav>
 
@@ -138,15 +143,26 @@ export default function Dashboard({ initialStock }) {
 
           {detailTab === 'policy' && <section id='detail-panel-policy' className='detail-info-grid detail-tab-panel'
             role='tabpanel' aria-labelledby='detail-tab-policy'>
-              <section className='panel policy-panel'>
-                <div className='panel-heading'><h2>{selectedStock.name || selectedStock.symbol} 산업·정책 동향</h2></div>
-                <Suspense fallback={<PolicySkeleton />}>
+              <div className='detail-tabs' role='tablist' aria-label='공시·정책 자료 구분'>
+                {policyTabs.map((tab, index) => <button
+                  key={tab.id}
+                  id={`policy-tab-${tab.id}`}
+                  type='button'
+                  role='tab'
+                  aria-selected={policyTab === tab.id}
+                  aria-controls={`policy-panel-${tab.id}`}
+                  tabIndex={policyTab === tab.id ? 0 : -1}
+                  onClick={() => setPolicyTab(tab.id)}
+                  onKeyDown={event => handleTabKeyDown(event, index, policyTabs, setPolicyTab)}
+                >{tab.label}</button>)}
+              </div>
+              <section id='policy-panel-trends' className='panel' role='tabpanel' aria-labelledby='policy-tab-trends' hidden={policyTab !== 'trends'}>
+                {policyTab === 'trends' && <Suspense fallback={<PolicySkeleton />}>
                   <LazyPolicyFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />
-                </Suspense>
+                </Suspense>}
               </section>
-              <section className='panel'>
-                <div className='panel-heading'><h2>최신 기사</h2></div>
-                <StockNewsFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />
+              <section id='policy-panel-news' className='panel' role='tabpanel' aria-labelledby='policy-tab-news' hidden={policyTab !== 'news'}>
+                {policyTab === 'news' && <StockNewsFeed key={selectedStock.symbol} symbol={selectedStock.symbol} />}
               </section>
           </section>}
         </section>

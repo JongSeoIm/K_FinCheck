@@ -45,28 +45,23 @@ export default function PolicyFeed({ symbol }) {
 
   return (
     <>
-      <div className='policy-toolbar'><span>산업통상부·정책브리핑 · 관련도 기준 통과</span><span>허용된 텍스트만 수집 · 원문 출처 표시</span></div>
+      <div className='policy-toolbar'><span>산업통상부·정책브리핑 · 관련도 기준 통과</span></div>
       <div className='policy-scroll' tabIndex={0} aria-label='산업·정책 동향 목록'>
-        <ol className='policy-list'>
-          {policies.map((policy, index) => (
+        <ul className='stock-news-list policy-copy'>
+          {policies.map(policy => (
             <li key={policy.link}>
-              <span className='policy-index' aria-hidden='true'>{String(index + 1).padStart(2, '0')}</span>
-              <div className='policy-copy'>
-                {policy.tags?.length > 0 && <div className='policy-tags' aria-label='자료 분류'>
-                  {policy.tags.map(tag => <span className='policy-tag' key={tag}>{tag}</span>)}
-                </div>}
-                <a href={policy.link} target='_blank' rel='noopener noreferrer'>{policy.title}</a>
-                {policy.summary && <p>{policy.summary}</p>}
-                <small>
-                  {relationLabels[policy.relationType] || '관련성 확인 필요'} · {statusLabels[policy.policyStatus] || '발표 자료'}
-                  {' · '}{policy.source === 'KOREA_KR' ? `정책브리핑${policy.publisher ? ` · ${policy.publisher}` : ''}` : '산업통상부'}
-                  {policy.publishedAt && <> · <time dateTime={policy.publishedAt}>{dateFormat.format(new Date(`${policy.publishedAt}T00:00:00+09:00`))}</time></>}
-                </small>
+              <div className='policy-tags'>
+                <span className='policy-tag'>{relationLabels[policy.relationType] || '관련성 확인 필요'}</span>
+                <span className='policy-tag'>{statusLabels[policy.policyStatus] || '발표 자료'}</span>
               </div>
-              <span className='policy-link-label' aria-hidden='true'>원문 ↗</span>
+              <a href={policy.link} target='_blank' rel='noopener noreferrer'>{policy.title} <span aria-hidden='true'>↗</span></a>
+              <small>
+                {policy.source === 'KOREA_KR' ? `정책브리핑${policy.publisher ? ` · ${policy.publisher}` : ''}` : '산업통상부'}
+                {policy.publishedAt && <> · <time dateTime={policy.publishedAt}>{dateFormat.format(new Date(`${policy.publishedAt}T00:00:00+09:00`))}</time></>}
+              </small>
             </li>
           ))}
-        </ol>
+        </ul>
       </div>
     </>
   )
