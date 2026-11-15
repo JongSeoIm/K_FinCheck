@@ -1,17 +1,65 @@
-# 비밀 값 (커밋 금지)
-.env
-.env.*
-!.env.example
-**/.kis-token.json
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
 
-**/.env.bak*
-
-# Python AI 서버
-ai-server/.venv/
-**/__pycache__/
+# Testing
+coverage/
 .pytest_cache/
 
-# 빌드 결과
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Java & Maven
+target/
 backend/target/
-frontend/.next/
-frontend/node_modules/
+*.class
+.realtime-spool/
+**/.realtime-spool/
+
+# Package Manager
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment & Local Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+application-local.yml
+application-local.properties
+**/application-local.yml
+**/application-local.properties
+.kis_token.json
+**/.kis_token.json
+
+# IDE & Editor
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local work artifacts
+.tmp/
+tmp/
+outputs/
+scratch/
+HANDOFF.md
