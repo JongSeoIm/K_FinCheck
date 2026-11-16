@@ -26,9 +26,12 @@ const eventTones = {
 const sources = { OPENDART: 'OpenDART', KIND: 'KIND', COMPANY_IR: '기업 IR' }
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
 
+function seoulDate() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
+}
+
 function currentMonth() {
-  const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
-  const [year, month] = date.split('-').map(Number)
+  const [year, month] = seoulDate().split('-').map(Number)
   return new Date(year, month - 1, 1)
 }
 
@@ -41,6 +44,7 @@ export default function CompanyCalendar() {
   const [result, setResult] = useState(null)
   const [hovered, setHovered] = useState(null)
   const [opened, setOpened] = useState(null)
+  const [attempt, setAttempt] = useState(0)
   const calendar = useRef(null)
   const year = month.getFullYear()
   const index = month.getMonth()
@@ -48,8 +52,9 @@ export default function CompanyCalendar() {
   const days = new Date(year, index + 1, 0).getDate()
   const cellCount = Math.ceil((firstDay + days) / 7) * 7
   const monthKey = `${year}-${String(index + 1).padStart(2, '0')}`
-  const monthResult = result?.month === monthKey ? result : null
+  const monthResult = result?.month === monthKey && result.attempt === attempt ? result : null
   const events = monthResult?.events ?? []
+  const today = seoulDate()
   const active = opened ?? hovered
 
   useEffect(() => {
@@ -63,13 +68,13 @@ export default function CompanyCalendar() {
         return response.json()
       })
       .then(events => {
-        if (!controller.signal.aborted) setResult({ month: monthKey, events })
+        if (!controller.signal.aborted) setResult({ month: monthKey, attempt, events })
       })
       .catch(() => {
-        if (!controller.signal.aborted) setResult({ month: monthKey, failed: true })
+        if (!controller.signal.aborted) setResult({ month: monthKey, attempt, failed: true })
       })
     return () => controller.abort()
-  }, [monthKey])
+  }, [monthKey, attempt])
 
   useEffect(() => {
     if (opened === null) return
@@ -80,7 +85,7 @@ export default function CompanyCalendar() {
     return () => document.removeEventListener('pointerdown', closeOutside)
   }, [opened])
 
-  function move(delta) {
+  function moveMonth(delta) {
     setHovered(null)
     setOpened(null)
     setResult(null)
@@ -125,9 +130,9 @@ export default function CompanyCalendar() {
       </div>
       <div className={styles.panel}>
         <div className={styles.monthBar}>
-          <button type='button' onClick={() => move(-1)} aria-label='이전 달'>‹</button>
+          <button type='button' onClick={() => moveMonth(-1)} aria-label='이전 달'>‹</button>
           <h2 aria-live='polite'>{year}년 {index + 1}월</h2>
-          <button type='button' onClick={() => move(1)} aria-label='다음 달'>›</button>
+          <button type='button' onClick={() => moveMonth(1)} aria-label='다음 달'>›</button>
         </div>
         <div className={styles.grid}>
           {weekdays.map(day => <div className={styles.weekday} key={day}>{day}</div>)}
@@ -141,7 +146,7 @@ export default function CompanyCalendar() {
             const selected = opened === moreId || entries.some(event => opened === eventId(event))
             return (
               <div className={selected ? `${styles.day} ${styles.selectedDay}` : styles.day} key={cell}>
-                <time dateTime={date}>{day}</time>
+                <time dateTime={date} aria-current={date === today ? 'date' : undefined}>{day}</time>
                 {entries.slice(0, 2).map(event => {
                   const id = eventId(event)
                   const label = `${event.name} · ${eventLabels[event.type]}`
@@ -170,11 +175,12 @@ export default function CompanyCalendar() {
           })}
         </div>
         {events.length === 0 && (
-          <p className={styles.empty} role='status'>
-            {!monthResult ? '기업 일정을 불러오는 중입니다.'
+          <div className={styles.empty}>
+            <span role='status'>{!monthResult ? '기업 일정을 불러오는 중입니다.'
               : monthResult.failed ? '기업 일정을 불러오지 못했습니다.'
-              : '이 달에 등록된 일정이 없습니다.'}
-          </p>
+              : '이 달에 등록된 일정이 없습니다.'}</span>
+            {monthResult?.failed && <button type='button' onClick={() => setAttempt(value => value + 1)}>다시 조회</button>}
+          </div>
         )}
       </div>
     </section>

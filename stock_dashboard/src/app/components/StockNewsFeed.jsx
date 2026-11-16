@@ -45,7 +45,7 @@ export default function StockNewsFeed({ symbol }) {
         <div className='policy-tags'>
           <span className='policy-tag'>{article.relation === 'DIRECT' ? '직접 관련' : '산업 관련'}</span>
         </div>
-        <a href={article.link} target='_blank' rel='noopener noreferrer'>{article.title} ↗</a>
+        <a href={article.link} target='_blank' rel='noopener noreferrer'>{article.title}</a>
         <small>{source} · <time dateTime={article.publishedAt}>{dateFormat.format(new Date(article.publishedAt))}</time></small>
       </li>)}
     </ul>

@@ -37,8 +37,9 @@ export default function Dashboard({ initialStock }) {
   const isList = !isCalendar && !params.has('symbol')
   const isDetail = !isCalendar && !isList
   const selectedStock = marketStocks.find(stock => stock.symbol === params.get('symbol')) || initialStock || marketStocks[0]
-  const recentSymbol = useRecentStock(isDetail ? selectedStock.symbol : null)
-  const recentStock = marketStocks.find(stock => stock.symbol === recentSymbol)
+  const recentSymbols = useRecentStock(isDetail ? selectedStock.symbol : null)
+  const recentStocks = recentSymbols.map(symbol => marketStocks.find(stock => stock.symbol === symbol)).filter(Boolean)
+  const recentStock = recentStocks[0]
   const [intervalSeconds, setIntervalSeconds] = useState(60)
   const [detailTab, setDetailTab] = useState('chart')
   const [policyTab, setPolicyTab] = useState('trends')
@@ -97,6 +98,11 @@ export default function Dashboard({ initialStock }) {
         <section className='primary-column' aria-label='선택 종목 정보'>
           <StockInfo key={selectedStock.symbol} stock={selectedStock} liveQuote={stream.trades[selectedStock.symbol]} />
 
+          {recentStocks.length > 1 && <nav className='recent-stock-history' aria-label='최근 본 종목 목록'>
+            {recentStocks.map(stock => <Link key={stock.symbol} href={`/?symbol=${stock.symbol}`}
+              aria-current={stock.symbol === selectedStock.symbol ? 'page' : undefined}>{stock.name}</Link>)}
+          </nav>}
+
           <nav className='detail-tabs' role='tablist' aria-label='종목 상세 메뉴'>
             {detailTabs.map((tab, index) => <button
               id={`detail-tab-${tab.id}`}
@@ -119,8 +125,6 @@ export default function Dashboard({ initialStock }) {
                 liveQuote={stream.trades[selectedStock.symbol]}
                 liveCandles={stream.candles?.[selectedStock.symbol]}
                 streamInterval={stream.intervalSeconds}
-                streamStatus={stream.status}
-                supported={stream.supportedSymbols.includes(selectedStock.symbol)}
                 onIntervalChange={setIntervalSeconds}
               />
           </section>}

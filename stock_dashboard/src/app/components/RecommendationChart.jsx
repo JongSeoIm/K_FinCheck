@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis, YAxis, usePlotArea, useYAxisScale } from 'recharts'
+import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis, usePlotArea, useYAxisScale } from 'recharts'
 import useStockCandles from '../hooks/useStockCandles'
 import useStockData from '../hooks/useStockData'
 
@@ -15,20 +15,35 @@ function TargetLabels({ targets }) {
   const scale = useYAxisScale()
   if (!plot || !scale) return null
 
-  const labelGap = 14
+  const labelGap = 18
+  const edge = plot.x + plot.width
   let nextY = plot.y + 5
   const labels = []
   for (const [index, target] of [...targets].reverse().entries()) {
-    const y = Math.min(Math.max(scale(target.value), nextY),
+    const point = scale(target.value)
+    const y = Math.min(Math.max(point, nextY),
       plot.y + plot.height - 5 - (targets.length - index - 1) * labelGap)
     nextY = y + labelGap
-    labels.push(<text key={target.key} x={plot.x + plot.width + 6} y={y} dominantBaseline='middle'
-      fontSize={11} fill={target.color}>{prices.format(target.value)}원</text>)
+    labels.push(<g key={target.key} className='target-price-label'>
+      {Math.abs(y - point) > 2 && <line x1={edge + 4} x2={edge + 12} y1={point} y2={y} stroke={target.color} />}
+      <text x={edge + 15} y={y} dominantBaseline='central' fontSize={11} fill={target.color}>
+        {target.label} {prices.format(target.value)}원
+      </text>
+    </g>)
   }
   return labels
 }
 
-function TargetPriceSummary({ symbol, items, price }) {
+function TargetPriceTooltip({ active, payload }) {
+  const row = payload?.[0]?.payload
+  if (!active || !row || row.close == null) return null
+  return <div className='chart-tooltip'>
+    {row.date ? <time dateTime={row.date}>{row.date}</time> : <span>비교 기준 주가</span>}
+    <strong>{prices.format(row.close)}원</strong>
+  </div>
+}
+
+function TargetPriceSummary({ symbol, items, price, businessDate }) {
   const { data: candles } = useStockCandles(symbol, 'D', 45)
   const values = items.map(item => item.targetPrice).filter(value => Number.isFinite(value) && value > 0)
   const average = values.reduce((sum, value) => sum + value, 0) / values.length
@@ -37,41 +52,45 @@ function TargetPriceSummary({ symbol, items, price }) {
     { key: 'average', label: '평균', value: average, color: '#17643f' },
     { key: 'high', label: '최고', value: Math.max(...values), color: '#a43c3c' },
   ]
-  const history = candles.filter(candle => Number.isFinite(candle.close) && candle.close > 0)
+  const history = candles.filter(candle => Number.isFinite(candle.close) && candle.close > 0 && (!businessDate || candle.date < businessDate))
     .sort((first, second) => first.date.localeCompare(second.date))
   const basisIndex = history.length
   const targetIndex = basisIndex + Math.max(1, Math.round(basisIndex / 4))
   const chartData = [
-    ...history.map((candle, index) => ({ index, close: candle.close })),
+    ...history.map((candle, index) => ({ index, date: candle.date, close: candle.close })),
     { index: basisIndex, close: price, low: price, average: price, high: price },
     { index: targetIndex, low: targets[0].value, average, high: targets[2].value },
   ]
   const axisLabels = {
     ...(history.length > 1 && { 0: history[0].date.slice(5).replace('-', '.') }),
     [basisIndex]: '기준 주가',
-    [targetIndex]: '목표주가',
   }
 
   return <>
     <p className='opinion-basis'>최근 3개월 · 목표주가를 제시한 증권사 {values.length}곳</p>
     {price != null && <div className='target-price-chart' role='img' aria-label='비교 기준 주가와 증권사 목표주가 비교'>
       <ResponsiveContainer width='100%' height='100%'>
-        <LineChart data={chartData} margin={{ top: 12, right: 92, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke='var(--line)' />
+        <LineChart data={chartData} margin={{ top: 12, right: 118, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke='var(--line-light)' />
           <XAxis type='number' dataKey='index' domain={[0, targetIndex]}
             ticks={Object.keys(axisLabels).map(Number)} tickFormatter={value => axisLabels[value]} tick={{ fontSize: 11 }} />
-          <YAxis domain={['auto', 'auto']} width={75} tickFormatter={value => prices.format(value)} tick={{ fontSize: 11 }} />
+          <YAxis domain={['auto', 'auto']} width={60} tickLine={false} axisLine={false}
+            tickFormatter={value => prices.format(value)} tick={{ fontSize: 11 }} />
+          <ReferenceArea x1={basisIndex} x2={targetIndex} fill='#e8edf4' fillOpacity={0.6} />
+          <Tooltip content={<TargetPriceTooltip />} />
           <Line dataKey='close' stroke='#707783' strokeWidth={2} dot={false} isAnimationActive={false} />
           {targets.map(target => <Line key={target.key} dataKey={target.key} stroke={target.color}
-            strokeWidth={2} strokeDasharray='4 4'
-            dot={{ r: 4, fill: target.color, stroke: '#fff', strokeWidth: 1.5, strokeDasharray: 'none' }}
+            strokeWidth={2} strokeDasharray='4 4' activeDot={false}
+            dot={({ cx, cy, payload }) => payload.index === targetIndex
+              ? <circle cx={cx} cy={cy} r={4} fill={target.color} stroke='#fff' strokeWidth={1.5} /> : null}
             isAnimationActive={false} />)}
+          <ReferenceDot x={basisIndex} y={price} r={4} fill='#354457' stroke='#fff' />
           <TargetLabels targets={targets} />
         </LineChart>
       </ResponsiveContainer>
     </div>}
     {price != null && <p className='opinion-footnote'>
-      {history.length > 0 && '회색 실선은 일봉 종가입니다. '}점선은 기준 주가와 목표주가의 차이를 나타냅니다.
+      {history.length > 0 && '실선은 일봉 종가, '}점선은 기준 주가 대비 증권사 목표주가를 나타냅니다.
     </p>}
     <dl className='target-price-values'>
       {[targets[1], targets[2], targets[0]].map(target => {
@@ -164,7 +183,7 @@ export default function RecommendationChart({ symbol, liveQuote }) {
     {feed.partial
       ? <p className='opinion-message'>일부 자료만 조회되어 목표주가 집계를 표시하지 않습니다.</p>
       : hasTargets
-        ? <TargetPriceSummary symbol={symbol} items={feed.items} price={price} />
+        ? <TargetPriceSummary symbol={symbol} items={feed.items} price={price} businessDate={quote?.businessDate} />
         : <p className='opinion-message'>최근 3개월간 조회된 목표주가가 없습니다.</p>}
     <p className='opinion-footnote'>
       비교 기준 주가 {price == null ? '확인 불가' : `${prices.format(price)}원`}

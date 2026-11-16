@@ -1,18 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
-  ReferenceLine,
+  Rectangle,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
   useXAxisScale,
+  useYAxisInverseScale,
   useYAxisScale,
   usePlotArea,
 } from 'recharts'
@@ -25,10 +25,42 @@ const datedTimeFormatter = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Se
 const timeTickSteps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600, 43200, 86400]
 
 const minuteOptions = ['1분', '3분', '5분', '10분', '15분', '30분', '60분']
+const movingAverages = [
+  { key: 'ma5', period: 5, color: '#966026' },
+  { key: 'ma20', period: 20, color: '#7251a3' },
+]
+const axisTick = { fill: '#666', fontSize: 12 }
+const axisWidth = 76
+const chartMargin = { top: 8, right: 6, bottom: 0, left: 0 }
+const volumeFormatter = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 })
+
+function withMovingAverages(candles) {
+  const sums = movingAverages.map(() => 0)
+  const counts = movingAverages.map(() => 0)
+  return candles.map((candle, index) => {
+    const item = { ...candle, previousClose: candles[index - 1]?.close }
+    movingAverages.forEach(({ key, period }, series) => {
+      const previous = candles[index - period]?.close
+      if (Number.isFinite(candle.close)) { sums[series] += candle.close; counts[series]++ }
+      if (Number.isFinite(previous)) { sums[series] -= previous; counts[series]-- }
+      item[key] = counts[series] === period ? sums[series] / period : null
+    })
+    return item
+  })
+}
 
 function formatKRW(value) {
   if (value == null) return '—'
-  return `₩${Number(value).toLocaleString('ko-KR')}`
+  return `${Number(value).toLocaleString('ko-KR')}원`
+}
+
+function priceTicks(low, high) {
+  const interval = (high - low) / 4
+  const magnitude = 10 ** Math.floor(Math.log10(interval))
+  const step = Math.max(1, magnitude * [1, 2, 2.5, 5, 10].find(value => value * magnitude >= interval))
+  const first = Math.max(0, Math.floor(low / step) * step)
+  const last = Math.ceil(high / step) * step
+  return Array.from({ length: Math.round((last - first) / step) + 1 }, (_, index) => first + index * step)
 }
 
 function CandlestickLayer({ candles }) {
@@ -66,41 +98,72 @@ function CandlestickLayer({ candles }) {
   )
 }
 
-function ChartTooltip({ active, payload }) {
+function ChartTooltip({ active, payload, showAverages }) {
   if (!active || !payload?.length) return null
   const item = payload[0].payload
   if (!item) return null
 
-  const isUp = item.close >= item.open
-  const change = item.close - item.open
-  const changeRate = item.open ? (change / item.open) * 100 : 0
+  const changeRate = item.previousClose > 0 ? (item.close / item.previousClose - 1) * 100 : null
 
   return (
     <div className='chart-tooltip'>
-      <span>{item.date}</span>
-      <div>
-        <strong>종가: {formatKRW(item.close)}</strong>
-        <span className={isUp ? 'positive' : 'negative'}>
-          {isUp ? '+' : ''}{changeRate.toFixed(2)}%
-        </span>
-      </div>
-      <small>시가: {formatKRW(item.open)}</small>
-      <small>고가: {formatKRW(item.high)}</small>
-      <small>저가: {formatKRW(item.low)}</small>
-      <small>거래량: {Number(item.volume).toLocaleString('ko-KR')}주</small>
+      <time dateTime={item.date}>{Number.isFinite(item.actualTimestamp) ? datedTimeFormatter.format(item.actualTimestamp) : item.date}</time>
+      <dl>
+        <dt>종가</dt><dd><strong>{formatKRW(item.close)}</strong></dd>
+        {changeRate != null && <><dt>전봉 대비</dt><dd className={changeRate > 0 ? 'positive' : changeRate < 0 ? 'negative' : undefined}>
+          {changeRate > 0 ? '+' : ''}{changeRate.toFixed(2)}%
+        </dd></>}
+        <dt>시가</dt><dd>{formatKRW(item.open)}</dd>
+        <dt>고가</dt><dd>{formatKRW(item.high)}</dd>
+        <dt>저가</dt><dd>{formatKRW(item.low)}</dd>
+        <dt>거래량</dt><dd>{Number.isFinite(item.volume) ? `${item.volume.toLocaleString('ko-KR')}주` : '—'}</dd>
+        {showAverages && movingAverages.filter(({ key }) => item[key] != null).map(({ key, period, color }) =>
+          <div key={key} className='chart-tooltip-average' style={{ color }}><dt>{period}봉 평균</dt><dd>{formatKRW(Math.round(item[key]))}</dd></div>)}
+      </dl>
     </div>
   )
 }
 
-export default function StockChart({ symbol, liveQuote, liveCandles, streamInterval, streamStatus, supported, onIntervalChange }) {
+function PriceGuide({ pointer, latestPrice }) {
+  const plot = usePlotArea()
+  const scale = useYAxisScale()
+  const invert = useYAxisInverseScale()
+  if (!plot || !scale || !invert) return null
+  const right = plot.x + plot.width
+  const bottom = plot.y + plot.height
+  const hovering = pointer && pointer.x >= plot.x && pointer.x <= right && pointer.y >= plot.y && pointer.y <= bottom
+  const y = hovering ? pointer.y : scale(latestPrice)
+  const price = hovering ? invert(y) : latestPrice
+  if (!Number.isFinite(y) || !Number.isFinite(price) || y < plot.y || y > bottom) return null
+  const x = right + 2
+  const labelY = Math.max(plot.y + 9, Math.min(bottom - 9, y))
+  return <g className={hovering ? 'chart-cursor-price' : 'chart-latest-price'} pointerEvents='none'>
+    <line x1={plot.x} x2={right} y1={y} y2={y} stroke='#627084' strokeDasharray='3 3' />
+    <rect x={x} y={labelY - 9} width={axisWidth - 4} height={18} rx={2} fill='#354457' />
+    <text x={x + (axisWidth - 4) / 2} y={labelY} dominantBaseline='central' textAnchor='middle'
+      fill='#fff' fontSize={11}>{Math.round(price).toLocaleString('ko-KR')}</text>
+  </g>
+}
+
+function VolumeBar({ payload, x, y, width, height }) {
+  return <Rectangle x={x} y={y} width={width} height={height} fill={payload.close >= payload.open ? '#c43b3b' : '#1769aa'} fillOpacity={0.55} />
+}
+
+export default function StockChart({ symbol, liveQuote, liveCandles, streamInterval, onIntervalChange }) {
   const [chartType, setChartType] = useState('candle')
+  const [showAverages, setShowAverages] = useState(true)
+  const chartSyncId = useId()
   const [selectedPeriod, setSelectedPeriod] = useState('일')
   const [selectedMinute, setSelectedMinute] = useState('1분')
   const [isMinuteOpen, setIsMinuteOpen] = useState(false)
   const dropdownRef = useRef(null)
   const chartAreaRef = useRef(null)
+  const priceAreaRef = useRef(null)
   const lastWheelRef = useRef(0)
+  const dragRef = useRef(null)
   const [zoom, setZoom] = useState(null)
+  const [pointer, setPointer] = useState(null)
+  const [panning, setPanning] = useState(false)
   const [chartWidth, setChartWidth] = useState(800)
 
   const periodCode = useMemo(() => {
@@ -114,7 +177,7 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
 
   const isIntraday = selectedPeriod === '분'
   const seconds = selectedMinute.endsWith('초') ? parseInt(selectedMinute, 10) : parseInt(selectedMinute, 10) * 60
-  const { data: historicalCandles, loading: historicalLoading, error: historicalError } = useStockCandles(symbol, periodCode, 45, !isIntraday)
+  const { data: historicalCandles, loading: historicalLoading, error: historicalError } = useStockCandles(symbol, periodCode, 100, !isIntraday)
   const intraday = useIntradayCandles(symbol, isIntraday)
   const { loadMore, hasMore, loading: intradayLoading } = intraday
   const loading = isIntraday ? intraday.loading && !intraday.data.length : historicalLoading
@@ -131,16 +194,20 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
   }, [isIntraday, streamInterval, seconds, liveCandles, periodCode, liveQuote, historicalCandles, intraday.data])
 
   const viewKey = `${symbol}:${selectedPeriod}:${isIntraday ? seconds : periodCode}`
-  const visibleCount = zoom?.key === viewKey ? zoom.count : isIntraday ? 120 : null
-  const visibleCandles = useMemo(() => (
-    visibleCount == null ? candles : candles.slice(-visibleCount)
-  ), [candles, visibleCount])
+  const currentView = zoom?.key === viewKey ? zoom : null
+  const count = Math.min(currentView ? currentView.count ?? candles.length : isIntraday ? 120 : 45, candles.length)
+  const anchorIndex = currentView?.endDate ? candles.findIndex(candle => candle.date === currentView.endDate) : -1
+  const end = anchorIndex < 0 ? candles.length : Math.max(count, anchorIndex + 1)
+  const start = end - count
+  const canLoadMore = isIntraday && hasMore && !intradayLoading
+  const candlesWithAverages = useMemo(() => withMovingAverages(candles), [candles])
+  const visibleCandles = useMemo(() => candlesWithAverages.slice(start, end), [candlesWithAverages, start, end])
   const chartCandles = useMemo(() => (
     isIntraday ? visibleCandles.map((candle, index) => ({ ...candle, timestamp: index, actualTimestamp: Date.parse(candle.date) })) : visibleCandles
   ), [visibleCandles, isIntraday])
   const timeAxis = useMemo(() => {
     if (!isIntraday || !chartCandles.length) return null
-    const targetTicks = Math.max(2, Math.min(8, Math.floor((chartWidth - 74) / 100)))
+    const targetTicks = Math.max(2, Math.min(8, Math.floor((chartWidth - axisWidth) / 100)))
     const desiredStep = Math.max(seconds, chartCandles.length * seconds / (targetTicks - 1))
     const step = timeTickSteps.find(value => value >= desiredStep) || 86400
     const ticks = []
@@ -159,39 +226,74 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     return (multipleDays ? datedTimeFormatter : timeAxisFormatter).format(new Date(candle.actualTimestamp))
   }
 
-  const [minPrice, maxPrice] = useMemo(() => {
-    if (!visibleCandles.length) return [0, 100]
-    const low = Math.min(...visibleCandles.map(candle => candle.low))
-    const high = Math.max(...visibleCandles.map(candle => candle.high))
-    // Pad the observed price range, rather than adding 2% of the stock price.
+  const visiblePriceTicks = useMemo(() => {
+    const values = visibleCandles.flatMap(candle => [candle.low, candle.high,
+      ...(showAverages ? movingAverages.map(({ key }) => candle[key]) : [])]).filter(Number.isFinite)
+    if (!values.length) return [0, 100]
+    const low = Math.min(...values)
+    const high = Math.max(...values)
     const padding = Math.max((high - low) * 0.12, high * 0.00005, 1)
-    return [Math.max(0, Math.floor(low - padding)), Math.ceil(high + padding)]
-  }, [visibleCandles])
+    return priceTicks(Math.max(0, low - padding), high + padding)
+  }, [visibleCandles, showAverages])
+
+  const adjustZoom = useCallback(zoomIn => {
+    if (!candles.length) return
+    if (!zoomIn && start === 0 && canLoadMore) loadMore()
+    const next = zoomIn ? Math.min(count, Math.max(8, Math.floor(count * 0.8))) : Math.min(candles.length, Math.ceil(count * 1.25))
+    const nextEnd = Math.max(end, next)
+    setZoom({ key: viewKey, count: next === candles.length ? null : next, endDate: nextEnd < candles.length ? candles[nextEnd - 1].date : null })
+  }, [viewKey, candles, count, start, end, canLoadMore, loadMore])
+
+  function beginPan(event) {
+    if (event.button !== 0 || !count || event.target.closest('button')) return
+    dragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, endDate: candles[end - 1].date, moved: false, atStart: false }
+  }
+
+  function movePointer(event) {
+    const drag = dragRef.current
+    if (drag?.id === event.pointerId) {
+      const distance = event.clientX - drag.x
+      if (!drag.moved) {
+        if (Math.abs(distance) < 5 || Math.abs(distance) < Math.abs(event.clientY - drag.y)) return
+        drag.moved = true
+        event.currentTarget.setPointerCapture(event.pointerId)
+        setPointer(null)
+        setPanning(true)
+      }
+      const initialEnd = candles.findIndex(candle => candle.date === drag.endDate) + 1 || end
+      const candlesMoved = Math.round(distance * count / Math.max(1, chartWidth - axisWidth))
+      const nextEnd = Math.min(candles.length, Math.max(count, initialEnd - candlesMoved))
+      drag.atStart = nextEnd === count && distance > 0
+      if (nextEnd !== end) setZoom({ key: viewKey, count, endDate: nextEnd < candles.length ? candles[nextEnd - 1].date : null })
+      return
+    }
+    const area = priceAreaRef.current?.getBoundingClientRect()
+    setPointer(area && event.pointerType !== 'touch'
+      ? { x: event.clientX - area.left, y: event.clientY - area.top } : null)
+  }
+
+  function endPan(event) {
+    const drag = dragRef.current
+    if (drag?.id !== event.pointerId) return
+    dragRef.current = null
+    setPanning(false)
+    if (drag.atStart && canLoadMore) loadMore()
+  }
 
   useEffect(() => {
     const area = chartAreaRef.current
     if (!area) return
     const handleWheel = event => {
-      if (event.ctrlKey || event.deltaY === 0 || !candles.length) return
+      if (event.ctrlKey || event.deltaY === 0 || !candles.length || dragRef.current?.moved) return
       event.preventDefault()
       const now = Date.now()
       if (now - lastWheelRef.current < 60) return
       lastWheelRef.current = now
-      const count = zoom?.key === viewKey ? Math.min(zoom.count ?? candles.length, candles.length) : Math.min(isIntraday ? 120 : candles.length, candles.length)
-      if (event.deltaY > 0 && count >= candles.length && isIntraday && hasMore && !intradayLoading) loadMore()
-      setZoom(current => {
-        const count = current?.key === viewKey
-          ? Math.min(current.count ?? candles.length, candles.length)
-          : Math.min(isIntraday ? 120 : candles.length, candles.length)
-        const next = event.deltaY < 0
-          ? Math.max(8, Math.floor(count * 0.8))
-          : Math.min(candles.length, Math.ceil(count * 1.25))
-        return { key: viewKey, count: next >= candles.length ? null : next }
-      })
+      adjustZoom(event.deltaY < 0)
     }
     area.addEventListener('wheel', handleWheel, { passive: false })
     return () => area.removeEventListener('wheel', handleWheel)
-  }, [viewKey, candles.length, isIntraday, zoom, hasMore, intradayLoading, loadMore])
+  }, [candles.length, adjustZoom])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -203,12 +305,11 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     return () => document.removeEventListener('pointerdown', handleClickOutside)
   }, [])
 
-  const { firstClose, lastClose, highPrice, lowPrice, changeRate, isRising } =
+  const { firstClose, highPrice, lowPrice, changeRate, isRising } =
     useMemo(() => {
-      if (!candles || candles.length === 0) {
+      if (visibleCandles.length === 0) {
         return {
           firstClose: null,
-          lastClose: null,
           highPrice: null,
           lowPrice: null,
           changeRate: null,
@@ -216,24 +317,23 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
         }
       }
 
-      const lows = candles.map((c) => c.low)
-      const highs = candles.map((c) => c.high)
+      const lows = visibleCandles.map((c) => c.low)
+      const highs = visibleCandles.map((c) => c.high)
       const minL = Math.min(...lows)
       const maxH = Math.max(...highs)
 
-      const first = candles[0].close
-      const last = candles.at(-1).close
+      const first = visibleCandles[0].close
+      const last = visibleCandles.at(-1).close
       const rate = first ? ((last - first) / first) * 100 : 0
 
       return {
         firstClose: first,
-        lastClose: last,
         highPrice: maxH,
         lowPrice: minL,
         changeRate: rate,
         isRising: last >= first,
       }
-    }, [candles])
+    }, [visibleCandles])
 
   const handleSelectMinute = (m) => {
     setSelectedMinute(m)
@@ -247,28 +347,33 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
     setIsMinuteOpen(false)
   }
 
+  const horizontalAxis = timeAxis || { dataKey: 'date', scale: 'band', minTickGap: 28 }
+  const hasVolume = chartCandles.some(candle => Number.isFinite(candle.volume))
+  const latestPrice = end === candles.length ? candles.at(-1)?.close : undefined
+
   return (
     <div className='chart-container'>
       <div className='chart-controls'>
-        <div className='stream-mode' aria-label='차트 종류 선택'>
+        <div className='chart-type' role='group' aria-label='차트 종류 선택'>
           <button
             type='button'
             className={chartType === 'candle' ? 'active' : ''}
+            aria-pressed={chartType === 'candle'}
             onClick={() => setChartType('candle')}
           >
-            캔들 차트
+            캔들
           </button>
           <span className='tab-separator' aria-hidden='true'>·</span>
           <button
             type='button'
             className={chartType === 'line' ? 'active' : ''}
+            aria-pressed={chartType === 'line'}
             onClick={() => setChartType('line')}
           >
-            선 차트
+            선
           </button>
         </div>
 
-        {/* 두 번째 사진과 동일한 글씨 클릭형 밑줄 탭 UI: 1분 ⌄ · 일 · 주 · 월 · 년 */}
         <div className='range-tabs' aria-label='차트 주기 선택'>
           <div className='minute-dropdown-container' ref={dropdownRef}>
             <button
@@ -335,28 +440,12 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
         </div>
       </div>
 
-      <div className='stream-status'>
-        <span>
-          {isIntraday ? `${selectedMinute}봉 · KIS 과거 분봉 + 실시간 수신분` : `${selectedPeriod}봉 시세 · KIS`}
-        </span>
-        <span>
-          {loading ? '시세 데이터 수신 중...' : error || `${visibleCandles.length < candles.length ? `${visibleCandles.length}/${candles.length}` : candles.length}개 봉 · ${supported ? streamStatus : '실시간 연결 종목 확인'}`}
-        </span>
-      </div>
-
-      {isIntraday && <div className='stream-status'>
-        <span>{intraday.loading ? '과거 분봉 조회 중…' : intraday.hasMore ? '더 축소하면 이전 분봉을 불러옵니다.' : '조회 가능한 분봉 범위입니다.'}</span>
-        {intraday.error && <button type='button' onClick={intraday.retry}>다시 조회</button>}
+      {error && <div className='chart-status' role='status'>
+        <span>{error}</span>
+        {isIntraday && <button type='button' onClick={intraday.retry}>다시 조회</button>}
       </div>}
 
-      <div className='chart-summary'>
-        <strong>{formatKRW(lastClose)}</strong>
-        <span className={changeRate == null ? '' : isRising ? 'positive' : 'negative'}>
-          {changeRate == null ? '—' : `${isRising ? '+' : ''}${changeRate.toFixed(2)}%`}
-        </span>
-      </div>
-
-      <div className='chart-stats' aria-label='차트 주요 값'>
+      {candles.length > 0 && <div className='chart-stats' aria-label='차트 주요 값'>
         <div>
           <span>기간 시작 종가</span>
           <strong>{formatKRW(firstClose)}</strong>
@@ -375,73 +464,61 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
             {changeRate == null ? '—' : `${isRising ? '+' : ''}${changeRate.toFixed(2)}%`}
           </strong>
         </div>
-      </div>
+      </div>}
 
-      <div className='chart-area' ref={chartAreaRef} aria-label='주가 차트, 마우스 휠로 확대 및 축소'>
-        {loading && candles.length === 0 ? (
-          <div className='skeleton-block' style={{ height: '100%' }} />
-        ) : candles.length === 0 ? (
-          <div className='empty-state' role='status'>{isIntraday ? (supported ? streamStatus : '실시간 구독 종목은 삼성전자·SK하이닉스입니다.') : (error || '차트 데이터가 없습니다.')}</div>
-        ) : (
-          <ResponsiveContainer width='100%' height='100%' onResize={width => setChartWidth(width)}>
-            {chartType === 'candle' ? (
-              <BarChart
-                data={chartCandles}
-                margin={{ top: 12, right: 6, bottom: 0, left: 0 }}
-              >
-                <CartesianGrid stroke='#e1e1e1' strokeDasharray='3 3' />
-                <XAxis
-                  {...(timeAxis || { dataKey: 'date', minTickGap: 28 })}
-                  tickFormatter={formatTimeTick}
-                  tick={{ fill: '#666', fontSize: 12 }}
-                />
-                <YAxis
-                  orientation='right'
-                  domain={[minPrice, maxPrice]}
-                  allowDataOverflow
-                  tickFormatter={(val) => Number(val).toLocaleString('ko-KR')}
-                  tick={{ fill: '#666', fontSize: 12 }}
-                  width={76}
-                />
-                <Tooltip content={<ChartTooltip />} />
-                <ReferenceLine y={visibleCandles[0]?.close} stroke='#888' strokeDasharray='4 4' />
-                <Bar dataKey='high' fill='transparent' isAnimationActive={false} />
-                <CandlestickLayer candles={chartCandles} />
-              </BarChart>
-            ) : (
-              <LineChart
-                data={chartCandles}
-                margin={{ top: 12, right: 6, bottom: 0, left: 0 }}
-              >
-                <CartesianGrid stroke='#e1e1e1' strokeDasharray='3 3' />
-                <XAxis
-                  {...(timeAxis || { dataKey: 'date', minTickGap: 28 })}
-                  tickFormatter={formatTimeTick}
-                  tick={{ fill: '#666', fontSize: 12 }}
-                />
-                <YAxis
-                  orientation='right'
-                  domain={[minPrice, maxPrice]}
-                  allowDataOverflow
-                  tickFormatter={(val) => Number(val).toLocaleString('ko-KR')}
-                  tick={{ fill: '#666', fontSize: 12 }}
-                  width={76}
-                />
-                <Tooltip content={<ChartTooltip />} />
-                <ReferenceLine y={visibleCandles[0]?.close} stroke='#888' strokeDasharray='4 4' />
-                <Line
-                  type='monotone'
-                  dataKey='close'
-                  stroke={isRising ? '#c43b3b' : '#1769aa'}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            )}
+      <div ref={chartAreaRef} className={panning ? 'chart-pan-area is-panning' : 'chart-pan-area'}
+        aria-label='주가 차트, 드래그로 이동하고 마우스 휠로 확대 및 축소'
+        onPointerDown={beginPan} onPointerMove={movePointer} onPointerUp={endPan}
+        onPointerCancel={endPan} onLostPointerCapture={endPan}
+        onPointerLeave={() => { if (!dragRef.current?.moved) dragRef.current = null; setPointer(null) }}>
+        {chartCandles.length > 0 && <div className='chart-indicators'>
+          <button type='button' aria-pressed={showAverages} onClick={() => setShowAverages(visible => !visible)}>
+            이동평균선
+            {movingAverages.map(({ key, period, color }) => <span key={key} style={{ color }}>{period}</span>)}
+          </button>
+        </div>}
+        <div className='chart-area' ref={priceAreaRef}>
+          {loading && chartCandles.length === 0 ? (
+            <div className='skeleton-block chart-loading' role='status'><span className='sr-only'>차트 불러오는 중</span></div>
+          ) : chartCandles.length === 0 ? (
+            !error && <div className='empty-state' role='status'>차트 데이터가 없습니다.</div>
+          ) : (
+            <ResponsiveContainer width='100%' height='100%' onResize={width => setChartWidth(width)}>
+              <ComposedChart data={chartCandles} margin={chartMargin} syncId={chartSyncId}>
+                <CartesianGrid vertical={false} stroke='#e6e6e6' />
+                <XAxis {...horizontalAxis} hide={hasVolume} tickFormatter={formatTimeTick} tick={axisTick} />
+                <YAxis orientation='right' domain={[visiblePriceTicks[0], visiblePriceTicks.at(-1)]} ticks={visiblePriceTicks} allowDataOverflow
+                  tickFormatter={value => value.toLocaleString('ko-KR')} tick={axisTick} width={axisWidth} />
+                <Tooltip cursor={!panning} content={<ChartTooltip showAverages={showAverages} />} />
+                {chartType === 'candle' ? (
+                  <>
+                    <Bar dataKey='high' fill='transparent' isAnimationActive={false} />
+                    <CandlestickLayer candles={chartCandles} />
+                  </>
+                ) : (
+                  <Line type='monotone' dataKey='close' stroke={isRising ? '#c43b3b' : '#1769aa'}
+                    strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+                )}
+                {showAverages && movingAverages.map(({ key, color }) => <Line key={key} className={`chart-${key}`}
+                  dataKey={key} stroke={color} strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />)}
+                <PriceGuide pointer={pointer} latestPrice={latestPrice} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        {hasVolume && <div className='chart-volume'>
+          <span className='chart-volume-label'>거래량</span>
+          <ResponsiveContainer width='100%' height='100%'>
+            <ComposedChart data={chartCandles} margin={chartMargin} syncId={chartSyncId}>
+              <CartesianGrid vertical={false} stroke='#eeeeee' />
+              <XAxis {...horizontalAxis} tickFormatter={formatTimeTick} tick={axisTick} />
+              <YAxis orientation='right' domain={[0, 'auto']} tickCount={3} width={axisWidth}
+                tickFormatter={value => volumeFormatter.format(value)} tick={axisTick} />
+              <Tooltip cursor={!panning} content={() => null} />
+              <Bar dataKey='volume' shape={<VolumeBar />} maxBarSize={20} isAnimationActive={false} />
+            </ComposedChart>
           </ResponsiveContainer>
-        )}
+        </div>}
       </div>
     </div>
   )

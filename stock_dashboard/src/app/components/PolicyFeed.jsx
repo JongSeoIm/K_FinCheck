@@ -54,7 +54,7 @@ export default function PolicyFeed({ symbol }) {
                 <span className='policy-tag'>{relationLabels[policy.relationType] || '관련성 확인 필요'}</span>
                 <span className='policy-tag'>{statusLabels[policy.policyStatus] || '발표 자료'}</span>
               </div>
-              <a href={policy.link} target='_blank' rel='noopener noreferrer'>{policy.title} <span aria-hidden='true'>↗</span></a>
+              <a href={policy.link} target='_blank' rel='noopener noreferrer'>{policy.title}</a>
               <small>
                 {policy.source === 'KOREA_KR' ? `정책브리핑${policy.publisher ? ` · ${policy.publisher}` : ''}` : '산업통상부'}
                 {policy.publishedAt && <> · <time dateTime={policy.publishedAt}>{dateFormat.format(new Date(`${policy.publishedAt}T00:00:00+09:00`))}</time></>}
