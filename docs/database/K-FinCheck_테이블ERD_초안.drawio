@@ -1,0 +1,55 @@
+<mxfile host="app.diagrams.net" modified="2026-11-03T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="kfincheck-erd" name="K-FinCheck ERD">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="outer_frame" value="" style="shape=rectangle;html=1;rounded=0;strokeColor=#64748B;strokeWidth=1;fillColor=none;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="10" y="10" width="1420" height="990" as="geometry"/>
+        </mxCell>
+        <mxCell id="outer_frame_title" value="K-FinCheck 데이터베이스 ERD" style="text;html=1;strokeColor=none;fillColor=#FFFFFF;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="520" y="0" width="400" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="service_area" value="" style="shape=rectangle;html=1;rounded=0;strokeColor=#94A3B8;strokeWidth=1;fillColor=none;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="1360" height="750" as="geometry"/>
+        </mxCell>
+        <mxCell id="service_area_title" value="투자정보 서비스(KFC)" style="text;html=1;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;fontColor=#1F2937;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="54" y="109" width="220" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="title" value="K-FinCheck 테이블 ERD" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="500" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="meta" value="ERD ID  KFC_ERD_001     ERD 명  K-FinCheck 데이터베이스" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="700" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="app_user" value="&lt;div style=&quot;font-size:17px;font-weight:bold;color:#111827;margin-bottom:12px;border-bottom:1px solid #cbd5e1;padding-bottom:8px;&quot;&gt;app_user&lt;/div&gt;&lt;div&gt;&lt;b&gt;PK&lt;/b&gt; user_id  BIGINT UNSIGNED&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; login_id  VARCHAR(50)&lt;br&gt;password_hash  VARCHAR(255)&lt;br&gt;nickname  VARCHAR(30)&lt;br&gt;created_at  DATETIME&lt;br&gt;updated_at  DATETIME&lt;/div&gt;" style="shape=rectangle;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=#334155;strokeWidth=2;fillColor=#ffffff;gradientColor=none;fontColor=#1f2937;fontSize=13;align=left;verticalAlign=top;spacing=14;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="280" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="watchlist" value="&lt;div style=&quot;font-size:17px;font-weight:bold;color:#111827;margin-bottom:12px;border-bottom:1px solid #cbd5e1;padding-bottom:8px;&quot;&gt;watchlist&lt;/div&gt;&lt;div&gt;&lt;b&gt;PK, FK&lt;/b&gt; user_id&lt;br&gt;&lt;b&gt;PK, FK&lt;/b&gt; stock_code&lt;br&gt;created_at  DATETIME&lt;/div&gt;" style="shape=rectangle;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=#334155;strokeWidth=2;fillColor=#ffffff;fontColor=#1f2937;fontSize=13;align=left;verticalAlign=top;spacing=14;" vertex="1" parent="1">
+          <mxGeometry x="410" y="185" width="240" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="company" value="&lt;div style=&quot;font-size:17px;font-weight:bold;color:#111827;margin-bottom:12px;border-bottom:1px solid #cbd5e1;padding-bottom:8px;&quot;&gt;company&lt;/div&gt;&lt;div&gt;&lt;b&gt;PK&lt;/b&gt; stock_code  VARCHAR(6)&lt;br&gt;company_name  VARCHAR(100)&lt;br&gt;market_type  VARCHAR(20)&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; dart_corp_code  VARCHAR(8)&lt;br&gt;created_at  DATETIME&lt;br&gt;updated_at  DATETIME&lt;/div&gt;" style="shape=rectangle;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=#334155;strokeWidth=2;fillColor=#ffffff;fontColor=#1f2937;fontSize=13;align=left;verticalAlign=top;spacing=14;" vertex="1" parent="1">
+          <mxGeometry x="720" y="150" width="260" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="financial_report" value="&lt;div style=&quot;font-size:17px;font-weight:bold;color:#111827;margin-bottom:12px;border-bottom:1px solid #cbd5e1;padding-bottom:8px;&quot;&gt;financial_report&lt;/div&gt;&lt;div&gt;&lt;b&gt;PK&lt;/b&gt; report_id  BIGINT UNSIGNED&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; stock_code  VARCHAR(6)&lt;br&gt;&lt;b&gt;UK1&lt;/b&gt; receipt_no  VARCHAR(14)&lt;br&gt;business_year  SMALLINT&lt;br&gt;report_code  VARCHAR(5)&lt;br&gt;&lt;b&gt;UK1&lt;/b&gt; fs_div  VARCHAR(3)&lt;br&gt;collected_at  DATETIME&lt;/div&gt;" style="shape=rectangle;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=#334155;strokeWidth=2;fillColor=#ffffff;fontColor=#1f2937;fontSize=13;align=left;verticalAlign=top;spacing=14;" vertex="1" parent="1">
+          <mxGeometry x="680" y="500" width="300" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="financial_value" value="&lt;div style=&quot;font-size:17px;font-weight:bold;color:#111827;margin-bottom:12px;border-bottom:1px solid #cbd5e1;padding-bottom:8px;&quot;&gt;financial_value&lt;/div&gt;&lt;div&gt;&lt;b&gt;PK&lt;/b&gt; value_id  BIGINT UNSIGNED&lt;br&gt;&lt;b&gt;FK, UK1&lt;/b&gt; report_id  BIGINT UNSIGNED&lt;br&gt;&lt;b&gt;UK1&lt;/b&gt; account_code  VARCHAR(50)&lt;br&gt;account_name  VARCHAR(100)&lt;br&gt;source_account_id  VARCHAR(200)&lt;br&gt;source_account_name  VARCHAR(200)&lt;br&gt;current_amount  DECIMAL(30,2)&lt;br&gt;previous_amount  DECIMAL(30,2)&lt;br&gt;currency  VARCHAR(3)&lt;br&gt;value_status  VARCHAR(30)&lt;/div&gt;" style="shape=rectangle;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;strokeColor=#334155;strokeWidth=2;fillColor=#ffffff;fontColor=#1f2937;fontSize=13;align=left;verticalAlign=top;spacing=14;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="450" width="350" height="390" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="rel_user_watch" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeWidth=2;strokeColor=#64748B;" edge="1" parent="1" source="app_user" target="watchlist"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rel_company_watch" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeWidth=2;strokeColor=#64748B;" edge="1" parent="1" source="company" target="watchlist"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rel_company_report" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeWidth=2;strokeColor=#64748B;" edge="1" parent="1" source="company" target="financial_report"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rel_report_value" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeWidth=2;strokeColor=#64748B;" edge="1" parent="1" source="financial_report" target="financial_value"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="범례   PK 기본키   FK 외래키   UK 고유키   UK1 동일 번호는 하나의 복합 고유키   관계선은 부모 1건과 자식 0건 이상을 표시" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="40" y="900" width="1300" height="40" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

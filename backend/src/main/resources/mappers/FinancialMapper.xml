@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfincheck.financial.FinancialMapper">
+    <sql id="header">
+        SELECT r.report_id AS reportId, r.stock_code AS stockCode, c.dart_corp_code AS corpCode,
+               r.business_year AS businessYear, r.report_code AS reportCode, r.fs_div AS fsDiv,
+               r.receipt_no AS receiptNo, r.collected_at AS collectedAt
+        FROM financial_report r JOIN company c ON c.stock_code = r.stock_code
+    </sql>
+    <select id="latest" resultType="com.kfincheck.financial.FinancialMapper$Header">
+        <include refid="header"/>
+        WHERE r.stock_code = #{stock} AND r.business_year = #{year}
+          AND r.report_code = '11011' AND r.fs_div = 'CFS'
+        ORDER BY r.receipt_no DESC LIMIT 1
+    </select>
+    <select id="byReceipt" resultType="com.kfincheck.financial.FinancialMapper$Header">
+        <include refid="header"/> WHERE r.receipt_no = #{receipt} AND r.fs_div = #{fsDiv}
+    </select>
+    <select id="values" resultType="com.kfincheck.financial.FinancialMapper$Value">
+        SELECT account_code AS accountCode, account_name AS accountName,
+               current_amount AS currentAmount, previous_amount AS previousAmount, currency,
+               COALESCE(value_status, CASE WHEN current_amount IS NULL THEN 'MISSING' ELSE 'AVAILABLE' END) AS valueStatus,
+               source_account_id AS sourceAccountId, source_account_name AS sourceAccountName
+        FROM financial_value WHERE report_id = #{reportId}
+    </select>
+    <insert id="upsertCompany">
+        INSERT INTO company (stock_code, company_name, market_type, dart_corp_code)
+        VALUES (#{stock}, #{name}, 'KOSPI', #{corp})
+        ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), dart_corp_code = VALUES(dart_corp_code)
+    </insert>
+    <insert id="upsertReport">
+        INSERT INTO financial_report (stock_code, receipt_no, business_year, report_code, fs_div, collected_at)
+        VALUES (#{report.stockCode}, #{report.receiptNo}, #{report.businessYear}, #{report.reportCode}, #{report.fsDiv}, #{collectedAt})
+        ON DUPLICATE KEY UPDATE collected_at = VALUES(collected_at)
+    </insert>
+    <insert id="upsertValue">
+        INSERT INTO financial_value (report_id, account_code, account_name, source_account_id, source_account_name,
+                                     current_amount, previous_amount, currency, value_status)
+        VALUES (#{reportId}, #{code}, #{metric.label}, #{metric.sourceAccountId}, #{metric.sourceAccountName},
+                #{metric.currentAmount}, #{metric.previousAmount}, #{metric.currency}, #{metric.status})
+        ON DUPLICATE KEY UPDATE account_name = VALUES(account_name), source_account_id = VALUES(source_account_id),
+            source_account_name = VALUES(source_account_name), current_amount = VALUES(current_amount),
+            previous_amount = VALUES(previous_amount), currency = VALUES(currency), value_status = VALUES(value_status)
+    </insert>
+</mapper>

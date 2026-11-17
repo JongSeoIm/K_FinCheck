@@ -1,93 +1,50 @@
-"""질문에서 기업을 찾습니다. 지원 기업 목록은 Spring(company 테이블)에서 받아 종목이 늘어도 코드를 고치지 않습니다."""
+from __future__ import annotations
 
 import re
-import time
 
-from .spring_client import SpringClient, SpringError
-
-ALIASES = {"삼전": "삼성전자", "하이닉스": "SK하이닉스", "하닉": "SK하이닉스", "현차": "현대차", "현대자동차": "현대차", "네이버": "NAVER", "기아차": "기아", "엘지화학": "LG화학", "삼성에스디아이": "삼성SDI"}
-GROUP_NAMES = ("삼성", "현대", "sk", "lg")  # 이 이름만으로는 기업을 정할 수 없습니다
-TARGET_WORDS = r"현재가|주가|시세|실적|매출|영업이익|순이익|뉴스|기사|전망"
-QUALIFIERS = r"최근|최신|오늘|지금|현재|요즘|올해|작년|관련"  # 기업명과 조회 단어 사이에 오는 말
-OPINION_WORDS = r"왜|사도|살까|팔까"
-NOT_COMPANY = {
-    "최근", "오늘", "현재", "최신", "요즘", "올해", "작년", "이", "그", "회사", "기업", "종목", "이회사", "그회사",
-    "이거", "저거", "그것", "이것", "저것", "얘", "걔", "이건", "주식이", "주가가", "주가는",
-    "해당", "관련", "연간", "연결", "전체", "국내", "미국", "시장", "내", "제", "주식", "지금", "오늘의", "이번", "최근의",
-    # 앞 대화를 잇는 말
-    "그럼", "그러면", "그건", "그게", "그거", "이건", "이게", "그래서", "그리고", "다시", "좀더", "거기", "여기", "저기",
-    # 시점
-    "어제", "그제", "내일", "내년", "재작년", "전년", "지난해", "지난주", "지난달", "이번주", "이번달", "다음주", "다음달",
-    # 실적 구분과 금융 용어의 앞부분 (당기순이익, 주당순이익 등)
-    "분기", "반기", "별도", "예상", "당기", "전기", "주당", "세전", "세후", "영업", "누적", "주요", "다른",
-}
+from app.quote_tool import ALIASES, named_codes, resolve_stock, is_quote_question
+from app.financial_tool import is_financial_question
+from app.news_tool import is_news_question
+from app.composite import is_composite_question
+from app.report_rag import is_report_question
+from app.disclosure_tool import is_disclosure_question
 
 
-# '카카오뱅크', '현대차증권' 처럼 지원 기업명 뒤에 글자가 더 붙은 다른 회사를 걸러 냅니다
-LONGER_NAME = re.compile(
-    rf"(?!의|은|는|이|가|을|를|도|와|과|랑|하고|에|로|만|보다|요|및|vs|{TARGET_WORDS}"
-    r"|현재|최근|오늘|지금|요즘|어때|어떤|왜|관련|실적|회사|기업|종목|비교|알려|정보|얼마|사도|살까|팔까|뭐|거래량|등락|공시|소식)[가-힣a-z0-9]"
-)
+# '왜 적자야?', '영업이익은 왜 줄었어?'처럼 기업·연도 없이 이유만 묻는 후속 질문.
+REASON_FOLLOWUP = re.compile(
+    r"^\s*(?:그럼|그러면|그렇다면|근데|그런데)?\s*(?:(?:당기순이익|영업이익|순이익|매출액?|영업손실)(?:이|은|는|도)?\s*)?(?:왜|이유|원인|어째서|적자|흑자)")
 
 
-def compact(text: str) -> str:
-    return re.sub(r"\s+", "", text).casefold()
-
-
-class CompanyDirectory:
-    """지원 기업 목록을 1분 동안 재사용합니다."""
-
-    def __init__(self, spring: SpringClient, ttl_seconds: float = 60):
-        self.spring = spring
-        self.ttl_seconds = ttl_seconds
-        self.items: list[dict] = []
-        self.loaded_at = 0.0
-
-    async def load(self) -> list[dict]:
-        now = time.monotonic()
-        if self.items and now - self.loaded_at < self.ttl_seconds:
-            return self.items
-        try:
-            self.items = await self.spring.all_companies()
-            self.loaded_at = now
-        except SpringError:
-            if not self.items:
-                raise
-        return self.items
-
-
-def find_companies(message: str, companies: list[dict]) -> list[str]:
-    """질문에 나온 지원 기업명을 질문 순서대로 돌려줍니다."""
-    text = compact(message)
-    found: list[tuple[int, str]] = []
-    aliases = {compact(alias): name for alias, name in ALIASES.items()}
-    for company in companies:
-        name, code = company["companyName"], company["stockCode"]
-        for token in [compact(name), code, *[a for a, n in aliases.items() if n == name]]:
-            at = text.find(token)
-            if at >= 0 and not LONGER_NAME.match(text[at + len(token):]):
-                found.append((at, name))
-                break
-    return [name for _, name in sorted(found)]
-
-
-def partial_company(message: str, companies: list[dict]) -> list[str] | None:
-    """'삼성 어때?' 처럼 그룹 이름만 말하면 지원 기업 중 후보를 돌려줍니다."""
-    text = compact(message)
-    for word in GROUP_NAMES:
-        if re.match(rf"^{word}(의|은|는|이|가)?({TARGET_WORDS}|어때|어떄|어떤가|어떰|정보|소식|알려|좀|[?!.]*$)", text):
-            return [c["companyName"] for c in companies if compact(c["companyName"]).startswith(word)]
-    return None
-
-
-def unknown_company(message: str, known: list[str]) -> str | None:
-    """'테슬라 주가' 처럼 기업처럼 보이지만 지원 목록에 없는 이름을 찾습니다."""
-    if known:
-        return None
-    match = re.search(rf"([가-힣A-Za-z0-9]{{2,20}}?)(?:의|은|는|이|가)?\s*(?:{QUALIFIERS})?\s*(?:{TARGET_WORDS}|{OPINION_WORDS})", message)
-    if not match:
-        return None
-    name = match.group(1)
-    if name in NOT_COMPANY or name[0].isdigit() or re.search(TARGET_WORDS, name):
-        return None
-    return name
+def prepare_question(message, previous, selected):
+    last = next((item.content for item in reversed(previous) if item.role == "user"), None)
+    codes = named_codes(message)
+    has_intent = (is_quote_question(message) or is_financial_question(message) or is_news_question(message)
+                  or is_composite_question(message) or is_report_question(message) or is_disclosure_question(message))
+    # 기업명만 바꾼 짧은 후속 질문에만 직전 조회 종류를 적용한다.
+    brief = re.fullmatch(r"(?:그럼|그러면|그렇다면)?\s*([가-힣A-Za-z0-9 ]+?)(?:은|는|도)?\s*[?!.]*", message)
+    if not has_intent and brief and (codes or message.startswith(("그럼", "그러면", "그렇다면"))):
+        if not codes:
+            raise ValueError("어느 기업을 말씀하시는지 확인해 주세요. 기업명이나 종목 코드 6자리를 알려 주세요.")
+        if not last or not (is_quote_question(last) or is_financial_question(last) or is_news_question(last)
+                            or is_composite_question(last) or is_report_question(last) or is_disclosure_question(last)):
+            raise ValueError("해당 기업의 현재가·실적·뉴스·공시 중 어떤 정보를 확인할까요?")
+        stock = resolve_stock(message, selected)
+        cleaned = last
+        for alias in sorted(ALIASES, key=len, reverse=True):
+            cleaned = re.sub(re.escape(alias), "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"(?<!\d)\d{6}(?!\d)", "", cleaned)
+        return f"{stock.name} {stock.symbol} {cleaned}", stock
+    if has_intent:
+        resolve_stock(message, selected)  # Tool 연결 여부와 무관하게 명시 기업을 확인한다.
+    if has_intent and not codes and last and is_financial_question(message) and REASON_FOLLOWUP.match(message):
+        # 직전 질문의 기업과 사업연도를 이어받는다(사업보고서 RAG 도 같은 연도 보고서를 쓴다).
+        stock = resolve_stock(last, selected)
+        years = re.findall(r"(?<!\d)20\d{2}(?!\d)", last) if is_financial_question(last) and not re.search(r"(?<!\d)20\d{2}(?!\d)", message) else []
+        return f"{stock.name} {stock.symbol} {message} {' '.join(years[-1:])}".strip(), stock
+    if has_intent and not codes and last:
+        # ‘그 회사 실적은?’처럼 지시어가 있거나 기업 없이 조회 종류를 바꾼 경우.
+        stock = resolve_stock(message, selected)  # 모르는 명시 기업을 먼저 거부한다.
+        if re.match(r"^(?:그럼\s*)?(?:그\s*회사|해당\s*기업|실적|뉴스|현재가|주가|매출|영업이익|순이익|관련\s*기사|공시)", message):
+            stock = resolve_stock(last, selected)
+            return (message if stock.symbol == selected.symbol else f"{stock.name} {stock.symbol} {message}"), stock
+    return message, selected

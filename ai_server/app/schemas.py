@@ -1,23 +1,8 @@
-from typing import Any, Literal
+from __future__ import annotations
+
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
-
-ChatStatus = Literal["answered", "out_of_scope", "needs_clarification", "no_data", "failed"]
-
-
-class Source(BaseModel):
-    provider: str
-    label: str
-    basisAt: str | None = None
-    url: str | None = None
-
-
-class ToolResult(BaseModel):
-    tool: str
-    ok: bool
-    data: Any = None
-    sources: list[Source] = []
-    error: str | None = None
 
 
 class StockContext(BaseModel):
@@ -27,48 +12,50 @@ class StockContext(BaseModel):
 
 class HistoryMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str
-
-
-class ConversationContext(BaseModel):
-    """직전 답변의 질문 종류·기업·연도. 후속 질문 해석에 쓰며 Spring 이 대화 기록과 함께 보관합니다."""
-
-    category: str | None = None
-    company: str | None = None
-    year: int | None = None
-
-
-class QuestionReading(BaseModel):
-    """LLM 의 질문 해석 결과. 답변이나 수치는 담지 않습니다."""
-
-    company: str
-    category: Literal["quote", "financial", "news", "movement", "outlook", "company", "concept", "unrelated", "clarify"]
+    content: str = Field(min_length=1, max_length=20000)
 
 
 class ChatRequest(BaseModel):
-    userId: int = Field(gt=0)
-    conversationId: str = Field(min_length=8, max_length=100, pattern=r"^[A-Za-z0-9_-]+$")
+    user_id: int = Field(gt=0)
+    conversation_id: str = Field(min_length=8, max_length=100, pattern=r"^[A-Za-z0-9_-]+$")
     message: str = Field(min_length=1, max_length=1500)
     stock: StockContext
-    history: list[HistoryMessage] = Field(default_factory=list, max_length=10)
-    context: ConversationContext | None = None
+    history: list[HistoryMessage] | None = Field(default=None, max_length=10)
 
     @field_validator("message")
     @classmethod
-    def strip_message(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
+    def normalize_message(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
             raise ValueError("질문을 입력해 주세요.")
-        return value
+        return normalized
+
+
+class SourceReference(BaseModel):
+    provider: Literal["KIS", "OpenDART", "NAVER"]
+    label: str
+    basis_at: str | None = None
+    url: str | None = None
+
+
+class AnswerPresentation(BaseModel):
+    type: Literal["quote", "financial", "financial_comparison", "news", "composite", "report", "disclosure"]
+    data: dict
 
 
 class ChatResponse(BaseModel):
-    status: ChatStatus
+    status: Literal["answered", "out_of_scope"]
     answer: str
-    sources: list[Source] = []
-    context: ConversationContext | None = None
+    sources: list[SourceReference] = Field(default_factory=list)
+    presentation: AnswerPresentation | None = None
+    context_message: str | None = None
+    # 답변의 자료 기준일. 예: "2026-11-06(금) 종가 기준"
+    basis: str | None = None
+    # 이번 질문에서 쓴 OpenAI 토큰. Spring 이 ai_usage_log 에 저장한다.
+    usage: dict | None = None
 
 
-class ToolRequest(BaseModel):
-    company: str = Field(min_length=1, max_length=30)
-    year: int | None = Field(default=None, ge=2015, le=2100)
+class HealthResponse(BaseModel):
+    status: Literal["UP"] = "UP"
+    provider: Literal["mock", "openai"]
+    configured: bool

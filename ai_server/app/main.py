@@ -1,72 +1,84 @@
+from __future__ import annotations
+
 import logging
-from contextlib import asynccontextmanager
 
-import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, status
+from openai import OpenAIError
 
-from .company_tool import get_company_info
-from .config import Settings
-from .financial_tool import get_financial_result
-from .news_tool import get_company_news
-from .provider import LlmError, MockProvider, OpenAiProvider
-from .quote_tool import get_stock_quote
-from .schemas import ChatRequest, ChatResponse, ToolRequest, ToolResult
-from .service import ChatService
-from .spring_client import SpringClient
-
-logging.basicConfig(level=logging.INFO)
-
-TOOLS = {
-    "get_stock_quote": lambda spring, body: get_stock_quote(spring, body.company),
-    "get_financial_result": lambda spring, body: get_financial_result(spring, body.company, body.year),
-    "get_company_news": lambda spring, body: get_company_news(spring, body.company),
-    "get_company_info": lambda spring, body: get_company_info(spring, body.company),
-}
+from app.config import Settings, get_settings
+from app.memory import ConversationMemory
+from app.provider import MockChatProvider, OpenAIChatProvider
+from app.schemas import ChatRequest, ChatResponse, HealthResponse
+from app.service import ChatService
+from app.quote_tool import StockQuoteTool
+from app.financial_tool import FinancialResultTool
+from app.news_tool import CompanyNewsTool
+from app.disclosure_tool import CompanyDisclosureTool
+from app.rag import EmbeddingCache, OpenAIEmbedder
+from app.report_rag import BusinessReportRag, BusinessReportTool, ReportStore, SpringReportStore
 
 
-def build_provider(settings: Settings):
+logger = logging.getLogger(__name__)
+
+
+def build_embedder(settings: Settings, client=None) -> OpenAIEmbedder | None:
+    """OpenAI 모드이고 RAG 임베딩을 켰을 때만 만든다. 아니면 글자 비교로 대신한다."""
+    if settings.ai_mode != "openai" or not settings.openai_configured or not settings.rag_enabled:
+        return None
+    if client is None:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=settings.openai_api_key)
+    return OpenAIEmbedder(client, settings.embedding_model, EmbeddingCache(settings.embedding_cache_path))
+
+
+def build_report_rag(settings: Settings, embedder: OpenAIEmbedder | None = None) -> BusinessReportRag:
+    store = (ReportStore(settings.report_store_path) if settings.report_store == "sqlite"
+             else SpringReportStore(settings.spring_base_url))
+    return BusinessReportRag(BusinessReportTool(settings.spring_base_url), store,
+                             embedder if embedder is not None else build_embedder(settings))
+
+
+def build_service(settings: Settings) -> ChatService:
+    embedder = None
     if settings.ai_mode == "mock":
-        return MockProvider()
-    return OpenAiProvider(settings.openai_api_key, settings.openai_model, settings.openai_timeout_seconds)
+        provider = MockChatProvider()
+    else:
+        if not settings.openai_configured:
+            raise RuntimeError("OPENAI_API_KEY와 OPENAI_MODEL 설정이 필요합니다.")
+        provider = OpenAIChatProvider(settings.openai_api_key, settings.openai_model, settings.openai_interpret_model)
+        embedder = build_embedder(settings, provider.client)
+    return ChatService(provider=provider, memory=ConversationMemory(max_messages=10),
+                       quote_tool=StockQuoteTool(settings.spring_base_url),
+                       financial_tool=FinancialResultTool(settings.spring_base_url),
+                       news_tool=CompanyNewsTool(settings.spring_base_url),
+                       report_rag=build_report_rag(settings, embedder),
+                       disclosure_tool=CompanyDisclosureTool(settings.spring_base_url))
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = Settings()
-    async with httpx.AsyncClient(base_url=settings.spring_base_url, timeout=settings.tool_timeout_seconds) as http:
-        spring = SpringClient(http)
-        provider = build_provider(settings)
-        app.state.spring = spring
-        app.state.provider = provider
-        app.state.chat = ChatService(spring, provider)
-        yield
+settings = get_settings()
+chat_service = build_service(settings)
+app = FastAPI(title="K-FinCheck AI Server", version="0.1.0")
 
 
-app = FastAPI(title="K-FinCheck AI 서버", lifespan=lifespan)
+@app.get("/api/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    configured = settings.ai_mode == "mock" or settings.openai_configured
+    return HealthResponse(provider=settings.ai_mode, configured=configured)
 
 
-@app.get("/health")
-async def health(request: Request) -> dict:
-    provider = request.app.state.provider
-    return {"status": "ok", "model": provider.model, "openaiConfigured": provider.client is not None}
-
-
-@app.get("/health/model")
-async def health_model(request: Request) -> dict:
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest) -> ChatResponse:
     try:
-        return {"status": "ok", "model": await request.app.state.provider.check_model()}
-    except LlmError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
-
-
-@app.post("/api/chat")
-async def chat(body: ChatRequest, request: Request) -> ChatResponse:
-    return await request.app.state.chat.ask(body)
-
-
-@app.post("/api/tools/{tool_name}")
-async def run_tool(tool_name: str, body: ToolRequest, request: Request) -> ToolResult:
-    tool = TOOLS.get(tool_name)
-    if tool is None:
-        raise HTTPException(status_code=404, detail="없는 Tool 입니다.")
-    return await tool(request.app.state.spring, body)
+        return await chat_service.ask(request)
+    except OpenAIError:
+        logger.exception("OpenAI API 호출에 실패했습니다.")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI 답변을 생성하지 못했습니다.",
+        ) from None
+    except RuntimeError:
+        logger.exception("AI 답변 처리에 실패했습니다.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI 서비스를 사용할 수 없습니다.",
+        ) from None
