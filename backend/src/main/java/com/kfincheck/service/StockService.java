@@ -1,5 +1,6 @@
 package com.kfincheck.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.kfincheck.client.KisApiClient;
 import com.kfincheck.client.dto.KisDailyChartResponse;
 import com.kfincheck.client.dto.KisPriceResponse;
@@ -8,11 +9,14 @@ import com.kfincheck.dto.StockPriceDto;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -21,6 +25,8 @@ public class StockService {
     private static final DateTimeFormatter KIS_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final long PRICE_CACHE_TTL_MS = 3_000L;
     private static final long CANDLE_CACHE_TTL_MS = 25_000L;
+    private static final long INVESTOR_CACHE_TTL_MS = 60_000L;
+    private static final int INVESTOR_DAYS = 5;
 
     private static class CachedPrice {
         private final StockPriceDto data;
@@ -60,6 +66,8 @@ public class StockService {
 
     private final Map<String, CachedPrice> priceCache = new ConcurrentHashMap<>();
     private final Map<String, CachedCandles> candleCache = new ConcurrentHashMap<>();
+    private final Map<String, CachedInvestorTrades> investorCache = new ConcurrentHashMap<>();
+    private volatile InvestorDateBackoff investorDateBackoff;
     private static final Map<String, String> KNOWN_STOCKS = Map.of(
             "005930", "삼성전자",
             "000660", "SK하이닉스",
@@ -189,6 +197,113 @@ public class StockService {
         Collections.reverse(candles);
         candleCache.put(cacheKey, new CachedCandles(candles, System.currentTimeMillis() + CANDLE_CACHE_TTL_MS));
         return candles;
+    }
+
+    public List<InvestorTrade> getInvestorTrades(String stockCode) {
+        if (stockCode == null || !KNOWN_STOCKS.containsKey(stockCode)) {
+            throw new IllegalArgumentException("지원하지 않는 종목입니다.");
+        }
+        return getInvestorDays(stockCode, LocalDate.now(ZoneId.of("Asia/Seoul"))).reversed().stream()
+                .map(InvestorDay::trade)
+                .filter(InvestorTrade::hasQuantity)
+                .limit(INVESTOR_DAYS)
+                .toList().reversed();
+    }
+
+    public InvestorRanking getInvestorRanking() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        var rowsByDate = new TreeMap<LocalDate, List<InvestorAmounts>>();
+        for (String code : KNOWN_STOCKS.keySet().stream().sorted().toList()) {
+            for (InvestorDay day : getInvestorDays(code, today)) {
+                if (day.amounts().isComplete()) {
+                    rowsByDate.computeIfAbsent(day.trade().date(), ignored -> new ArrayList<>()).add(day.amounts());
+                }
+            }
+        }
+        return rowsByDate.descendingMap().entrySet().stream()
+                .filter(entry -> entry.getValue().size() == KNOWN_STOCKS.size())
+                .findFirst()
+                .map(entry -> new InvestorRanking(entry.getKey(), List.copyOf(entry.getValue())))
+                .orElseGet(() -> new InvestorRanking(null, List.of()));
+    }
+
+    private List<InvestorDay> getInvestorDays(String stockCode, LocalDate today) {
+        return investorCache.compute(stockCode, (code, cached) -> {
+            if (cached != null && cached.date().equals(today) && cached.expiresAt() > System.currentTimeMillis()) {
+                return cached;
+            }
+            return new CachedInvestorTrades(today, loadInvestorTrades(code, today),
+                    System.currentTimeMillis() + INVESTOR_CACHE_TTL_MS);
+        }).days();
+    }
+
+    private List<InvestorDay> loadInvestorTrades(String stockCode, LocalDate today) {
+        var days = new TreeMap<LocalDate, InvestorDay>();
+        InvestorDateBackoff backoff = investorDateBackoff;
+        LocalDate dateToRequest = backoff != null && backoff.appliesTo(today) ? today.minusDays(1) : today;
+        String continuation = "";
+        for (int page = 0; page < 10; page++) {
+            var response = kisApiClient.getInvestorTrades(stockCode, dateToRequest.format(KIS_DATE_FORMATTER), continuation);
+            JsonNode body = response.getBody();
+            if (page == 0 && dateToRequest.equals(today) && body != null && !"0".equals(body.path("rt_cd").asText())
+                    && "OPSQ2001".equals(body.path("msg_cd").asText())) {
+                // KIS can reject today's date before the daily investor data is published.
+                investorDateBackoff = new InvestorDateBackoff(today, System.currentTimeMillis() + INVESTOR_CACHE_TTL_MS);
+                dateToRequest = today.minusDays(1);
+                response = kisApiClient.getInvestorTrades(stockCode, dateToRequest.format(KIS_DATE_FORMATTER), continuation);
+                body = response.getBody();
+            }
+            if (body == null || !"0".equals(body.path("rt_cd").asText()) || !body.path("output2").isArray()) {
+                throw new IllegalStateException("KIS 투자자별 매매 동향 응답이 올바르지 않습니다.");
+            }
+            for (JsonNode row : body.path("output2")) {
+                LocalDate date;
+                try { date = LocalDate.parse(row.path("stck_bsop_date").asText().strip(), DateTimeFormatter.BASIC_ISO_DATE); }
+                catch (DateTimeParseException e) { continue; }
+                if (date.isAfter(dateToRequest)) continue;
+                var trade = new InvestorTrade(date, investorNumber(row, "prsn_ntby_qty"),
+                        investorNumber(row, "orgn_ntby_qty"), investorNumber(row, "frgn_ntby_qty"));
+                var amounts = new InvestorAmounts(stockCode, investorNumber(row, "prsn_ntby_tr_pbmn"),
+                        investorNumber(row, "orgn_ntby_tr_pbmn"), investorNumber(row, "frgn_ntby_tr_pbmn"));
+                if (trade.hasQuantity() || amounts.isComplete()) {
+                    days.putIfAbsent(date, new InvestorDay(trade, amounts));
+                }
+            }
+            if (days.values().stream().filter(day -> day.trade().hasQuantity()).count() >= INVESTOR_DAYS) break;
+            String next = response.getHeaders().getFirst("tr_cont");
+            if (!"M".equals(next) && !"F".equals(next)) break;
+            continuation = "N";
+        }
+        return List.copyOf(days.values());
+    }
+
+    private static Long investorNumber(JsonNode row, String field) {
+        try { return Long.valueOf(row.path(field).asText().strip()); }
+        catch (NumberFormatException e) { return null; }
+    }
+
+    private record CachedInvestorTrades(LocalDate date, List<InvestorDay> days, long expiresAt) { }
+
+    private record InvestorDateBackoff(LocalDate date, long expiresAt) {
+        private boolean appliesTo(LocalDate today) {
+            return date.equals(today) && expiresAt > System.currentTimeMillis();
+        }
+    }
+
+    private record InvestorDay(InvestorTrade trade, InvestorAmounts amounts) { }
+
+    public record InvestorTrade(LocalDate date, Long individual, Long institution, Long foreign) {
+        private boolean hasQuantity() {
+            return individual != null || institution != null || foreign != null;
+        }
+    }
+
+    public record InvestorRanking(LocalDate date, List<InvestorAmounts> stocks) { }
+
+    public record InvestorAmounts(String symbol, Long individualMillions, Long institutionMillions, Long foreignMillions) {
+        private boolean isComplete() {
+            return individualMillions != null && institutionMillions != null && foreignMillions != null;
+        }
     }
 
     private String formatDate(String yyyymmdd) {

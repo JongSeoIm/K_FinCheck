@@ -2,7 +2,7 @@
 
 import useHydrated from '@/app/hooks/useHydrated'
 import useStockStore from '@/app/store/useStockStore'
-import { marketStocks } from '@/app/lib/market'
+import { changeRateClass, marketStocks } from '@/app/lib/market'
 import useStockData from '@/app/hooks/useStockData'
 import QuoteStatus from './QuoteStatus'
 import useAuthStore from '../store/useAuthStore'
@@ -19,7 +19,7 @@ function WatchlistRow({ stock, active, liveQuote, onSelect }) {
       <span className='watch-name'><strong>{name}</strong><small>{stock.symbol}</small></span>
       <span className='watch-price' title={error && !liveQuote ? error : undefined}>
         <strong>{price == null ? '—' : `${price.toLocaleString('ko-KR')}원`}</strong>
-        <small className={rate > 0 ? 'positive' : rate < 0 ? 'negative' : ''}>
+        <small className={changeRateClass(rate)}>
           {rate == null ? '—' : `${rate > 0 ? '+' : ''}${rate.toFixed(2)}%`}
         </small>
       </span>

@@ -2,13 +2,15 @@
 
 import { useState } from 'react'
 import { FaChevronRight } from 'react-icons/fa'
-import { marketStocks } from '../lib/market'
+import { changeRateClass, marketStocks } from '../lib/market'
 import useStockStore from '../store/useStockStore'
 import useStockListQuotes from '../hooks/useStockListQuotes'
 import useStockCandles from '../hooks/useStockCandles'
+import InvestorRanking from './InvestorRanking'
 import WatchStar from './WatchStar'
 
 const PAGE_SIZE = 10
+const RANKING_TAB = '투자자별 순위'
 
 function PriceSparkline({ symbol }) {
   const { data, loading } = useStockCandles(symbol, 'D', 45)
@@ -44,7 +46,7 @@ function StockRow({ stock, quote, error, loading, onSelect }) {
       {price == null ? '—' : `${price.toLocaleString('ko-KR')}원`}
       {error && <span className='sr-only'>시세 조회 실패</span>}
     </td>
-    <td className={`market-number${rate > 0 ? ' positive' : rate < 0 ? ' negative' : ''}`}>
+    <td className={`market-number ${changeRateClass(rate)}`}>
       {rate == null ? '—' : `${rate > 0 ? '+' : ''}${rate.toFixed(2)}%`}
     </td>
     <td className='market-open-cell'><button type='button' className='market-open' onClick={() => onSelect(stock)}
@@ -57,6 +59,7 @@ export default function DomesticStocks({ trades, onSelectStock }) {
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState(null)
   const error = useStockStore(state => state.watchlistError)
+  const showsRanking = market === RANKING_TAB
   const filtered = marketStocks.filter(stock => market === '전체' || stock.market === market)
   const quotes = useStockListQuotes(filtered.map(stock => stock.symbol), trades)
   const quoteFor = symbol => trades[symbol] || quotes.data[symbol]
@@ -77,15 +80,15 @@ export default function DomesticStocks({ trades, onSelectStock }) {
   }
 
   return <section className='domestic-market' aria-labelledby='domestic-market-title'>
-    <div className='market-title'><h1 id='domestic-market-title'>국내 주식</h1><span>{filtered.length}개 종목</span></div>
-    <nav className='market-tabs' aria-label='시장 구분'>
-      {['전체', 'KOSPI', 'KOSDAQ'].map(value => <button key={value} type='button'
+    <div className='market-title'><h1 id='domestic-market-title'>국내 주식</h1><span>{showsRanking ? marketStocks.length : filtered.length}개 종목</span></div>
+    <nav className='market-tabs' aria-label='국내 주식 보기'>
+      {['전체', 'KOSPI', RANKING_TAB].map(value => <button key={value} type='button'
         className={market === value ? 'active' : ''} aria-pressed={market === value}
         onClick={() => { setMarket(value); setPage(1) }}>{value}</button>)}
     </nav>
-    <div className='market-table-panel'>
+    {showsRanking ? <InvestorRanking onSelectStock={onSelectStock} /> : <div className='market-table-panel'>
       <div className='market-table-scroll' role='region' aria-label='국내 주식 목록' tabIndex={0}>
-        <table className='market-table'>
+        <table className='market-table market-stock-table'>
           <caption className='sr-only'>지원 국내 종목의 현재가와 등락률</caption>
           <thead><tr><th scope='col'>관심</th><th scope='col'>종목명</th><th scope='col'>종목코드</th>
             <th scope='col' className='market-trend'>최근 10일</th>
@@ -113,7 +116,7 @@ export default function DomesticStocks({ trades, onSelectStock }) {
         {visible.some(stock => quotes.errors[stock.symbol] && !trades[stock.symbol]) &&
           <button type='button' onClick={quotes.retry} disabled={quotes.loading}>시세 다시 조회</button>}
       </div>}
-    </div>
+    </div>}
     {error && <p className='financial-state' role='alert'>{error}</p>}
   </section>
 }

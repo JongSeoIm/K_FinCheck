@@ -1,6 +1,7 @@
 'use client'
 
 import useStockData from '@/app/hooks/useStockData'
+import { changeRateClass } from '../lib/market'
 import QuoteStatus from './QuoteStatus'
 import WatchStar from './WatchStar'
 
@@ -22,8 +23,6 @@ export default function StockInfo({ stock, liveQuote }) {
   const displayPrice = data?.price ?? null
   const displayChangeRate = data?.changeRate ?? null
   const priceChange = data?.priceChange ?? null
-  const isRising = displayChangeRate >= 0
-  const isZero = displayChangeRate === 0
 
   const metrics = [
     ['시가', data?.open != null ? `${formatNumber(data.open)}원` : null],
@@ -50,9 +49,9 @@ export default function StockInfo({ stock, liveQuote }) {
           ) : (
             <strong>{displayPrice == null ? '—' : `${formatNumber(displayPrice)}원`}</strong>
           )}
-          <p className={displayChangeRate == null || isZero ? '' : isRising ? 'positive' : 'negative'}>
+          <p>
             {priceChange == null ? '—' : `${priceChange > 0 ? '+' : ''}${formatNumber(priceChange)}원`}
-            {displayChangeRate != null && <span>({displayChangeRate > 0 ? '+' : ''}{formatNumber(displayChangeRate, 2)}%)</span>}
+            {displayChangeRate != null && <span className={changeRateClass(displayChangeRate)}>({displayChangeRate > 0 ? '+' : ''}{formatNumber(displayChangeRate, 2)}%)</span>}
           </p>
           {error && <small className='inline-warning'>{error}</small>}
         </div>

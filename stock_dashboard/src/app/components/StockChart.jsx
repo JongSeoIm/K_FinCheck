@@ -18,6 +18,7 @@ import {
 } from 'recharts'
 import useStockCandles from '../hooks/useStockCandles'
 import useIntradayCandles from '../hooks/useIntradayCandles'
+import { changeRateClass } from '../lib/market'
 import { mergeAndAggregate } from '../lib/intraday.mjs'
 
 const timeAxisFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
@@ -110,7 +111,7 @@ function ChartTooltip({ active, payload, showAverages }) {
       <time dateTime={item.date}>{Number.isFinite(item.actualTimestamp) ? datedTimeFormatter.format(item.actualTimestamp) : item.date}</time>
       <dl>
         <dt>종가</dt><dd><strong>{formatKRW(item.close)}</strong></dd>
-        {changeRate != null && <><dt>전봉 대비</dt><dd className={changeRate > 0 ? 'positive' : changeRate < 0 ? 'negative' : undefined}>
+        {changeRate != null && <><dt>전봉 대비</dt><dd className={changeRateClass(changeRate)}>
           {changeRate > 0 ? '+' : ''}{changeRate.toFixed(2)}%
         </dd></>}
         <dt>시가</dt><dd>{formatKRW(item.open)}</dd>
@@ -460,7 +461,7 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
         </div>
         <div>
           <span>기간 등락률</span>
-          <strong className={changeRate == null ? '' : isRising ? 'positive' : 'negative'}>
+          <strong className={changeRateClass(changeRate)}>
             {changeRate == null ? '—' : `${isRising ? '+' : ''}${changeRate.toFixed(2)}%`}
           </strong>
         </div>

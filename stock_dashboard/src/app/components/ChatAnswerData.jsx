@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+import { changeRateClass } from '../lib/market'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
 const number = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 })
@@ -11,6 +13,25 @@ const direction = value => !present(value) ? '' : Number(value) > 0 ? 'positive'
 const safeLink = value => {
   try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username }
   catch { return false }
+}
+
+const DISCLOSURE_PAGE_SIZE = 5
+
+function DisclosureList({ items }) {
+  const [visibleCount, setVisibleCount] = useState(DISCLOSURE_PAGE_SIZE)
+
+  return <>
+    <ul className='stock-chat-sources' aria-label='공시 목록'>
+      {items.slice(0, visibleCount).map(item => <li key={item.url}>
+        {safeLink(item.url) ? <a href={item.url} target='_blank' rel='noopener noreferrer'>{item.title} ↗</a> : item.title}
+        <small>{[item.date, item.filer].filter(Boolean).join(' · ')}</small>
+      </li>)}
+    </ul>
+    {visibleCount < items.length && <button className='stock-chat-disclosure-more' type='button'
+      onClick={() => setVisibleCount(count => count + DISCLOSURE_PAGE_SIZE)}>
+      공시 더 보기
+    </button>}
+  </>
 }
 
 export function formatChatTime(value) {
@@ -25,14 +46,7 @@ export function formatChatTime(value) {
 export default function ChatAnswerData({ presentation }) {
   const data = presentation?.data
   if (!data) return null
-  if (presentation.type === 'disclosure' && Array.isArray(data.items)) return (
-    <ul className='stock-chat-sources' aria-label='공시 목록'>
-      {data.items.map(item => <li key={item.url}>
-        {safeLink(item.url) ? <a href={item.url} target='_blank' rel='noopener noreferrer'>{item.title} ↗</a> : item.title}
-        <small>{[item.date, item.filer].filter(Boolean).join(' · ')}</small>
-      </li>)}
-    </ul>
-  )
+  if (presentation.type === 'disclosure' && Array.isArray(data.items)) return <DisclosureList items={data.items} />
   if (presentation.type === 'report' && Array.isArray(data.chunks)) return (
     <details>
       <summary>사업보고서 근거</summary>
@@ -107,9 +121,9 @@ export default function ChatAnswerData({ presentation }) {
     <div className='chat-quote' aria-label={`${data.name} 현재가 조회 결과`}>
       <span className='chat-data-label'>{data.name} · {data.symbol}</span>
       <strong className='chat-quote-price'>{format(data.price)}원</strong>
-      <div className={`chat-quote-change ${direction(data.changeRate)}`}>
+      <div className='chat-quote-change'>
         {present(data.priceChange) ? `${percent.format(Number(data.priceChange))}원` : '—'}
-        {' · '}{present(data.changeRate) ? `${percent.format(Number(data.changeRate))}%` : '—'}
+        {' · '}{present(data.changeRate) ? <span className={changeRateClass(data.changeRate)}>{percent.format(Number(data.changeRate))}%</span> : '—'}
       </div>
       <span className='chat-data-label'>거래량 {format(data.volume)}주</span>
       <span className='chat-data-label'>{data.time_kind} · {formatChatTime(data.basis_at)}</span>

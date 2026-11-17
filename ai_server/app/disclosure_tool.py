@@ -14,7 +14,7 @@ from app.schemas import SourceReference, StockContext
 
 
 DART_URL = "https://dart.fss.or.kr/"
-MAX_ITEMS_FOR_AI = 20
+MAX_ITEMS_FOR_AI = 5
 
 
 def disclosure_source(data: dict) -> SourceReference:
@@ -63,7 +63,7 @@ class CompanyDisclosureTool:
 
 
 def for_ai(data: dict) -> dict:
-    """GPT 에 넣을 때는 최근 20건의 날짜·제목·제출인만 넣는다(토큰 절약). 화면에는 전체를 보여 준다."""
+    """첫 화면에 표시되는 최신 공시의 날짜·제목·제출인으로 요약 범위를 제한한다."""
     return {"name": data["name"], "symbol": data["symbol"], "period": data["label"], "count": len(data["items"]),
             "truncated": data["truncated"] or len(data["items"]) > MAX_ITEMS_FOR_AI,
             "items": [{"date": item["date"], "title": item["title"], "filer": item["filer"]}

@@ -41,6 +41,16 @@ public class StockController {
         return ResponseEntity.ok(candles);
     }
 
+    @GetMapping("/{stockCode}/investor-trades")
+    public List<StockService.InvestorTrade> getInvestorTrades(@PathVariable("stockCode") String stockCode) {
+        return stockService.getInvestorTrades(stockCode);
+    }
+
+    @GetMapping("/investor-ranking")
+    public StockService.InvestorRanking getInvestorRanking() {
+        return stockService.getInvestorRanking();
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

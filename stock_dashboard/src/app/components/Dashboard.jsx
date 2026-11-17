@@ -4,6 +4,7 @@ import { lazy, Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import EarningsPanel from './EarningsPanel'
+import InvestorTradesPanel from './InvestorTradesPanel'
 import DividendPanel from './DividendPanel'
 import DomesticStocks from './DomesticStocks'
 import CompanyCalendar from './CompanyCalendar'
@@ -38,8 +39,7 @@ export default function Dashboard({ initialStock }) {
   const isDetail = !isCalendar && !isList
   const selectedStock = marketStocks.find(stock => stock.symbol === params.get('symbol')) || initialStock || marketStocks[0]
   const recentSymbols = useRecentStock(isDetail ? selectedStock.symbol : null)
-  const recentStocks = recentSymbols.map(symbol => marketStocks.find(stock => stock.symbol === symbol)).filter(Boolean)
-  const recentStock = recentStocks[0]
+  const recentStock = recentSymbols.map(symbol => marketStocks.find(stock => stock.symbol === symbol)).find(Boolean)
   const [intervalSeconds, setIntervalSeconds] = useState(60)
   const [detailTab, setDetailTab] = useState('chart')
   const [policyTab, setPolicyTab] = useState('trends')
@@ -98,11 +98,6 @@ export default function Dashboard({ initialStock }) {
         <section className='primary-column' aria-label='선택 종목 정보'>
           <StockInfo key={selectedStock.symbol} stock={selectedStock} liveQuote={stream.trades[selectedStock.symbol]} />
 
-          {recentStocks.length > 1 && <nav className='recent-stock-history' aria-label='최근 본 종목 목록'>
-            {recentStocks.map(stock => <Link key={stock.symbol} href={`/?symbol=${stock.symbol}`}
-              aria-current={stock.symbol === selectedStock.symbol ? 'page' : undefined}>{stock.name}</Link>)}
-          </nav>}
-
           <nav className='detail-tabs' role='tablist' aria-label='종목 상세 메뉴'>
             {detailTabs.map((tab, index) => <button
               id={`detail-tab-${tab.id}`}
@@ -117,8 +112,9 @@ export default function Dashboard({ initialStock }) {
             >{tab.label}</button>)}
           </nav>
 
-          {detailTab === 'chart' && <section id='detail-panel-chart' className='panel chart-panel detail-tab-panel'
+          {detailTab === 'chart' && <section id='detail-panel-chart' className='detail-info-grid detail-tab-panel'
             role='tabpanel' aria-labelledby='detail-tab-chart'>
+            <section className='panel chart-panel'>
               <div className='panel-heading'><h2>주가 차트</h2></div>
               <StockChart
                 symbol={selectedStock.symbol}
@@ -127,6 +123,11 @@ export default function Dashboard({ initialStock }) {
                 streamInterval={stream.intervalSeconds}
                 onIntervalChange={setIntervalSeconds}
               />
+            </section>
+            <section className='panel'>
+              <div className='panel-heading'><h2>투자자별 매매 동향</h2></div>
+              <InvestorTradesPanel key={selectedStock.symbol} symbol={selectedStock.symbol} />
+            </section>
           </section>}
 
           {detailTab === 'info' && <section id='detail-panel-info' className='detail-info-grid detail-tab-panel'
