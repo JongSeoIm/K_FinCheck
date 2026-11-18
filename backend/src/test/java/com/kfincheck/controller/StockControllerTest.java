@@ -9,6 +9,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
@@ -33,6 +34,18 @@ class StockControllerTest {
 
     @MockitoBean
     private StockService stockService;
+
+    @Test
+    void investorRankingReturnsCommonDateAndSignedMillions() throws Exception {
+        given(stockService.getInvestorRanking()).willReturn(new StockService.InvestorRanking(
+                LocalDate.of(2026, 11, 16), List.of(new StockService.InvestorAmounts("005930", 135L, 0L, -135L))));
+
+        mockMvc.perform(get("/api/stocks/investor-ranking"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.date").value("2026-11-16"))
+                .andExpect(jsonPath("$.stocks[0].symbol").value("005930"))
+                .andExpect(jsonPath("$.stocks[0].foreignMillions").value(-135));
+    }
 
     @Test
     void getStockPriceReturnsDto() throws Exception {

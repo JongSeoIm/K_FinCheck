@@ -27,6 +27,30 @@ spring:
     import:
       - optional:application-local.yml
 
+auth:
+  login-limit:
+    per-account: ${LOGIN_LIMIT_PER_ACCOUNT:5}
+    per-ip: ${LOGIN_LIMIT_PER_IP:20}
+    lock-minutes: ${LOGIN_LIMIT_LOCK_MINUTES:10}
+
+api:
+  limit:
+    auth-per-minute: ${API_LIMIT_AUTH_PER_MINUTE:30}
+    report-per-minute: ${API_LIMIT_REPORT_PER_MINUTE:5}
+    price-per-minute: ${API_LIMIT_PRICE_PER_MINUTE:60}
+    chart-per-minute: ${API_LIMIT_CHART_PER_MINUTE:40}
+    default-per-minute: ${API_LIMIT_DEFAULT_PER_MINUTE:60}
+    per-day: ${API_LIMIT_PER_DAY:20000}
+    suspend-after-violations: ${API_LIMIT_SUSPEND_AFTER:20}
+    suspend-minutes: ${API_LIMIT_SUSPEND_MINUTES:10}
+
+chat:
+  limit:
+    per-minute: ${CHAT_LIMIT_PER_MINUTE:5}
+    per-day: ${CHAT_LIMIT_PER_DAY:100}
+    daily-tokens: ${CHAT_LIMIT_DAILY_TOKENS:200000}
+    monthly-tokens: ${CHAT_LIMIT_MONTHLY_TOKENS:0}
+
 mybatis:
   mapper-locations: classpath:mappers/**/*.xml
   configuration:

@@ -1,16 +1,37 @@
 'use client'
 
+import { useState } from 'react'
+import { changeRateClass } from '../lib/market'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
 const number = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 })
 const percent = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2, signDisplay: 'exceptZero' })
 const comparisons = { TURNAROUND: '흑자 전환', TURNED_LOSS: '적자 전환', CONTINUED_LOSS: '적자 지속' }
 const present = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
-const format = value => present(value) ? number.format(Number(value)) : '—'
+const format = value => present(value) ? number.format(Number(value)) : '-'
 const direction = value => !present(value) ? '' : Number(value) > 0 ? 'positive' : Number(value) < 0 ? 'negative' : ''
 const safeLink = value => {
   try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username }
   catch { return false }
+}
+
+const DISCLOSURE_PAGE_SIZE = 5
+
+function DisclosureList({ items }) {
+  const [visibleCount, setVisibleCount] = useState(DISCLOSURE_PAGE_SIZE)
+
+  return <>
+    <ul className='stock-chat-sources' aria-label='공시 목록'>
+      {items.slice(0, visibleCount).map(item => <li key={item.url}>
+        {safeLink(item.url) ? <a href={item.url} target='_blank' rel='noopener noreferrer'>{item.title} ↗</a> : item.title}
+        <small>{[item.date, item.filer].filter(Boolean).join(' · ')}</small>
+      </li>)}
+    </ul>
+    {visibleCount < items.length && <button className='stock-chat-disclosure-more' type='button'
+      onClick={() => setVisibleCount(count => count + DISCLOSURE_PAGE_SIZE)}>
+      공시 더 보기
+    </button>}
+  </>
 }
 
 export function formatChatTime(value) {
@@ -25,6 +46,15 @@ export function formatChatTime(value) {
 export default function ChatAnswerData({ presentation }) {
   const data = presentation?.data
   if (!data) return null
+  if (presentation.type === 'disclosure' && Array.isArray(data.items)) return <DisclosureList items={data.items} />
+  if (presentation.type === 'report' && Array.isArray(data.chunks)) return (
+    <details>
+      <summary>사업보고서 근거</summary>
+      <ul>{data.chunks.map((chunk, index) => <li key={index}>
+        <strong>{chunk.section}</strong><p>{chunk.content ?? chunk.text}</p>
+      </li>)}</ul>
+    </details>
+  )
   if (presentation.type === 'financial_comparison' && Array.isArray(data.reports)) {
     const labels = ['매출액', '영업이익', '당기순이익']
     const years = data.years || data.reports.map(report => report.businessYear)
@@ -48,7 +78,7 @@ export default function ChatAnswerData({ presentation }) {
         <span className='chat-data-label'>{label} 추이 · {data.unit}</span>
         <ResponsiveContainer width='100%' height={150}>
           <LineChart data={rows} margin={{ left: 5, right: 12, top: 12, bottom: 5 }}>
-            <CartesianGrid vertical={false} stroke='#e4e4e4' />
+            <CartesianGrid vertical={false} stroke='var(--line-light)' />
             <XAxis dataKey='year' tick={{ fontSize: 12 }} />
             <YAxis width={68} tick={{ fontSize: 11 }} tickFormatter={value => new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 }).format(value)} />
             <Tooltip formatter={value => [`${format(value)}억 원`, label]} labelFormatter={value => `${value}년`} />
@@ -57,59 +87,43 @@ export default function ChatAnswerData({ presentation }) {
         </ResponsiveContainer>
       </div>)}
       {data.notes?.map(note => <span key={note} className='chat-data-label'>{note}</span>)}
-      <span className='chat-data-label'>— 자료 없음 · 누락된 연도의 그래프는 연결하지 않습니다.</span>
+      <span className='chat-data-label'>“-” 표시는 자료 없음입니다. 누락된 연도의 그래프는 연결하지 않습니다.</span>
     </div>
   }
   if (presentation.type === 'composite' && Array.isArray(data.sections)) return (
     <div className='chat-composite'>
-      {data.sections.filter(section => ['quote', 'financial', 'news'].includes(section.type)).map((section, index) =>
+      {data.sections.filter(section => ['quote', 'financial', 'policy'].includes(section.type)).map((section, index) =>
         <ChatAnswerData key={`${section.type}-${index}`} presentation={section} />)}
       {data.notes?.length > 0 && <div className='chat-composite-notes' role='status'>
         {data.notes.map((note, index) => <span className='chat-data-label' key={index}>{note}</span>)}
       </div>}
     </div>
   )
-  if (data.newsExpired && ['news', 'news_summary'].includes(presentation.type)) return (
-    <div className='chat-news'>
-      <span className='chat-data-label'>기사 제목·요약은 보관 기간(24시간)이 지나 삭제되었습니다. 최신 기사는 다시 질문해 주세요.</span>
-    </div>
-  )
-  if (presentation.type === 'news' && Array.isArray(data.articles)) return (
-    <div className='chat-news'>
-      <span className='chat-data-label'>{data.name} · 조선비즈 RSS · 관련도는 본문 분석이 아닌 제목 키워드 기준</span>
-      <ol className='chat-news-list' aria-label='관련 기사'>
-        {data.articles.filter(article => safeLink(article.link)).map((article, index) => <li key={article.link}>
-          <span className='chat-news-number'>{index + 1}번</span>
-          <a href={article.link} target='_blank' rel='noopener noreferrer'>{article.title}<span aria-hidden='true'> ↗</span></a>
-          <span className='chat-data-label'>{article.publishedAt ? `게시 ${formatChatTime(article.publishedAt)}` : '게시 시각 미제공'}</span>
+  if (presentation.type === 'policy' && Array.isArray(data.documents)) return (
+    <div className='chat-policy'>
+      <span className='chat-data-label'>{data.name} · 산업통상부 보도·참고자료</span>
+      <ul className='chat-policy-list' aria-label='관련 산업·정책 자료'>
+        {data.documents.filter(document => safeLink(document.link)).map(document => <li key={document.link}>
+          {document.tags?.length > 0 && <div className='policy-tags' aria-label='자료 분류'>
+            {document.tags.map(tag => <span className='policy-tag' key={tag}>{tag}</span>)}
+          </div>}
+          <a href={document.link} target='_blank' rel='noopener noreferrer'>{document.title}<span aria-hidden='true'> ↗</span></a>
+          <span className='chat-data-label'>
+            {document.relationType === 'DIRECT' ? '기업 직접 언급' : '산업 간접 관련'}
+            {' · '}{document.policyStatus === 'IN_EFFECT' ? '본문에 시행 표현 포함' : document.policyStatus === 'PLANNED' ? '본문에 시행 예정 표현 포함' : document.policyStatus === 'CONFIRMED' ? '본문에 확정 표현 포함' : '발표 자료'}
+            {document.publishedAt ? ` · 발표 ${document.publishedAt}` : ''}
+          </span>
         </li>)}
-      </ol>
-      <span className='chat-data-label'>&apos;1번 기사 요약해줘&apos;처럼 번호로 요청하면 기사 1건을 AI로 요약합니다.</span>
-    </div>
-  )
-  if (presentation.type === 'news_summary') return (
-    <div className='chat-news-summary' role='region' aria-label='기사 AI 요약'>
-      {safeLink(data.link)
-        ? <a href={data.link} target='_blank' rel='noopener noreferrer'>{data.title}<span aria-hidden='true'> ↗</span></a>
-        : <strong>{data.title}</strong>}
-      {data.expired || !data.summary
-        ? <p className='chat-data-label'>요약문 보관 기간(24시간)이 지나 삭제되었습니다. 같은 기사를 다시 요청하면 새로 요약합니다.</p>
-        : <p>{data.summary}</p>}
-      <span className='chat-data-label'>
-        {data.attribution || '출처: 조선비즈'} · {data.publishedAt ? `발행 ${formatChatTime(data.publishedAt)}` : '발행 시각 미제공'}
-      </span>
-      {!data.expired && data.summary && <span className='chat-data-label'>
-        {data.notice}{data.expiresAt ? ` 요약문은 ${formatChatTime(data.expiresAt)}까지 보관 후 삭제됩니다.` : ''}
-      </span>}
+      </ul>
     </div>
   )
   if (presentation.type === 'quote') return (
     <div className='chat-quote' aria-label={`${data.name} 현재가 조회 결과`}>
       <span className='chat-data-label'>{data.name} · {data.symbol}</span>
       <strong className='chat-quote-price'>{format(data.price)}원</strong>
-      <div className={`chat-quote-change ${direction(data.changeRate)}`}>
-        {present(data.priceChange) ? `${percent.format(Number(data.priceChange))}원` : '—'}
-        {' · '}{present(data.changeRate) ? `${percent.format(Number(data.changeRate))}%` : '—'}
+      <div className='chat-quote-change'>
+        {present(data.priceChange) ? `${percent.format(Number(data.priceChange))}원` : '-'}
+        {' · '}{present(data.changeRate) ? <span className={changeRateClass(data.changeRate)}>{percent.format(Number(data.changeRate))}%</span> : '-'}
       </div>
       <span className='chat-data-label'>거래량 {format(data.volume)}주</span>
       <span className='chat-data-label'>{data.time_kind} · {formatChatTime(data.basis_at)}</span>
@@ -128,14 +142,14 @@ export default function ChatAnswerData({ presentation }) {
             ? direction(Number(metric.current) - Number(metric.previous)) : ''
           return <tr key={`${metric.label}-${index}`}>
             <th scope='row'>{metric.label}</th>
-            <td>{available ? format(metric.current) : '—'}</td>
+            <td>{available ? format(metric.current) : '-'}</td>
             <td className={comparison}>{available ? comparisons[metric.comparison] ||
-              (present(metric.growthRate) ? `${percent.format(Number(metric.growthRate))}%` : '—') : '—'}</td>
+              (present(metric.growthRate) ? `${percent.format(Number(metric.growthRate))}%` : '-') : '-'}</td>
           </tr>
         })}</tbody>
       </table>
       {data.metrics.some(metric => metric.status !== 'AVAILABLE' || metric.growthRate == null) &&
-        <span className='chat-data-label'>— 자료 없음 또는 증감률 비교 불가</span>}
+        <span className='chat-data-label'>“-” 표시는 자료 없음 또는 증감률 비교 불가입니다.</span>}
     </div>
   )
 }

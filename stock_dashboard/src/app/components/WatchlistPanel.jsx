@@ -2,12 +2,14 @@
 
 import useHydrated from '@/app/hooks/useHydrated'
 import useStockStore from '@/app/store/useStockStore'
-import { marketStocks } from '@/app/lib/market'
+import { changeRateClass, marketStocks } from '@/app/lib/market'
 import useStockData from '@/app/hooks/useStockData'
 import QuoteStatus from './QuoteStatus'
 import useAuthStore from '../store/useAuthStore'
+import WatchStar from './WatchStar'
+import StockAvatar from './StockAvatar'
 
-function WatchlistRow({ stock, active, liveQuote, onSelect, onRemove }) {
+function WatchlistRow({ stock, active, liveQuote, onSelect }) {
   const { data, error } = useStockData(stock.symbol, !liveQuote)
   const quote = liveQuote || data
   const price = Number.isFinite(quote?.price) ? quote.price : null
@@ -15,22 +17,21 @@ function WatchlistRow({ stock, active, liveQuote, onSelect, onRemove }) {
   const name = data?.stockName || stock.name
   return <li className={active ? 'active' : ''}>
     <button className='watchlist-select' type='button' onClick={() => onSelect(stock)}>
-      <span className='watch-name'><strong>{name}</strong><small>{stock.symbol}</small></span>
+      <StockAvatar symbol={stock.symbol} name={name} /><span className='watch-name'><strong>{name}</strong><small>{stock.symbol}</small></span>
       <span className='watch-price' title={error && !liveQuote ? error : undefined}>
-        <strong>{price == null ? '—' : `${price.toLocaleString('ko-KR')}원`}</strong>
-        <small className={rate > 0 ? 'positive' : rate < 0 ? 'negative' : ''}>
-          {rate == null ? '—' : `${rate > 0 ? '+' : ''}${rate.toFixed(2)}%`}
+        <strong>{price == null ? '-' : `${price.toLocaleString('ko-KR')}원`}</strong>
+        <small className={changeRateClass(rate)}>
+          {rate == null ? '-' : `${rate > 0 ? '+' : ''}${rate.toFixed(2)}%`}
         </small>
       </span>
     </button>
-    <button className='watchlist-remove' type='button' onClick={() => onRemove(stock.symbol)} aria-label={`${name} 관심 종목 삭제`}>삭제</button>
+    <WatchStar symbol={stock.symbol} name={name} />
   </li>
 }
 
 export default function WatchlistPanel({ activeSymbol, onSelectStock, trades = {} }) {
   const hydrated = useHydrated()
   const watchlist = useStockStore((state) => state.watchlist)
-  const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
   const user = useAuthStore(state => state.user)
   const error = useStockStore(state => state.watchlistError)
 
@@ -56,7 +57,7 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock, trades = {
             const stock = marketStocks.find((item) => item.symbol === symbol) || { symbol, name: symbol }
             return (
               <WatchlistRow key={symbol} stock={stock} active={activeSymbol === symbol}
-                liveQuote={trades[symbol]} onSelect={onSelectStock} onRemove={removeFromWatchlist} />
+                liveQuote={trades[symbol]} onSelect={onSelectStock} />
             )
           })}
         </ul>

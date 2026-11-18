@@ -32,14 +32,14 @@ class ChatRequest(BaseModel):
 
 
 class SourceReference(BaseModel):
-    provider: Literal["KIS", "OpenDART", "RSS"]
+    provider: Literal["KIS", "OpenDART", "MOTIR", "KOREA_KR"]
     label: str
     basis_at: str | None = None
     url: str | None = None
 
 
 class AnswerPresentation(BaseModel):
-    type: Literal["quote", "financial", "financial_comparison", "news", "composite"]
+    type: Literal["quote", "financial", "financial_comparison", "policy", "composite", "report", "disclosure"]
     data: dict
 
 
@@ -49,6 +49,8 @@ class ChatResponse(BaseModel):
     sources: list[SourceReference] = Field(default_factory=list)
     presentation: AnswerPresentation | None = None
     context_message: str | None = None
+    basis: str | None = None
+    usage: dict | None = None
 
 
 class HealthResponse(BaseModel):

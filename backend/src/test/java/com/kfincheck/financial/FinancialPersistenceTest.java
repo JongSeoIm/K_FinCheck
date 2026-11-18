@@ -58,13 +58,13 @@ class FinancialPersistenceTest {
            {"rcept_no":"99990101000002","sj_div":"IS","account_id":"dart_OperatingIncomeLoss","thstrm_amount":"50","currency":"USD"}
           ]
           """);
-        repository.save(FinancialService.normalize("000660", "00164779", 2015, data));
-        var loaded = repository.latest("000660", 2015);
+        repository.save(FinancialService.normalize("000660", "00164779", 2015, "11011", data));
+        var loaded = repository.latest("000660", 2015, "11011");
         assertThat(loaded.metrics()).extracting(FinancialReport.Metric::status)
                 .containsExactly("AMBIGUOUS", "UNSUPPORTED_CURRENCY", "MISSING");
         assertThat(loaded.metrics().get(1).currency()).isEqualTo("USD");
         assertThat(loaded.metrics()).allMatch(value -> value.currentAmount() == null);
-        assertThatThrownBy(() -> repository.save(FinancialService.normalize("005930", "00126380", 2015, json.readTree("[]"))))
+        assertThatThrownBy(() -> repository.save(FinancialService.normalize("005930", "00126380", 2015, "11011", json.readTree("[]"))))
                 .isInstanceOf(FinancialException.class);
     }
 }

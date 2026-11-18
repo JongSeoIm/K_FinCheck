@@ -1,7 +1,6 @@
 stream:
   enabled: true
   relay-enabled: ${KIS_RELAY_ENABLED:true}
-  symbols: ["005930", "000660"]
   topic: stock-quotes-v1
   group-id: k-fincheck-quotes
   outbox:

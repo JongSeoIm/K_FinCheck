@@ -12,11 +12,29 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 @Service
 public class FinancialService {
-    private static final Map<String, String> COMPANIES = Map.of(
-            "005930", "00126380", "000660", "00164779");
+    private static final Map<String, Company> COMPANIES = Map.of(
+            "005930", new Company("삼성전자", "00126380"),
+            "000660", new Company("SK하이닉스", "00164779"),
+            "035420", new Company("NAVER", "00266961"),
+            "035720", new Company("카카오", "00258801"),
+            "005380", new Company("현대차", "00164742"),
+            "000270", new Company("기아", "00106641"),
+            "051910", new Company("LG화학", "00356361"),
+            "006400", new Company("삼성SDI", "00126362"));
+    record Company(String name, String dartCode) { }
+
+    static Company company(String stockCode) {
+        Company company = COMPANIES.get(stockCode);
+        if (company == null) {
+            throw new FinancialException(HttpStatus.NOT_FOUND, "UNSUPPORTED_STOCK",
+                    "이 종목의 연결 실적은 지원하지 않습니다.");
+        }
+        return company;
+    }
     private final OpenDartClient client;
     private final FinancialRepository repository;
 
@@ -26,36 +44,55 @@ public class FinancialService {
     }
 
     public synchronized FinancialReport annual(String stockCode, Integer requestedYear) {
-        String corp = COMPANIES.get(stockCode);
-        if (corp == null) {
-            throw new FinancialException(HttpStatus.NOT_FOUND, "UNSUPPORTED_STOCK",
-                    "현재 연간 실적은 삼성전자·SK하이닉스를 지원합니다.");
-        }
+        String corp = company(stockCode).dartCode();
         int currentYear = LocalDate.now(ZoneId.of("Asia/Seoul")).getYear();
         int year = requestedYear == null ? currentYear - 1 : requestedYear;
         if (year < 2015 || year >= currentYear) {
             throw new FinancialException(HttpStatus.BAD_REQUEST, "INVALID_YEAR",
                     "사업연도는 2015년부터 전년도까지 선택할 수 있습니다.");
         }
+        return load(stockCode, corp, year, "11011", () -> client.annualReport(corp, year));
+    }
+
+    public synchronized FinancialReport quarterly(String stockCode, Integer year, int quarter) {
+        String corp = company(stockCode).dartCode();
+        String reportCode = switch (quarter) {
+            case 1 -> "11013";
+            case 2 -> "11012";
+            case 3 -> "11014";
+            default -> throw new FinancialException(HttpStatus.BAD_REQUEST, "INVALID_QUARTER",
+                    "분기 실적은 1분기부터 3분기까지 선택할 수 있습니다.");
+        };
+        int currentYear = LocalDate.now(ZoneId.of("Asia/Seoul")).getYear();
+        if (year == null || year < 2015 || year > currentYear) {
+            throw new FinancialException(HttpStatus.BAD_REQUEST, "INVALID_YEAR",
+                    "사업연도는 2015년부터 올해까지 선택할 수 있습니다.");
+        }
+        return load(stockCode, corp, year, reportCode, () -> client.financialReport(corp, year, reportCode));
+    }
+
+    private FinancialReport load(String stockCode, String corp, int year, String reportCode, Supplier<JsonNode> fetch) {
         try {
-            FinancialReport saved = repository.latest(stockCode, year);
+            FinancialReport saved = repository.latest(stockCode, year, reportCode);
             if (saved != null && saved.fetchedAt().plusSeconds(3600).isAfter(Instant.now())) return saved;
-            FinancialReport report = normalize(stockCode, corp, year, client.annualReport(corp, year));
+            FinancialReport report = normalize(stockCode, corp, year, reportCode, fetch.get());
             repository.save(report);
-            return repository.latest(stockCode, year);
+            return repository.latest(stockCode, year, reportCode);
         } catch (org.springframework.dao.DataAccessException error) {
             throw new FinancialException(HttpStatus.SERVICE_UNAVAILABLE, "FINANCIAL_DB_UNAVAILABLE",
                     "실적 저장소에 연결하지 못했습니다. DB 설정을 확인해 주세요.");
         }
     }
 
-    static FinancialReport normalize(String stock, String corp, int year, JsonNode rows) {
+    static FinancialReport normalize(String stock, String corp, int year, String reportCode, JsonNode rows) {
+        // 분기·반기 손익계산서에서 전년 같은 3개월은 전기 분기 금액에 있다.
+        String previousField = "11011".equals(reportCode) ? "frmtrm_amount" : "frmtrm_q_amount";
         var metrics = List.of(
-                metric(rows, "revenue", "매출액", List.of("ifrs-full_Revenue", "ifrs_Revenue"),
+                metric(rows, previousField, "revenue", "매출액", List.of("ifrs-full_Revenue", "ifrs_Revenue"),
                         List.of("매출액", "수익(매출액)", "영업수익")),
-                metric(rows, "operatingProfit", "영업이익", List.of("dart_OperatingIncomeLoss"),
+                metric(rows, previousField, "operatingProfit", "영업이익", List.of("dart_OperatingIncomeLoss"),
                         List.of("영업이익", "영업이익(손실)", "영업손익")),
-                metric(rows, "netIncome", "당기순이익", List.of("ifrs-full_ProfitLoss", "ifrs_ProfitLoss"),
+                metric(rows, previousField, "netIncome", "당기순이익", List.of("ifrs-full_ProfitLoss", "ifrs_ProfitLoss"),
                         List.of("당기순이익", "당기순이익(손실)", "당기순손익")));
         String receipt = "";
         for (JsonNode row : rows) {
@@ -64,12 +101,12 @@ public class FinancialService {
                 break;
             }
         }
-        return new FinancialReport(stock, corp, year, year - 1, "11011", "CFS", "KRW", receipt,
+        return new FinancialReport(stock, corp, year, year - 1, reportCode, "CFS", "KRW", receipt,
                 receipt.isEmpty() ? null : "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" + receipt,
                 Instant.now(), metrics);
     }
 
-    private static FinancialReport.Metric metric(JsonNode rows, String key, String label,
+    private static FinancialReport.Metric metric(JsonNode rows, String previousField, String key, String label,
             List<String> ids, List<String> names) {
         // 표준 코드 우선. IS가 없을 때만 CIS를 사용하며 이름 매핑은 그 다음에 적용한다.
         for (boolean byId : List.of(true, false)) {
@@ -85,14 +122,14 @@ public class FinancialService {
                 if (matches.isEmpty()) continue;
                 JsonNode row = matches.getFirst();
                 // 같은 계정 후보가 서로 다른 값이면 임의로 하나를 선택하지 않는다.
-                if (matches.stream().anyMatch(other -> !sameAmounts(row, other))) {
+                if (matches.stream().anyMatch(other -> !sameAmounts(row, other, previousField))) {
                     return new FinancialReport.Metric(key, label, null, null, null, "UNAVAILABLE", "AMBIGUOUS", null, null, "KRW");
                 }
                 if (!"KRW".equals(row.path("currency").asText())) {
                     return new FinancialReport.Metric(key, label, null, null, null, "UNAVAILABLE", "UNSUPPORTED_CURRENCY", row.path("account_id").asText(), row.path("account_nm").asText(), row.path("currency").asText());
                 }
                 BigDecimal current = amount(row.path("thstrm_amount").asText());
-                BigDecimal previous = amount(row.path("frmtrm_amount").asText());
+                BigDecimal previous = amount(row.path(previousField).asText());
                 return metricValue(key, label, current, previous, current == null ? "MISSING" : "AVAILABLE",
                         row.path("account_id").asText(), row.path("account_nm").asText(), "KRW");
             }
@@ -116,9 +153,9 @@ public class FinancialService {
                 sourceId, sourceName, currency);
     }
 
-    private static boolean sameAmounts(JsonNode first, JsonNode second) {
+    private static boolean sameAmounts(JsonNode first, JsonNode second, String previousField) {
         return first.path("thstrm_amount").equals(second.path("thstrm_amount"))
-                && first.path("frmtrm_amount").equals(second.path("frmtrm_amount"))
+                && first.path(previousField).equals(second.path(previousField))
                 && first.path("currency").equals(second.path("currency"));
     }
 

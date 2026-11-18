@@ -1,40 +1,221 @@
+/* Hallmark · built: the project · redesign: full · scope: app · shape: app screen · tokens: globals.css (디자인 기준 문서) */
 .calendar { min-width: 0; }
-.panel { border: 1px solid var(--line); background: #fff; }
-.monthBar { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 16px; }
-.monthBar h2 { min-width: 122px; margin: 0; text-align: center; font-size: 19px; }
-.monthBar button { width: 34px; height: 34px; border: 1px solid var(--line); background: #fff; color: var(--text); font-size: 24px; line-height: 1; cursor: pointer; }
-.monthBar button:hover { background: #f4f4f4; }
-.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.grid > * { border-top: 1px solid var(--line); border-right: 1px solid var(--line); min-width: 0; }
-.grid > :nth-child(7n) { border-right: 0; }
-.weekday { background: #f4f4f4; padding: 9px 0; text-align: center; font-size: 13px; font-weight: 600; }
-.day, .emptyCell { min-height: 100px; padding: 8px; }
-.selectedDay { background: #f5f7fa; }
-.emptyCell { background: #fafafa; }
-.day time { display: block; margin-bottom: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
-.event { position: relative; margin-bottom: 3px; }
-.eventButton { display: flex; align-items: baseline; gap: 5px; width: 100%; padding: 4px 5px; border: 1px solid transparent; background: var(--event-background, #f2f2f2); color: var(--text); text-align: left; font-size: 12px; cursor: pointer; }
-.earnings { --event-background: #e8eff8; }
-.buyback { --event-background: #e8f1ec; }
-.dividend { --event-background: #f4eddf; }
-.meeting { --event-background: #eee8f6; }
-.eventButton span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.eventButton span:last-child { flex-shrink: 0; color: var(--muted); }
-.eventButton:hover, .eventButton[aria-expanded='true'] { border-color: var(--line); }
-.more { border: 0; padding: 2px 4px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
-.popup { position: absolute; z-index: 5; top: 100%; left: 0; width: 230px; border: 1px solid var(--line); background: #fff; padding: 10px 12px; box-shadow: 0 3px 10px #0002; }
-.day:nth-last-child(-n + 14) .popup { top: auto; bottom: 100%; }
-.day:nth-child(7n) .popup, .day:nth-child(7n - 1) .popup { right: 0; left: auto; }
-.popupItem { display: grid; gap: 5px; font-size: 12px; }
-.popupItem + .popupItem { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
-.popupItem span { color: var(--muted); }
-.popupItem a { width: fit-content; text-underline-offset: 2px; }
-.empty { border-top: 1px solid var(--line); margin: 0; padding: 14px; color: var(--muted); font-size: 13px; text-align: center; }
-@media (max-width: 760px) {
-  .panel { position: relative; }
-  .day, .emptyCell { min-height: 90px; padding: 4px; }
-  .eventButton { display: grid; gap: 0; padding: 3px 2px; font-size: 10px; }
-  .eventButton span:last-child { white-space: normal; }
-  .event { position: static; }
-  .day .popup { position: absolute; top: 58px; bottom: auto; left: auto; right: 8px; max-width: calc(100% - 16px); }
+.panel { position: relative; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
+
+.monthBar { display: flex; align-items: center; justify-content: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-light); }
+.monthBar h2 { min-width: 132px; margin: 0; text-wrap: balance; font-size: var(--text-2xl); font-weight: var(--weight-bold); text-align: center; font-variant-numeric: tabular-nums; }
+.monthBar button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--hover-transition), transform var(--dur-micro) var(--ease-out);
 }
+.monthBar button:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.monthBar button:active { transform: scale(.94); }
+
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.grid > * { min-width: 0; border-top: 1px solid var(--line-light); border-right: 1px solid var(--line-light); }
+.grid > :nth-child(-n + 7) { border-top: 0; }
+.grid > :nth-child(7n) { border-right: 0; }
+.weekday { padding: var(--space-2) 0; background: var(--surface-subtle); color: var(--muted); font-size: var(--text-xs); font-weight: var(--weight-semibold); text-align: center; }
+.day, .emptyCell { min-height: 92px; padding: var(--space-1); }
+.emptyCell { background: var(--surface-faint); }
+.day:is(:nth-child(7n), :nth-child(7n + 1)) { background: var(--surface-faint); }
+.day.selectedDay { background: var(--brand-soft); }
+
+.dateButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 28px;
+  margin-bottom: var(--space-1);
+  padding: 0 2px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.dateButton:hover time { background: var(--surface-hover); }
+.dateButton time {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.dateButton[aria-current='date'] time { background: var(--brand); color: var(--on-strong); }
+.dateButton[aria-pressed='true'] time { box-shadow: inset 0 0 0 2px var(--brand); }
+.dateButton[aria-current='date'][aria-pressed='true'] time { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand); }
+.count { display: none; }
+
+.event { position: relative; margin-bottom: var(--space-1); }
+.eventButton {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: var(--event-background, var(--event-neutral-background));
+  color: var(--text);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  text-align: left;
+  cursor: pointer;
+}
+.earnings { --event-background: var(--event-earnings-background); --event-accent: var(--event-earnings-accent); }
+.buyback { --event-background: var(--event-buyback-background); --event-accent: var(--event-buyback-accent); }
+.dividend { --event-background: var(--event-dividend-background); --event-accent: var(--event-dividend-accent); }
+.meeting { --event-background: var(--event-meeting-background); --event-accent: var(--event-meeting-accent); }
+.eventButton span:first-child { overflow: hidden; font-weight: var(--weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
+/* 분류는 칸 배경과 작은 사각 표시로 구분한다(분류명 글자도 함께 표시). */
+.eventButton span:first-child::before, .agendaType::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: var(--space-1);
+  border-radius: 1px;
+  background: var(--event-accent, var(--event-neutral-accent));
+  vertical-align: 1px;
+}
+.eventButton span:last-child { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.eventButton:hover, .eventButton[aria-expanded='true'] { box-shadow: inset 0 0 0 1px var(--event-accent, var(--event-neutral-accent)); }
+.eventButton:focus-visible, .monthBar button:focus-visible, .more:focus-visible, .dateButton:focus-visible, .agendaHeading button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.more { min-height: 24px; padding: 0 var(--space-1); border: 0; border-radius: var(--radius-chip); background: transparent; color: var(--muted); font-size: var(--text-xs); font-weight: var(--weight-semibold); cursor: pointer; }
+.more:hover { background: var(--surface-hover); color: var(--text); }
+
+.popup {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  gap: var(--space-2);
+  width: 260px;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  transform-origin: top left;
+  animation: popIn var(--dur-short) var(--ease-out);
+}
+@keyframes popIn { from { opacity: 0; transform: scale(.98); } }
+.day:nth-last-child(-n + 14) .popup { top: auto; bottom: calc(100% + 4px); transform-origin: bottom left; }
+.day:nth-child(7n) .popup, .day:nth-child(7n - 1) .popup { right: 0; left: auto; }
+.popupItem { display: grid; gap: var(--space-1); font-size: var(--text-sm); }
+.popupItem + .popupItem { padding-top: var(--space-2); border-top: 1px solid var(--line-light); }
+
+/* 팝업과 일정 목록이 함께 쓰는 상세 */
+.eventTitle { line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.eventFacts { display: grid; gap: 2px; margin: 0; font-size: var(--text-xs); }
+.eventFacts div { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: var(--space-2); }
+.eventFacts dt { color: var(--muted); }
+.eventFacts dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.eventLinks { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); font-size: var(--text-sm); }
+.eventLinks a { color: var(--brand); text-underline-offset: 3px; }
+.eventLinks a:hover { color: var(--brand-hover); }
+
+/* 이달·선택일 일정 목록 */
+.agenda { border-top: 1px solid var(--line); }
+.agendaHeading { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.agendaHeading h3 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-bold); text-wrap: balance; }
+.agendaCount { color: var(--muted); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.agendaHeading button {
+  margin-left: auto; min-height: 32px; padding: 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-chip); background: var(--surface); color: var(--text); font-size: var(--text-sm); cursor: pointer; }
+.agendaHeading button:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.agendaEmpty { margin: 0; padding: 0 var(--space-4) var(--space-4); color: var(--muted); font-size: var(--text-sm); }
+.agendaList { margin: 0; padding: 0 var(--space-4) var(--space-2); list-style: none; }
+.agendaList li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--line-light); }
+.agendaDate { display: grid; align-content: start; color: var(--text); font-size: var(--text-lg); font-weight: var(--weight-bold); line-height: var(--leading-tight); font-variant-numeric: tabular-nums; }
+.agendaDate small { color: var(--muted); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+.agendaBody { display: grid; gap: var(--space-1); min-width: 0; font-size: var(--text-sm); }
+.agendaTitle { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; }
+.agendaTitle strong { font-size: var(--text-md); }
+.agendaType {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--event-background, var(--event-neutral-background));
+  color: var(--text);
+  font-size: var(--text-xs);
+}
+
+.empty { margin: 0; padding: var(--space-4); border-top: 1px solid var(--line); color: var(--muted); font-size: var(--text-sm); text-align: center; }
+.empty button { margin-left: var(--space-2); min-height: 32px; padding: 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-chip); background: var(--surface); color: var(--text); font-size: var(--text-sm); cursor: pointer; }
+.empty button:hover { border-color: var(--line-strong); }
+
+/* 좁은 화면: 달력 칸에는 날짜와 건수만 두고, 일정 내용은 아래 목록에서 읽는다. */
+@media (max-width: 760px) {
+  .day, .emptyCell { min-height: 56px; padding: var(--space-0-5); }
+  .event { display: none; }
+  .dateButton { flex-direction: column; justify-content: center; gap: 2px; height: 100%; min-height: 52px; margin: 0; padding: 2px 0; }
+  .dateButton time { width: 28px; height: 28px; }
+  .count {
+    display: block;
+    min-width: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-size: 11px;
+    font-weight: var(--weight-bold);
+    line-height: 16px;
+    text-align: center;
+  }
+  .monthBar h2 { font-size: var(--text-xl); }
+  .agendaHeading, .agendaList { padding-inline: var(--space-3); }
+  .agendaList li { grid-template-columns: 44px minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup { animation: none; }
+}
+
+/* ---------- 디자인 기준 톤: 오늘은 파란 원, 고른 날짜는 blue-50 ---------- */
+.panel { overflow: hidden; border: 1px solid var(--line-subtle); border-radius: var(--radius-3xl); box-shadow: none; }
+.monthBar { justify-content: space-between; padding: var(--space-4) var(--space-5); }
+.monthBar h2 { order: -1; margin-right: auto; font-family: var(--font-display); font-size: var(--text-3xl); text-align: left; }
+.monthBar button { width: 40px; height: 40px; border: 0; border-radius: var(--radius-m); background: var(--grey-100); }
+.monthBar button:hover { background: var(--grey-200); color: var(--text); }
+.dateButton[aria-current='date'] time { background: var(--primary); color: var(--on-strong); }
+.dateButton[aria-pressed='true'] time { background: var(--blue-50); color: var(--primary-text); box-shadow: none; }
+.dateButton[aria-current='date'][aria-pressed='true'] time { background: var(--primary); color: var(--on-strong); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--blue-50); }
+.day.selectedDay { background: var(--brass-soft); }
+.day { transition: background-color var(--dur-micro) ease; }
+.agendaHeading button { border-color: var(--line); border-radius: var(--radius-full); }
+.agendaHeading button:hover { border-color: var(--ink); }
+.agendaDate { font-family: var(--font-display); font-size: var(--text-2xl); }
+.count { background: var(--brass-soft); color: var(--brass-text); }
+.eventLinks a { color: var(--brass-text); font-weight: var(--weight-semibold); }
+.eventLinks a:hover { color: var(--text); }
+@keyframes agendaIn { from { opacity: 0; transform: translateY(4px); } }
+
+/* 넓은 화면: 달력 옆에 일정 목록을 두어 날짜를 누르면 바로 옆에서 읽는다. */
+@media (min-width: 1100px) {
+  .panel:has(.agenda) { display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+  .panel:has(.agenda) .monthBar { grid-column: 1 / -1; }
+  .panel:has(.agenda) .agenda { grid-column: 2; grid-row: 2; max-height: 620px; overflow-y: auto; border-top: 0; border-left: 1px solid var(--line); }
+  .panel:has(.agenda) .agendaList li { grid-template-columns: 48px minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agendaList li, .day { animation: none; transition: none; }
+}
+
+/* 비활성(디자인 기준: 전체 30% 불투명)과 누름 */
+.monthBar button:disabled, .agendaHeading button:disabled, .empty button:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
+.monthBar button:active:not(:disabled), .agendaHeading button:active, .empty button:active { transform: scale(.94); }

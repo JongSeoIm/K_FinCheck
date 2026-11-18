@@ -6,6 +6,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -18,14 +19,13 @@ public class SecurityConfig {
     @Bean SecurityFilterChain security(HttpSecurity http, HttpSessionSecurityContextRepository context,
             HttpSessionCsrfTokenRepository csrf) throws Exception {
         return http.cors(cors -> { })
-                .csrf(config -> config.csrfTokenRepository(csrf))
+                .csrf(config -> config.csrfTokenRepository(csrf).ignoringRequestMatchers(
+                        new AntPathRequestMatcher("/api/rag/reports/**")))
                 .securityContext(config -> config.securityContextRepository(context))
                 .requestCache(cache -> cache.disable())
                 .formLogin(form -> form.disable()).httpBasic(basic -> basic.disable()).logout(logout -> logout.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // 기사 AI 요약(뉴스 목록 버튼·AI 대화)은 AI 호출 비용이 들어 로그인 사용자만 쓴다.
-                        .requestMatchers("/api/watchlist/**", "/api/chat", "/api/chat/**",
-                                "/api/stocks/*/news/summary").authenticated()
+                        .requestMatchers("/api/watchlist/**", "/api/chat", "/api/chat/**").authenticated()
                         .anyRequest().permitAll())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((req, res, error) -> {

@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis, usePlotArea, useYAxisScale } from 'recharts'
+import useStockCandles from '../hooks/useStockCandles'
 import useStockData from '../hooks/useStockData'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
@@ -8,90 +10,129 @@ const prices = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 })
 const quoteTime = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul',
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
 
-function BrokerOpinion({ item, price }) {
-  const difference = price != null && item.targetPrice > 0 ? (item.targetPrice / price - 1) * 100 : null
-  const gap = difference == null ? null : Math.abs(difference).toFixed(1)
-  return <li className='broker-opinion'>
-    <div className='broker-opinion-heading'>
-      <strong>{item.broker || '증권사 미제공'}</strong>
-      <time dateTime={item.date}>{item.date.replaceAll('-', '.')} 발표</time>
-    </div>
-    <div className='broker-opinion-body'>
-      <span>발표 의견 <strong>{item.opinion || '—'}</strong></span>
-      <span>목표주가 <strong>{item.targetPrice == null ? '—' : `${prices.format(item.targetPrice)}원`}</strong></span>
-    </div>
-    {difference != null && <p className='broker-opinion-difference'>
-      {gap === '0.0' ? '목표주가는 기준 주가와 비슷한 수준'
-        : `목표주가는 기준 주가보다 ${gap}% ${difference > 0 ? '높게' : '낮게'} 제시`}
+function TargetLabels({ targets }) {
+  const plot = usePlotArea()
+  const scale = useYAxisScale()
+  if (!plot || !scale) return null
+
+  const labelGap = 18
+  const edge = plot.x + plot.width
+  let nextY = plot.y + 5
+  const labels = []
+  for (const [index, target] of [...targets].reverse().entries()) {
+    const point = scale(target.value)
+    const y = Math.min(Math.max(point, nextY),
+      plot.y + plot.height - 5 - (targets.length - index - 1) * labelGap)
+    nextY = y + labelGap
+    labels.push(<g key={target.key} className='target-price-label'>
+      {Math.abs(y - point) > 2 && <line x1={edge + 4} x2={edge + 12} y1={point} y2={y} stroke={target.color} />}
+      <text x={edge + 15} y={y} dominantBaseline='central' fontSize={11} fill={target.color}>
+        {target.label} {prices.format(target.value)}원
+      </text>
+    </g>)
+  }
+  return labels
+}
+
+function TargetPriceTooltip({ active, payload }) {
+  const row = payload?.[0]?.payload
+  if (!active || !row || row.close == null) return null
+  return <div className='chart-tooltip'>
+    {row.date ? <time dateTime={row.date}>{row.date}</time> : <span>비교 기준 주가</span>}
+    <strong>{prices.format(row.close)}원</strong>
+  </div>
+}
+
+function TargetPriceSummary({ symbol, items, price, businessDate }) {
+  const { data: candles } = useStockCandles(symbol, 'D', 45)
+  const values = items.map(item => item.targetPrice).filter(value => Number.isFinite(value) && value > 0)
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length
+  const targets = [
+    { key: 'low', label: '최저', value: Math.min(...values), color: '#1769aa' },
+    { key: 'average', label: '평균', value: average, color: '#17643f' },
+    { key: 'high', label: '최고', value: Math.max(...values), color: '#a43c3c' },
+  ]
+  const history = candles.filter(candle => Number.isFinite(candle.close) && candle.close > 0 && (!businessDate || candle.date < businessDate))
+    .sort((first, second) => first.date.localeCompare(second.date))
+  const basisIndex = history.length
+  const targetIndex = basisIndex + Math.max(1, Math.round(basisIndex / 4))
+  const chartData = [
+    ...history.map((candle, index) => ({ index, date: candle.date, close: candle.close })),
+    { index: basisIndex, close: price, low: price, average: price, high: price },
+    { index: targetIndex, low: targets[0].value, average, high: targets[2].value },
+  ]
+  const axisLabels = {
+    ...(history.length > 1 && { 0: history[0].date.slice(5).replace('-', '.') }),
+    [basisIndex]: '기준 주가',
+  }
+
+  return <>
+    <p className='opinion-basis'>최근 3개월 · 목표주가를 제시한 증권사 {values.length}곳</p>
+    {price != null && <div className='target-price-chart' role='img' aria-label='비교 기준 주가와 증권사 목표주가 비교'>
+      <ResponsiveContainer width='100%' height='100%'>
+        <LineChart data={chartData} margin={{ top: 12, right: 118, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke='var(--line-light)' />
+          <XAxis type='number' dataKey='index' domain={[0, targetIndex]}
+            ticks={Object.keys(axisLabels).map(Number)} tickFormatter={value => axisLabels[value]} tick={{ fontSize: 11 }} />
+          <YAxis domain={['auto', 'auto']} width={60} tickLine={false} axisLine={false}
+            tickFormatter={value => prices.format(value)} tick={{ fontSize: 11 }} />
+          <ReferenceArea x1={basisIndex} x2={targetIndex} fill='#e8edf4' fillOpacity={0.6} />
+          <Tooltip content={<TargetPriceTooltip />} />
+          <Line dataKey='close' stroke='#707783' strokeWidth={2} dot={false} isAnimationActive={false} />
+          {targets.map(target => <Line key={target.key} dataKey={target.key} stroke={target.color}
+            strokeWidth={2} strokeDasharray='4 4' activeDot={false}
+            dot={({ cx, cy, payload }) => payload.index === targetIndex
+              ? <circle cx={cx} cy={cy} r={4} fill={target.color} stroke='#fff' strokeWidth={1.5} /> : null}
+            isAnimationActive={false} />)}
+          <ReferenceDot x={basisIndex} y={price} r={4} fill='#354457' stroke='#fff' />
+          <TargetLabels targets={targets} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>}
+    {price != null && <p className='opinion-footnote'>
+      {history.length > 0 && '실선은 일봉 종가, '}점선은 기준 주가 대비 증권사 목표주가를 나타냅니다.
     </p>}
-  </li>
+    <dl className='target-price-values'>
+      {[targets[1], targets[2], targets[0]].map(target => {
+        const difference = price == null ? null : (target.value / price - 1) * 100
+        return <div key={target.key} className={target.key === 'average' ? 'target-price-average' : undefined}>
+          <dt style={{ color: target.color }}>{target.label} 목표주가</dt>
+          <dd><strong>{prices.format(target.value)}원</strong>
+            {difference != null && <small>기준 주가 대비 {difference > 0 ? '+' : ''}{difference.toFixed(1)}%</small>}
+          </dd>
+        </div>
+      })}
+    </dl>
+  </>
+}
+
+function BrokerOpinionList({ items }) {
+  return <div className='broker-opinion-scroll' tabIndex={0} role='region' aria-label='증권사별 투자의견'>
+    <table className='broker-opinion-table'>
+      <thead><tr>
+        <th scope='col'>증권사</th><th scope='col'>발표일</th>
+        <th scope='col'>의견</th><th scope='col'>목표주가</th>
+      </tr></thead>
+      <tbody>{items.map(item => <tr key={item.broker}>
+        <th scope='row'>{item.broker}</th>
+        <td><time dateTime={item.date}>{item.date.replaceAll('-', '.')}</time></td>
+        <td>{item.opinion || '—'}</td>
+        <td>{item.targetPrice == null ? '—' : `${prices.format(item.targetPrice)}원`}</td>
+      </tr>)}</tbody>
+    </table>
+  </div>
 }
 
 function OpinionDistribution({ distribution }) {
-  return <svg className='opinion-chart' viewBox='0 0 320 235' role='img'
-    aria-label={distribution.map(item => `${item.label} ${item.percentage}% ${item.count}곳`).join(', ')}>
-    {[0, 50, 100].map(value => <g key={value}>
-      <line className='opinion-grid' x1='40' x2='310' y1={175 - value * 1.3} y2={175 - value * 1.3} />
-      <text className='opinion-axis' x='32' y={180 - value * 1.3} textAnchor='end'>{value}%</text>
-    </g>)}
-    {distribution.map((item, index) => {
-      const center = 85 + index * 90
-      const top = 175 - item.percentage * 1.3
-      return <g key={item.label}>
-        <title>{item.label} {item.percentage}% · {item.count}곳</title>
-        <rect className={`opinion-bar opinion-bar-${index}`} x={center - 22} y={top} width='44' height={175 - top} />
-        <text className='opinion-value' x={center} y={top - 10} textAnchor='middle'>{item.percentage}%</text>
-        <text className='opinion-label' x={center} y='198' textAnchor='middle'>{item.label}</text>
-        <text className='opinion-axis' x={center} y='220' textAnchor='middle'>{item.count}곳</text>
-      </g>
-    })}
-  </svg>
-}
-
-function BrokerOpinionList({ items, price }) {
-  const listRef = useRef(null)
-  const [moreBelow, setMoreBelow] = useState(false)
-  const [moreAbove, setMoreAbove] = useState(false)
-
-  useEffect(() => {
-    const list = listRef.current
-    let frame
-    const updateFade = () => {
-      setMoreBelow(list.scrollHeight - list.scrollTop - list.clientHeight > 2)
-      setMoreAbove(list.scrollTop > 2)
-    }
-    const measure = () => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => {
-        const rows = [...list.children]
-        // 3곳은 온전히 보여주고 다음 항목의 시작을 살짝 노출한다.
-        list.style.maxHeight = rows.length > 3
-          ? `${Math.ceil(rows.slice(0, 3).reduce((sum, row) => sum + row.getBoundingClientRect().height, 0)) + 36}px`
-          : 'none'
-        updateFade()
-      })
-    }
-    const observer = new ResizeObserver(measure)
-    observer.observe(list)
-    for (const row of list.children) observer.observe(row)
-    list.addEventListener('scroll', updateFade, { passive: true })
-    measure()
-    return () => {
-      observer.disconnect()
-      cancelAnimationFrame(frame)
-      list.removeEventListener('scroll', updateFade)
-    }
-  }, [items])
-
-  return <div className='broker-opinion-scroll'>
-    <div className='broker-opinion-window'>
-      <ul ref={listRef} className='broker-opinion-list' tabIndex={0} aria-label='증권사별 투자의견 목록'>
-        {items.map(item => <BrokerOpinion key={item.broker} item={item} price={price} />)}
-      </ul>
-      {moreAbove && <div className='broker-opinion-fade broker-opinion-fade-top' aria-hidden='true' />}
-      {moreBelow && <div className='broker-opinion-fade broker-opinion-fade-bottom' aria-hidden='true' />}
-    </div>
-  </div>
+  return <ul className='opinion-ratios' aria-label='매수·중립·매도 의견 분포'>
+    {distribution.map((item, index) => <li key={item.label}>
+      <span>{item.label}</span>
+      <span className='opinion-ratio-track' aria-hidden='true'>
+        <span className={`opinion-bar-${index}`} style={{ width: `${item.percentage}%` }} />
+      </span>
+      <strong>{item.percentage}% · {item.count}곳</strong>
+    </li>)}
+  </ul>
 }
 
 export default function RecommendationChart({ symbol, liveQuote }) {
@@ -136,27 +177,37 @@ export default function RecommendationChart({ symbol, liveQuote }) {
   </div>
   if (!feed) return <div className='opinion-panel' role='status'>투자의견을 불러오는 중입니다.</div>
 
+  const hasTargets = feed.items.some(item => Number.isFinite(item.targetPrice) && item.targetPrice > 0)
+
   return <div className='opinion-panel'>
-    <p className='opinion-basis'>증권사 발표 당시 투자의견</p>
-    <p className='opinion-meta'>최근 3개월 · 조회 {feed.items.length}곳</p>
-    <div className='opinion-current-quote'>
-      <span>비교 기준 주가</span><strong>{price == null ? '확인 불가' : `${prices.format(price)}원`}</strong>
-      <small>KIS · {basisTime ? `${quote?.exchangeTime ? '최근 체결' : '마지막 조회'} ${basisTime} (한국시간)` : '기준 시각 확인 불가'}</small>
-    </div>
-    {feed.items.length === 0 ? <p className='opinion-message'>최근 의견이 없습니다.</p> :
-      <BrokerOpinionList items={feed.items} price={price} />
-    }
-    <details className='opinion-details'>
-      <summary>의견 분포 보기</summary>
-      {feed.partial
-        ? <p className='opinion-message'>일부 자료만 조회되어 비율 집계를 표시하지 않습니다.</p>
-        : feed.countedBrokers > 0
-          ? <><p className='opinion-footnote'>매수·중립·매도 분류 가능 {feed.countedBrokers}곳 기준</p><OpinionDistribution distribution={feed.distribution} /></>
-          : <p className='opinion-message'>비율로 집계할 수 있는 의견이 없습니다.</p>}
-      {(feed.excludedBrokers > 0 || feed.missingBrokerRows > 0) && <p className='opinion-footnote'>
-        집계 제외: 의견 분류 불가 {feed.excludedBrokers}곳 · 증권사명 누락 {feed.missingBrokerRows}건
-      </p>}
-    </details>
+    {feed.partial
+      ? <p className='opinion-message'>일부 자료만 조회되어 목표주가 집계를 표시하지 않습니다.</p>
+      : hasTargets
+        ? <TargetPriceSummary symbol={symbol} items={feed.items} price={price} businessDate={quote?.businessDate} />
+        : <p className='opinion-message'>최근 3개월간 조회된 목표주가가 없습니다.</p>}
+    <p className='opinion-footnote'>
+      비교 기준 주가 {price == null ? '확인 불가' : `${prices.format(price)}원`}
+      {basisTime && ` · ${quote?.exchangeTime ? '최근 체결' : '마지막 조회'} ${basisTime} (한국시간)`}
+    </p>
+    {feed.items.length === 0 ? <p className='opinion-message'>최근 의견이 없습니다.</p> : (
+        <div className='opinion-detail-grid'>
+          <BrokerOpinionList items={feed.items} />
+          <div className='opinion-distribution'>
+            <h3>투자의견 분포</h3>
+            {feed.partial
+              ? <p className='opinion-message'>일부 자료만 조회되어 비율 집계를 표시하지 않습니다.</p>
+              : feed.countedBrokers > 0
+                ? <>
+                  <OpinionDistribution distribution={feed.distribution} />
+                  <p className='opinion-footnote'>매수·중립·매도 분류 가능 {feed.countedBrokers}곳 기준</p>
+                </>
+                : <p className='opinion-message'>비율로 집계할 수 있는 의견이 없습니다.</p>}
+            {(feed.excludedBrokers > 0 || feed.missingBrokerRows > 0) && <p className='opinion-footnote'>
+              집계 제외: 의견 분류 불가 {feed.excludedBrokers}곳 · 증권사명 누락 {feed.missingBrokerRows}건
+            </p>}
+          </div>
+        </div>
+    )}
     <p className='opinion-footnote opinion-fine-print'>KIS · {feed.periodStart.replaceAll('-', '.')} ~ {feed.periodEnd.replaceAll('-', '.')}<br />
       조회된 증권사별 최신 의견 1건 기준
     </p>

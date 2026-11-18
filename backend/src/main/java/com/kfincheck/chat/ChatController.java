@@ -38,7 +38,7 @@ public class ChatController {
     }
     @GetMapping("/api/chat/conversations/{id}/messages")
     public java.util.List<ChatHistory.Message> messages(Authentication auth, @PathVariable String id) {
-        return service.messages(user(auth).userId(), id);
+        return history.messages(user(auth).userId(), id);
     }
     @DeleteMapping("/api/chat/conversations/{id}")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)

@@ -39,6 +39,7 @@ export default function AuthNav({ symbol, returnTo }) {
   return <nav className='account-nav' aria-label='계정'>
     {error && <span role='alert'>{error}</span>}
     {!ready ? <span>계정 확인 중…</span> : user ? <>
+      {user.nickname && <span className='account-nickname' title={`${user.nickname} 계정으로 로그인됨`}>{user.nickname}</span>}
       <button type='button' disabled={busy} onClick={logout}>{busy ? '로그아웃 중…' : '로그아웃'}</button>
     </> : <a href={`/login?next=${encodeURIComponent(returnTo || `/?symbol=${symbol}`)}`}>로그인</a>}
   </nav>

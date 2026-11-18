@@ -1,3 +1,9 @@
+export function changeRateClass(rate) {
+  if (rate > 0) return 'change-rate-up'
+  if (rate < 0) return 'change-rate-down'
+  return ''
+}
+
 export const marketStocks = [
   { symbol: '005930', name: '삼성전자', price: 0, change: 0, market: 'KOSPI' },
   { symbol: '000660', name: 'SK하이닉스', price: 0, change: 0, market: 'KOSPI' },

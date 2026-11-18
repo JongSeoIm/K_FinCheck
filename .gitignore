@@ -9,6 +9,8 @@ coverage/
 
 # Python
 __pycache__/
+# AI 서버가 로컬에서 만드는 사업보고서 검색 캐시
+ai_server/data/embeddings.sqlite3
 *.py[cod]
 .venv/
 venv/
@@ -63,3 +65,6 @@ tmp/
 outputs/
 scratch/
 HANDOFF.md
+
+# AI 서버 로컬 RAG 캐시 (실행 중 생성)
+ai_server/data/embeddings.sqlite3

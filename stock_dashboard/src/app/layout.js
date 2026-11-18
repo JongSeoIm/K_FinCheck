@@ -2,8 +2,12 @@ import './globals.css'
 import './chat-drawer.css'
 
 export const metadata = {
-  title: '실시간 주식 대시보드',
-  description: 'Finnhub와 WebSocket으로 확인하는 미국 주식 대시보드',
+  title: 'K-FinCheck | 국내 주식 리서치',
+  description: '국내 주식의 시세·차트·실적·배당·정책·뉴스를 확인하고 출처가 연결된 AI 답변을 받는 대시보드',
+}
+
+export const viewport = {
+  themeColor: '#f2f4f6',
 }
 
 export default function RootLayout({ children }) {

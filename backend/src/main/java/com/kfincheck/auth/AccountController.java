@@ -19,8 +19,10 @@ public class AccountController {
     private final AccountService service;
     private final HttpSessionSecurityContextRepository contexts;
     private final HttpSessionCsrfTokenRepository csrf;
-    public AccountController(AccountService service, HttpSessionSecurityContextRepository contexts, HttpSessionCsrfTokenRepository csrf) {
-        this.service = service; this.contexts = contexts; this.csrf = csrf;
+    private final LoginAttemptGuard attempts;
+    public AccountController(AccountService service, HttpSessionSecurityContextRepository contexts, HttpSessionCsrfTokenRepository csrf,
+                             LoginAttemptGuard attempts) {
+        this.service = service; this.contexts = contexts; this.csrf = csrf; this.attempts = attempts;
     }
     @GetMapping("/api/auth/csrf") public Map<String, String> csrf(CsrfToken token) {
         return Map.of("token", token.getToken(), "headerName", token.getHeaderName());
@@ -30,7 +32,21 @@ public class AccountController {
     public AccountService.User signup(@RequestBody AccountService.Registration body) { return service.signup(body); }
     @PostMapping("/api/auth/login")
     public AccountService.User login(@RequestBody AccountService.Credentials body, HttpServletRequest request, HttpServletResponse response) {
-        var user = service.login(body);
+        String ip = request.getRemoteAddr();
+        long retryAfter = attempts.lockedSeconds(body.loginId(), ip);
+        if (retryAfter > 0) throw lockedError(response, retryAfter);
+
+        AccountService.User user;
+        try {
+            user = service.login(body);
+        } catch (ResponseStatusException error) {
+            if (error.getStatusCode().value() == 401) {
+                retryAfter = attempts.recordFailure(body.loginId(), ip);
+                if (retryAfter > 0) throw lockedError(response, retryAfter);
+            }
+            throw error;
+        }
+        attempts.recordSuccess(body.loginId(), ip);
         var auth = UsernamePasswordAuthenticationToken.authenticated(user, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
         new ChangeSessionIdAuthenticationStrategy().onAuthentication(auth, request, response);
         var context = SecurityContextHolder.createEmptyContext(); context.setAuthentication(auth);
@@ -46,6 +62,11 @@ public class AccountController {
     @GetMapping("/api/watchlist") public List<String> watchlist(Authentication auth) { return service.watchlist(user(auth).userId()); }
     @PostMapping("/api/watchlist/{code}") public List<String> add(Authentication auth, @PathVariable("code") String code) { return service.add(user(auth).userId(), code); }
     @DeleteMapping("/api/watchlist/{code}") public List<String> remove(Authentication auth, @PathVariable("code") String code) { return service.remove(user(auth).userId(), code); }
+    private static ResponseStatusException lockedError(HttpServletResponse response, long seconds) {
+        response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(seconds));
+        return new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                "로그인 시도가 너무 많습니다. " + ((seconds + 59) / 60) + "분 후 다시 시도해 주세요.");
+    }
     private static AccountService.User user(Authentication auth) {
         if (auth == null || !(auth.getPrincipal() instanceof AccountService.User user))
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");

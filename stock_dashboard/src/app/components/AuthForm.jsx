@@ -25,9 +25,13 @@ export default function AuthForm({ mode, nextPath, registered = false }) {
     } catch (err) { setError(err.message); setBusy(false) }
   }
   return <main className='auth-page'>
-    <header className='auth-page-header'><a className='auth-wordmark' href={destination}>K-FinCheck</a><a href={destination}>주식 화면으로</a></header>
+    <header className='auth-page-header'>
+      <a className='auth-wordmark brand-wordmark' href={destination}>K-FinCheck</a>
+      <a href={destination}>주식 화면으로</a>
+    </header>
     <section className='auth-card' aria-labelledby='auth-title'>
       <h1 id='auth-title'>{signup ? '회원가입' : '로그인'}</h1>
+      <p className='auth-lead'>관심 종목과 AI 대화 기록은 계정별로 저장됩니다.</p>
       {!signup && registered && <p className='auth-success' role='status'>가입이 완료되었습니다. 로그인해 주세요.</p>}
       <form onSubmit={submit}>
         <div className='auth-field'><label htmlFor='loginId'>아이디</label>
@@ -41,7 +45,7 @@ export default function AuthForm({ mode, nextPath, registered = false }) {
         </div>
         {signup && <div className='auth-field'><label htmlFor='confirmPassword'>비밀번호 확인</label><input id='confirmPassword' name='confirmPassword' type='password' autoComplete='new-password' required minLength={8} maxLength={64} placeholder='비밀번호 다시 입력' /></div>}
         {error && <p className='auth-error' role='alert'>{error}</p>}
-        <button className='auth-submit' disabled={busy} type='submit'>{busy ? '처리 중…' : signup ? '회원가입' : '로그인'}</button>
+        <button className='auth-submit' disabled={busy} aria-busy={busy} type='submit'>{busy ? '처리 중…' : signup ? '회원가입' : '로그인'}</button>
       </form>
       <div className='auth-switch'><span>{signup ? '이미 계정이 있나요?' : '아직 계정이 없나요?'}</span><a href={`/${signup ? 'login' : 'signup'}?next=${encodeURIComponent(destination)}`}>{signup ? '로그인' : '회원가입'}</a></div>
     </section>

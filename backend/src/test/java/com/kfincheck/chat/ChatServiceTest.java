@@ -29,8 +29,7 @@ class ChatServiceTest {
 
     private final AiServerClient client = mock(AiServerClient.class);
     private final ChatHistory history = mock(ChatHistory.class);
-    private final ArticleSummaryChat articleSummary = mock(ArticleSummaryChat.class);
-    private final ChatService service = new ChatService(client, history, articleSummary);
+    private final ChatService service = new ChatService(client, history);
 
     @Test
     void injectsAuthenticatedUserAndForwardsValidatedRequest() {
@@ -38,7 +37,6 @@ class ChatServiceTest {
         when(client.ask(any())).thenReturn(expected);
         when(history.owned(7L, "user-7-stock-005930", true)).thenReturn(new ChatHistory.Room("user-7-stock-005930", "005930", "삼성전자", "새 대화", ""));
         when(history.context("user-7-stock-005930")).thenReturn(List.of());
-        when(articleSummary.handle(7L, "user-7-stock-005930", "005930", "삼성전자 현재가 알려줘")).thenReturn(java.util.Optional.empty());
 
         var result = service.ask(7L, new ChatModels.WebRequest(
                 "user-7-stock-005930", " 삼성전자 현재가 알려줘 ",
