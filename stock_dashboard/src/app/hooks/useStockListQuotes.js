@@ -12,6 +12,8 @@ export default function useStockListQuotes(symbols, trades) {
   useEffect(() => { live.current = trades }, [trades])
 
   useEffect(() => {
+    if (!key) return
+
     const controller = new AbortController()
     let timer
     async function load() {

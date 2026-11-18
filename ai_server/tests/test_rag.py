@@ -6,7 +6,6 @@ from types import SimpleNamespace
 import httpx
 
 from app.market_date import KST, DateBasis
-from app.news_tool import CompanyNewsTool
 from app.quote_tool import StockQuoteTool
 from app.rag import EmbeddingCache, OpenAIEmbedder, chunk_text
 from app.schemas import StockContext
@@ -47,46 +46,6 @@ class EmbeddingCacheTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(first, second)
             self.assertEqual(1, client.embeddings.calls)
             self.assertEqual(20, usage.embedding_tokens)
-
-
-def spring(feed, calls=None):
-    def handler(req):
-        if calls is not None:
-            calls.append(str(req.url))
-        return httpx.Response(200, json=feed)
-    return httpx.MockTransport(handler)
-
-
-def article(i, day):
-    return {"title": f"삼성전자 기사 {i}", "description": "설명", "link": f"https://example.com/{i}",
-            "publishedAt": f"{day}T01:00:00Z"}
-
-
-class NewsTest(unittest.IsolatedAsyncioTestCase):
-    """뉴스는 최신순 검색 결과만 쓴다. 날짜를 지정한 뉴스는 지원하지 않는다."""
-
-    async def test_latest_news_has_basis_and_naver_source(self):
-        feed = {"stockCode": "005930", "fetchedAt": "2026-11-10T01:00:00Z", "articles": [article(1, "2026-11-09")]}
-        calls, provider = [], RecordingProvider()
-        clock = lambda: datetime(2026, 11, 10, 8, 0, tzinfo=KST)
-        tool = CompanyNewsTool("http://spring", spring(feed, calls))
-        result = await ChatService(provider, news_tool=tool, clock=clock).ask(request("오늘 삼성전자 뉴스"))
-        self.assertEqual("news", result.presentation.type)
-        self.assertEqual("최신순 검색 결과 기준", result.basis)
-        self.assertEqual(["NAVER"], [s.provider for s in result.sources])
-        self.assertNotIn("from=", calls[0])
-        self.assertIn("2026-11-10", provider.histories[0][-2].content)  # 오늘 날짜 안내
-
-    async def test_past_dated_news_is_rejected_without_model(self):
-        feed = {"stockCode": "005930", "fetchedAt": "x", "articles": [article(1, "2026-11-09")]}
-        clock = lambda: datetime(2026, 11, 10, 10, 0, tzinfo=KST)
-        for text in ["어제 삼성전자 뉴스", "삼성전자 지난주 뉴스", "11월 6일 삼성전자 기사"]:
-            calls, provider = [], RecordingProvider()
-            tool = CompanyNewsTool("http://spring", spring(feed, calls))
-            result = await ChatService(provider, news_tool=tool, clock=clock).ask(request(text))
-            self.assertIn("날짜를 지정한 뉴스 조회는 지원하지 않습니다", result.answer, text)
-            self.assertEqual([], calls, text)
-            self.assertEqual([], provider.histories, text)
 
 
 def daily_price(prices):
@@ -176,8 +135,9 @@ class PastQuoteTest(unittest.IsolatedAsyncioTestCase):
 class TimeSensitiveTest(unittest.IsolatedAsyncioTestCase):
     async def test_current_question_without_tool_is_told_not_to_guess(self):
         provider = RecordingProvider()
-        await ChatService(provider).ask(request("요즘 기준금리 몇 퍼센트야?"))
-        self.assertIn("학습 지식은 2025년 8월까지", provider.histories[0][-1].content)
+        result = await ChatService(provider).ask(request("요즘 기준금리 몇 퍼센트야?"))
+        self.assertIn("서버 조회 자료가 없습니다", result.answer)
+        self.assertEqual([], provider.histories)
 
 
 class DateWithoutCompanyTest(unittest.IsolatedAsyncioTestCase):

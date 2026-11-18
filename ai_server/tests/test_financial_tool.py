@@ -49,10 +49,18 @@ class FinancialToolTest(unittest.IsolatedAsyncioTestCase):
             self.fail("지원하지 않는 조건으로 조회하면 안 됩니다.")
         tool = FinancialResultTool("http://spring", httpx.MockTransport(handler))
         service = ChatService(provider, financial_tool=tool)
-        for question in ["삼성전자 분기 실적", "삼성전자 별도 실적", "NAVER 최근 실적"]:
+        for question in ["삼성전자 분기 실적", "삼성전자 별도 실적"]:
             result = await service.ask(request(question))
             self.assertIn("지원", result.answer)
         self.assertEqual([], provider.histories)
+
+    async def test_naver_annual_question_queries_naver_financials(self):
+        def handler(req):
+            self.assertEqual("/api/stocks/035420/financials", req.url.path)
+            return httpx.Response(200, json={**report(), "stockCode": "035420"})
+        tool = FinancialResultTool("http://spring", httpx.MockTransport(handler))
+        result = await ChatService(RecordingProvider(), financial_tool=tool).ask(request("NAVER 2025년 실적"))
+        self.assertEqual("035420", result.presentation.data["symbol"])
 
     async def test_mismatched_year_is_rejected(self):
         provider = RecordingProvider()

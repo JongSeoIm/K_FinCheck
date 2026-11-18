@@ -1,0 +1,161 @@
+/*
+ * 토스증권식 라이트 테마 (theme-clean.css 위에 덮어쓰는 파일).
+ * - 흰 카드 + 넓은 여백 + 큰 현재가, 한 줄 레이아웃, AI 채팅은 우측 하단 플로팅 버튼
+ * - 상승(빨강)/하락(파랑) 차트·숫자 색, 컴포넌트(JSX) 코드는 건드리지 않는다.
+ * - 되돌리기: layout.js 의 import './theme-toss.css' 한 줄만 지우면 이전(theme-clean) 화면.
+ */
+:root {
+  --background: #f2f4f6;
+  --text: #191f28;
+  --muted: #6b7684;
+  --line: #e5e8eb;
+  --line-light: #f2f4f6;
+  --radius-card: 24px;
+  --toss-blue: #3182f6;
+}
+
+body { background: #f2f4f6; color: #191f28; letter-spacing: -.01em; }
+
+/* ── 전체 폭: 가운데 정렬 한 줄 레이아웃 ── */
+.app-shell { width: min(1060px, calc(100% - 40px)); padding: 0 0 120px; }
+
+/* ── 상단 바: 전체 폭 흰색 바 + 로고 ── */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  margin-inline: calc(50% - 50vw); padding: 0 calc(50vw - 50%);
+  min-height: 64px; background: #fff; box-shadow: 0 1px 0 #e5e8eb;
+  align-items: center;
+}
+.topbar-navigation { gap: 4px; align-items: center; }
+.topbar-navigation::before {
+  content: 'K-FinCheck'; margin-right: 24px; color: var(--toss-blue);
+  font-size: 20px; font-weight: 800; letter-spacing: -.03em;
+}
+.market-nav-link, .market-nav-link.active, .recent-stock-link.active {
+  padding: 8px 14px; border-radius: 10px; background: transparent;
+  font-size: 15px; font-weight: 500; color: #6b7684;
+}
+.market-nav-link:hover { background: #f2f4f6; color: #191f28; }
+.market-nav-link.active, .recent-stock-link.active { color: #191f28; font-weight: 700; background: transparent; }
+.recent-stock-link.unavailable { color: #b0b8c1; }
+.topbar + .dashboard-layout { margin-top: 32px; }
+.topbar-actions { gap: 12px; }
+.topbar-actions .global-search { width: min(300px, 42vw); }
+.search-form input { height: 42px; border: 0; border-radius: 12px; background-color: #f2f4f6; }
+.search-form button {
+  width: 60px; border: 0; border-radius: 0 12px 12px 0; background: var(--toss-blue); color: #fff; font-weight: 700;
+}
+
+/* 로그인 / 로그아웃 버튼 */
+.account-nav { font-size: 14px; }
+.account-nav a, .account-nav button {
+  padding: 9px 18px; border-radius: 10px; background: var(--toss-blue); color: #fff; font-weight: 700;
+}
+.account-nav a:hover, .account-nav button:hover { background: #1b64da; color: #fff; text-decoration: none; }
+.account-nav button { background: #e8f3ff; color: var(--toss-blue); }
+.account-nav button:hover { background: #d4e8ff; color: #1b64da; }
+
+/* ── 레이아웃: 본문 한 줄, 우측 패널은 아래로 ── */
+.dashboard-layout, .dashboard-layout.market-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.insight-column { display: block; }
+.insight-column > * + * { margin-top: 24px; }
+.primary-column { gap: 24px; }
+
+/* ── 카드 공통 ── */
+.panel, .market-table-panel, .quote-overview, .calendar-panel {
+  border: 0; border-radius: 24px; background: #fff; box-shadow: none; overflow: hidden;
+}
+.panel-heading { padding: 22px 28px 8px; border-bottom: 0; min-height: 0; }
+.panel-heading h2 { font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+
+/* ── 국내 주식 목록 ── */
+.market-title { margin: 8px 0 6px; }
+.market-title h1 { font-size: 32px; font-weight: 800; letter-spacing: -.03em; }
+.market-title > span { font-size: 15px; color: #6b7684; }
+
+.market-tabs { display: flex; gap: 8px; padding: 0; background: transparent; border-radius: 0; margin: 20px 0 18px; }
+.market-tabs button {
+  padding: 9px 18px; border: 0; border-radius: 999px; background: #e5e8eb;
+  color: #4e5968; font-size: 14px; font-weight: 600; box-shadow: none;
+}
+.market-tabs button.active { background: #191f28; color: #fff; box-shadow: none; }
+
+.market-table-scroll { padding: 10px 20px; }
+.market-table thead th { height: 40px; color: #8b95a1; font-size: 13px; font-weight: 500; background: transparent; }
+.market-table th, .market-table td { height: 80px; padding: 14px 12px; border-bottom: 1px solid #f2f4f6; }
+.market-table tbody tr:hover { background: #f9fafb; }
+.market-stock-name { font-size: 17px; font-weight: 700; color: #191f28; }
+.market-code { color: #8b95a1; font-size: 13px; }
+.market-number { font-size: 17px; font-weight: 700; }
+.market-sparkline { width: 110px; height: 34px; }
+.market-open { color: #b0b8c1; }
+.market-list-footer { color: #8b95a1; }
+.market-pagination button { border-radius: 10px; }
+
+/* ── 종목 상세: 큰 현재가 ── */
+.quote-heading { padding: 28px 32px 0; }
+.quote-heading h2 { font-size: 20px; font-weight: 700; color: #6b7684; letter-spacing: -.02em; }
+.quote-heading p { font-size: 13px; color: #8b95a1; }
+.quote-body { border-top: 0; grid-template-columns: 1fr; }
+.headline-price { padding: 10px 32px 8px; border: 0; }
+.headline-price > span:first-child { font-size: 14px; color: #8b95a1; }
+.headline-price > strong { margin-top: 6px; font-size: 56px; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; }
+.headline-price p { margin-top: 10px; font-size: 18px; font-weight: 700; }
+.quote-metrics { padding: 14px 20px 18px; background: transparent; border-top: 1px solid #f2f4f6; margin: 10px 12px 0; }
+.quote-metrics div { padding: 6px 16px; border-right: 0; }
+.quote-metrics dt { font-size: 13px; color: #8b95a1; }
+.quote-metrics dd { margin-top: 6px; font-size: 18px; font-weight: 700; }
+.quote-overview .quote-status { padding: 12px 32px; border-top: 1px solid #f2f4f6; color: #8b95a1; }
+
+/* 상세 탭: 밑줄형 */
+.detail-tabs {
+  display: flex; width: 100%; gap: 28px; padding: 0; border: 0; border-bottom: 2px solid #e5e8eb;
+  border-radius: 0; background: transparent; overflow-x: auto;
+}
+.detail-tabs button {
+  padding: 4px 0 14px; border-radius: 0; background: transparent; margin-bottom: -2px;
+  border-bottom: 3px solid transparent; font-size: 17px; font-weight: 700; color: #8b95a1;
+}
+.detail-tabs button[aria-selected='true'] {
+  background: transparent; box-shadow: none; color: #191f28; border-bottom-color: #191f28;
+}
+.detail-tabs button[aria-selected='true']::after { display: none; }
+
+/* 차트·표 카드 안쪽 */
+.chart-container { padding: 12px 28px 28px; }
+.chart-stats { border-radius: 14px; background: #f9fafb; }
+.chart-stats div { padding: 14px 18px; }
+.chart-stats strong { font-size: 16px; font-weight: 700; }
+.chart-type button, .chart-period button, .chart-controls button { border-radius: 999px; }
+.target-price-values > div { border-radius: 16px; background: #f9fafb; }
+.target-price-values > .target-price-average { background: #e8f3ff; }
+.broker-opinion-scroll, .opinion-distribution { border: 0; background: #f9fafb; border-radius: 18px; }
+.broker-opinion-table thead th { background: transparent; }
+
+/* ── 관심 종목 패널 ── */
+.watchlist-select { padding: 14px 24px; }
+.watchlist li.active { background: #f2f8ff; }
+.watch-name strong { font-size: 16px; font-weight: 700; }
+.watch-price strong { font-size: 15px; }
+.watch-price small { font-size: 13px; }
+
+/* ── 종목 AI 채팅: 우측 하단 플로팅 버튼 ── */
+.stock-ai-launcher {
+  position: fixed; right: 40px; bottom: 36px; z-index: 40;
+  width: auto; min-height: 0; padding: 14px 24px 14px 16px; gap: 10px;
+  border: 0; border-radius: 999px; background: var(--toss-blue); color: #fff;
+  box-shadow: 0 8px 24px rgba(49, 130, 246, .4);
+}
+.stock-ai-launcher:hover { background: #1b64da; }
+.ai-launcher-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 255, 255, .22); }
+.ai-launcher-text strong { font-size: 15px; font-weight: 700; color: #fff; }
+.ai-launcher-text small, .ai-launcher-arrow { display: none; }
+
+/* ── 반응형 ── */
+@media (max-width: 720px) {
+  .app-shell { width: calc(100% - 24px); }
+  .topbar { padding: 0 12px; margin-inline: -12px; flex-wrap: wrap; gap: 8px; padding-block: 8px; }
+  .topbar-navigation::before { display: none; }
+  .headline-price > strong { font-size: 40px; }
+  .stock-ai-launcher { right: 16px; bottom: 16px; }
+}

@@ -63,7 +63,3 @@ tmp/
 outputs/
 scratch/
 HANDOFF.md
-
-# AI 서버 임베딩 캐시
-ai_server/data/
-ai_server/data/

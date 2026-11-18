@@ -9,6 +9,15 @@ import ChatAnswerData, { formatChatTime } from './ChatAnswerData'
 const subscribe = () => () => {}
 const clientSnapshot = () => true
 const serverSnapshot = () => false
+const suggestions = ['현재가와 등락률 알려줘', '최근 연간 실적 알려줘', '관련 산업 정책 알려줘']
+const followUpsByType = {
+  quote: ['어제 종가와 거래량 알려줘', '최근 연간 실적 알려줘'],
+  financial: ['최근 3년 연간 실적 비교해줘', '최근 공시 알려줘'],
+  financial_comparison: ['최근 사업보고서에서 실적 변동 이유를 알려줘', '최근 공시 알려줘'],
+  policy: ['회사에 직접 관련된 정책만 알려줘', '최근 공시 알려줘'],
+  report: ['최근 3년 연간 실적 비교해줘', '최근 공시 알려줘'],
+  disclosure: ['최근 사업보고서의 주요 위험 요인을 알려줘', '최근 연간 실적 알려줘'],
+}
 
 export default function StockChatDrawer({ stock }) {
   const mounted = useSyncExternalStore(subscribe, clientSnapshot, serverSnapshot)
@@ -34,10 +43,14 @@ export default function StockChatDrawer({ stock }) {
   const viewKey = useRef('')
   const conversationKey = user ? `${user.userId}:${context.symbol}` : `guest:${context.symbol}`
   const storageKey = `kfc-chat-room-${conversationKey}`
-  const suggestions = ['현재가와 등락률 알려줘',
-    ...(['005930', '000660'].includes(context.symbol) ? ['최근 연간 실적 알려줘'] : []),
-    ...(['005930', '000660', '035420', '035720', '005380', '000270', '051910', '006400'].includes(context.symbol) ? ['관련 뉴스 요약해줘'] : []),
-  ]
+  const lastMessage = messages.at(-1)
+  const lastQuestion = messages.at(-2)?.text?.trim()
+  const showFollowUps = user && !sending && !loading && !historyOpen && !draft.trim()
+    && lastMessage?.role === 'assistant' && !lastMessage.pending && !lastMessage.error
+  const followUps = showFollowUps
+    ? [...new Set([...(followUpsByType[lastMessage.presentation?.type] ?? []), ...suggestions])].filter(question =>
+        question !== lastQuestion && `${context.name} ${question}` !== lastQuestion).slice(0, 3)
+    : []
 
   useEffect(() => () => clearTimeout(closeTimer.current), [])
 
@@ -53,8 +66,7 @@ export default function StockChatDrawer({ stock }) {
         const records = room ? await accountApi(`/api/chat/conversations/${room.conversationId}/messages`) : []
         if (cancelled) return
         setRooms(list); setActiveRoom(room); setMessages(records.map(record => ({
-          role: record.role, text: record.text, sources: record.response?.sources || [], presentation: record.response?.presentation,
-          basis: record.response?.basis,
+          role: record.role, text: record.text, sources: record.response?.sources || [], presentation: record.response?.presentation, basis: record.response?.basis,
         })))
         setNotice('')
       } catch (error) { if (!cancelled) setNotice(error.message) }
@@ -115,7 +127,10 @@ export default function StockChatDrawer({ stock }) {
   }, [mounted, open])
 
   useEffect(() => {
-    if (open) endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+    if (open) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      endRef.current?.scrollIntoView({ block: 'end', behavior: reduceMotion ? 'auto' : 'smooth' })
+    }
   }, [messages, open])
 
   function show() {
@@ -211,8 +226,18 @@ export default function StockChatDrawer({ stock }) {
 
   return (
     <>
-      <button className='stock-ai-launcher' type='button' onClick={show} aria-haspopup='dialog'>
-        <span>이 종목 AI에게 물어보기</span><span aria-hidden='true'>↗</span>
+      <button className='stock-ai-launcher' type='button' onClick={show} aria-haspopup='dialog' disabled={!ready}
+        aria-label='종목 AI 채팅'>
+        <span className='ai-launcher-icon' aria-hidden='true'>
+          <svg width='20' height='20' viewBox='0 0 20 20' fill='none' stroke='currentColor' strokeWidth='1.8'
+            strokeLinecap='round' strokeLinejoin='round'><path d='M3 5.5A2.5 2.5 0 015.5 3h9A2.5 2.5 0 0117 5.5v6a2.5 2.5 0 01-2.5 2.5H9l-4 3v-3h-.5A1.5 1.5 0 013 12.5z' /></svg>
+        </span>
+        <span className='ai-launcher-text'>
+          <strong>종목 AI 채팅</strong>
+          <small>종목을 골라 궁금한 점을 물어보세요</small>
+        </span>
+        <svg className='ai-launcher-arrow' width='18' height='18' viewBox='0 0 18 18' fill='none' stroke='currentColor'
+          strokeWidth='1.8' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><path d='M7 4l5 5-5 5' /></svg>
       </button>
       {mounted && createPortal(
         <dialog ref={dialogRef} className={`stock-chat-drawer${closing ? ' is-closing' : ''}`}
@@ -256,7 +281,7 @@ export default function StockChatDrawer({ stock }) {
                   <div className='stock-chat-suggestions' aria-label='예시 질문'>
                     {suggestions.map(question => <button type='button' key={question}
                       onClick={() => send(`${context.name} ${question}`)} disabled={sending || loading}>
-                      <span>{question}</span><span aria-hidden='true'>↗</span>
+                      {question}
                     </button>)}
                   </div>
                 </div>}
@@ -264,15 +289,18 @@ export default function StockChatDrawer({ stock }) {
                 {(user ? messages : []).map((message, index) => (
                   <article key={message.id || `${conversationKey}-${index}`}
                     className={`stock-chat-message ${message.role}${message.error ? ' error' : ''}${message.pending ? ' pending' : ''}`}
-                    aria-label={message.pending ? '답변 생성 중' : undefined}>
-                    <p>{message.text}</p>
-                    {message.basis && <small className='stock-chat-basis'>자료 기준: {message.basis}</small>}
+                    aria-label={message.role === 'user' ? '내 질문' : 'AI 답변'}>
+                    {message.pending ? <div className='stock-chat-typing' role='status'>
+                      <span className='sr-only'>답변 생성 중</span>
+                      <span aria-hidden='true' /><span aria-hidden='true' /><span aria-hidden='true' />
+                    </div> : <p>{message.text}</p>}
+                    {message.basis && <small>{message.basis}</small>}
                     <ChatAnswerData presentation={message.presentation} />
                     {message.sources?.length > 0 && <ul className='stock-chat-sources' aria-label='답변 출처'>
                       {message.sources.map((source, sourceIndex) => <li key={`${source.provider}-${sourceIndex}`}>
                         {source.url
-                          ? <a href={source.url} target='_blank' rel='noreferrer'>{source.provider} · {source.label}</a>
-                          : <span>{source.provider} · {source.label}</span>}
+                          ? <a href={source.url} target='_blank' rel='noreferrer'>{source.provider === 'KOREA_KR' ? '정책브리핑' : source.provider} · {source.label}</a>
+                          : <span>{source.provider === 'KOREA_KR' ? '정책브리핑' : source.provider} · {source.label}</span>}
                         {source.basisAt && <small>{formatChatTime(source.basisAt)}</small>}
                       </li>)}
                     </ul>}
@@ -281,23 +309,22 @@ export default function StockChatDrawer({ stock }) {
               </div>
               <div ref={endRef} />
             </div>
+            {followUps.length > 0 && <div className='stock-chat-suggestions stock-chat-follow-ups' role='group' aria-label='추천 후속 질문'>
+              {followUps.map(question => <button type='button' key={question} onClick={() => send(`${context.name} ${question}`)}>{question}</button>)}
+            </div>}
             <footer className='stock-chat-footer'>
               <form className='stock-chat-composer' onSubmit={event => { event.preventDefault(); send() }}>
                 <label className='sr-only' htmlFor='stock-chat-input'>종목에 대해 질문 입력</label>
-                <textarea id='stock-chat-input' ref={inputRef} value={draft}
+                <textarea id='stock-chat-input' ref={inputRef} value={draft} enterKeyHint='send'
                   readOnly={sending || loading}
-                  onChange={event => setDraft(event.target.value)} maxLength={1500} rows={2}
-                  placeholder='메시지 입력'
+                  onChange={event => setDraft(event.target.value)} maxLength={1500} rows={1}
+                  placeholder={`${context.name}에 대해 질문하기`}
                   onKeyDown={event => {
                     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                       event.preventDefault()
                       send()
                     }
                   }} />
-                <div className='stock-chat-composer-actions'>
-                  <span>Shift + Enter 줄바꿈</span>
-                  <button type='submit' disabled={!draft.trim() || sending || loading || !user} aria-label='질문 전송'>↑</button>
-                </div>
               </form>
             </footer>
           </div>

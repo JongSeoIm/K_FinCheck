@@ -4,23 +4,20 @@
 
 kis:
   base-url: https://openapi.koreainvestment.com:9443
-  app-key: 
-  app-secret: 
+  app-key: YOUR_KIS_APP_KEY_HERE
+  app-secret: YOUR_KIS_APP_SECRET_HERE
+
 
 # OpenDART 인증키는 백엔드 로컬 설정에만 입력합니다.
-
 opendart:
-  api-key: 
+  api-key: YOUR_OPENDART_API_KEY_HERE
 
-# NAVER API HUB 검색 서비스에서 발급한 인증 정보 (구 Developers 키와 다름)
-naver-news:
-  client-id: 
-  client-secret: 
 # 프로젝트 전용 DB 계정. 실제 비밀번호는 application-local.yml에만 입력합니다.
 spring:
   datasource:
-    url: jdbc:mariadb://localhost:3306/k_fincheck?connectTimeout=3000&socketTimeout=5000
-    username: 
-    password:
+    username: k_fincheck_app
+    password: YOUR_DB_PASSWORD
 
-
+# Python FastAPI 서버. 기본값을 사용할 때는 생략할 수 있습니다.
+ai-server:
+  base-url: http://127.0.0.1:8000

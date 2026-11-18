@@ -10,7 +10,7 @@
     <select id="latest" resultType="com.kfincheck.financial.FinancialMapper$Header">
         <include refid="header"/>
         WHERE r.stock_code = #{stock} AND r.business_year = #{year}
-          AND r.report_code = '11011' AND r.fs_div = 'CFS'
+          AND r.report_code = #{reportCode} AND r.fs_div = 'CFS'
         ORDER BY r.receipt_no DESC LIMIT 1
     </select>
     <select id="byReceipt" resultType="com.kfincheck.financial.FinancialMapper$Header">

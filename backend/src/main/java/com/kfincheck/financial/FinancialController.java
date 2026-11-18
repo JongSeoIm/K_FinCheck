@@ -8,13 +8,30 @@ import java.util.Map;
 @RequestMapping("/api/stocks")
 public class FinancialController {
     private final FinancialService service;
+    private final FinancialEstimateService estimates;
+    private final DividendService dividends;
 
-    public FinancialController(FinancialService service) { this.service = service; }
+    public FinancialController(FinancialService service, FinancialEstimateService estimates, DividendService dividends) {
+        this.service = service;
+        this.estimates = estimates;
+        this.dividends = dividends;
+    }
+
+    @GetMapping("/{stockCode}/dividends")
+    public DividendService.DividendFeed dividends(@PathVariable("stockCode") String stockCode) {
+        return dividends.latest(stockCode);
+    }
+
+    @GetMapping("/{stockCode}/financial-estimates")
+    public FinancialEstimateService.EstimateFeed estimates(@PathVariable("stockCode") String stockCode) {
+        return estimates.latest(stockCode);
+    }
 
     @GetMapping("/{stockCode}/financials")
     public FinancialReport annual(@PathVariable("stockCode") String stockCode,
-            @RequestParam(value = "year", required = false) Integer year) {
-        return service.annual(stockCode, year);
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "quarter", required = false) Integer quarter) {
+        return quarter == null ? service.annual(stockCode, year) : service.quarterly(stockCode, year, quarter);
     }
 
     @ExceptionHandler(FinancialException.class)

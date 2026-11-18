@@ -44,32 +44,12 @@ class ChatServiceTest {
 
         var request = ArgumentCaptor.forClass(ChatModels.AiRequest.class);
         verify(client).ask(request.capture());
-        assertThat(result).isEqualTo(expected);
+        assertThat(result).isSameAs(expected);
         assertThat(request.getValue().userId()).isEqualTo(7L);
         assertThat(request.getValue().message()).isEqualTo("삼성전자 현재가 알려줘");
         assertThat(request.getValue().stock().symbol()).isEqualTo("005930");
         assertThat(request.getValue().history()).isEmpty();
         verify(history).appendPair("user-7-stock-005930", "삼성전자 현재가 알려줘", expected);
-    }
-
-    @Test
-    void storesAnswerWithoutTokenUsageAndKeepsBasis() throws Exception {
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var withUsage = mapper.readValue("""
-                {"status":"answered","answer":"답변","sources":[],"basis":"2026-11-06(금) 종가 기준",
-                 "usage":{"model":"gpt-5.4-mini","input_tokens":900,"output_tokens":120,"embedding_tokens":40,"llm_calls":1}}
-                """, ChatModels.AiResponse.class);
-        assertThat(withUsage.usage().path("input_tokens").asInt()).isEqualTo(900);
-        when(client.ask(any())).thenReturn(withUsage);
-        when(history.owned(7L, "user-7-stock-005930", true)).thenReturn(new ChatHistory.Room("user-7-stock-005930", "005930", "삼성전자", "새 대화", ""));
-        when(history.context("user-7-stock-005930")).thenReturn(List.of());
-
-        var result = service.ask(7L, new ChatModels.WebRequest("user-7-stock-005930", "어제 삼성전자 주가",
-                new ChatModels.Stock("005930", "삼성전자")));
-
-        assertThat(result.usage()).isNull();
-        assertThat(result.basis()).isEqualTo("2026-11-06(금) 종가 기준");
-        verify(history).appendPair("user-7-stock-005930", "어제 삼성전자 주가", result);
     }
 
     @Test

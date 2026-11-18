@@ -21,7 +21,7 @@ class FinancialServiceTest {
               {"sj_div":"CIS","account_id":"ifrs-full_ProfitLoss","thstrm_amount":"100","frmtrm_amount":"80","currency":"KRW"}
             ]
             """);
-        var report = FinancialService.normalize("005930", "00126380", 2025, rows);
+        var report = FinancialService.normalize("005930", "00126380", 2025, "11011", rows);
         assertThat(report.metrics().get(0).currentAmount()).isEqualTo("1200");
         assertThat(report.metrics().get(0).growthRate()).isEqualByComparingTo("20");
         assertThat(report.metrics().get(1).comparison()).isEqualTo("TURNAROUND");
@@ -40,7 +40,7 @@ class FinancialServiceTest {
               {"sj_div":"IS","account_id":"ifrs-full_ProfitLoss","thstrm_amount":"10","currency":"USD"}
             ]
             """);
-        var report = FinancialService.normalize("005930", "00126380", 2025, rows);
+        var report = FinancialService.normalize("005930", "00126380", 2025, "11011", rows);
         assertThat(report.metrics()).extracting(FinancialReport.Metric::status)
                 .containsExactly("AMBIGUOUS", "MISSING", "UNSUPPORTED_CURRENCY");
         assertThat(report.metrics()).allMatch(metric -> metric.currentAmount() == null);
@@ -53,12 +53,12 @@ class FinancialServiceTest {
         FinancialService service = new FinancialService(client, repository);
         int year = LocalDate.now(ZoneId.of("Asia/Seoul")).getYear() - 1;
         when(client.annualReport("00126380", year)).thenReturn(mapper.readTree("[]"));
-        var saved = FinancialService.normalize("005930", "00126380", year, mapper.readTree("[]"));
-        when(repository.latest("005930", year)).thenReturn(null, saved);
+        var saved = FinancialService.normalize("005930", "00126380", year, "11011", mapper.readTree("[]"));
+        when(repository.latest("005930", year, "11011")).thenReturn(null, saved);
         assertThat(service.annual("005930", null)).isEqualTo(service.annual("005930", year));
         verify(repository, times(1)).save(any());
         verify(client, times(1)).annualReport("00126380", year);
-        assertThatThrownBy(() -> service.annual("035420", year)).isInstanceOf(FinancialException.class);
+        assertThatThrownBy(() -> service.annual("999999", year)).isInstanceOf(FinancialException.class);
         assertThatThrownBy(() -> service.annual("005930", year + 1)).isInstanceOf(FinancialException.class);
         when(client.annualReport("00164779", year)).thenThrow(new FinancialException(
                 org.springframework.http.HttpStatus.BAD_GATEWAY, "DART_UNAVAILABLE", "일시 오류"));
@@ -69,13 +69,31 @@ class FinancialServiceTest {
 
     @Test
     void usesKnownNameFallbackAndDoesNotDivideByZero() throws Exception {
-        var report = FinancialService.normalize("005930", "00126380", 2025, mapper.readTree("""
+        var report = FinancialService.normalize("005930", "00126380", 2025, "11011", mapper.readTree("""
             [{"sj_div":"IS","account_id":"-표준계정코드 미사용-","account_nm":"영업이익(손실)",
               "thstrm_amount":"0","frmtrm_amount":"0","currency":"KRW"}]
             """));
         assertThat(report.metrics().get(1).currentAmount()).isEqualTo("0");
         assertThat(report.metrics().get(1).growthRate()).isNull();
         assertThat(report.metrics().get(0).status()).isEqualTo("MISSING");
+    }
+
+    @Test
+    void comparesThreeMonthAmountsFromTheSameQuarter() throws Exception {
+        var report = FinancialService.normalize("005930", "00126380", 2025, "11012", mapper.readTree("""
+            [
+              {"sj_div":"IS","account_id":"ifrs-full_Revenue","currency":"KRW",
+               "thstrm_amount":"120","thstrm_add_amount":"250","frmtrm_amount":"1000",
+               "frmtrm_q_amount":"100","frmtrm_add_amount":"300"},
+              {"sj_div":"IS","account_id":"dart_OperatingIncomeLoss","currency":"KRW",
+               "thstrm_amount":"20","frmtrm_amount":"1000","frmtrm_add_amount":"300"}
+            ]
+            """));
+        assertThat(report.reportCode()).isEqualTo("11012");
+        assertThat(report.metrics().get(0).currentAmount()).isEqualTo("120");
+        assertThat(report.metrics().get(0).previousAmount()).isEqualTo("100");
+        assertThat(report.metrics().get(0).growthRate()).isEqualByComparingTo("20");
+        assertThat(report.metrics().get(1).previousAmount()).isNull();
     }
 
     @Test

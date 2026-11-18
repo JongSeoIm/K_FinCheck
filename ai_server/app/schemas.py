@@ -32,14 +32,14 @@ class ChatRequest(BaseModel):
 
 
 class SourceReference(BaseModel):
-    provider: Literal["KIS", "OpenDART", "NAVER"]
+    provider: Literal["KIS", "OpenDART", "MOTIR", "KOREA_KR"]
     label: str
     basis_at: str | None = None
     url: str | None = None
 
 
 class AnswerPresentation(BaseModel):
-    type: Literal["quote", "financial", "financial_comparison", "news", "composite", "report", "disclosure"]
+    type: Literal["quote", "financial", "financial_comparison", "policy", "composite", "report", "disclosure"]
     data: dict
 
 
@@ -49,9 +49,7 @@ class ChatResponse(BaseModel):
     sources: list[SourceReference] = Field(default_factory=list)
     presentation: AnswerPresentation | None = None
     context_message: str | None = None
-    # 답변의 자료 기준일. 예: "2026-11-06(금) 종가 기준"
     basis: str | None = None
-    # 이번 질문에서 쓴 OpenAI 토큰. Spring 이 ai_usage_log 에 저장한다.
     usage: dict | None = None
 
 

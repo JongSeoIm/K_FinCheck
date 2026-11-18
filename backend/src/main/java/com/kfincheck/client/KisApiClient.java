@@ -1,5 +1,6 @@
 package com.kfincheck.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kfincheck.client.dto.KisDailyChartResponse;
 import com.kfincheck.client.dto.KisPriceResponse;
@@ -9,8 +10,10 @@ import com.kfincheck.config.KisConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -182,6 +185,32 @@ public class KisApiClient {
             }
         }
         throw new IllegalStateException("KIS 기간별 시세 조회 재시도 초과");
+    }
+
+    public ResponseEntity<JsonNode> getInvestorTrades(String stockCode, String date, String continuation) {
+        validateKeyConfig();
+        String token = getAccessToken();
+        paceRequest();
+        try {
+            return restClient.get()
+                    .uri(uri -> uri.path("/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily")
+                            .queryParam("FID_COND_MRKT_DIV_CODE", "J")
+                            .queryParam("FID_INPUT_ISCD", stockCode)
+                            .queryParam("FID_INPUT_DATE_1", date)
+                            .queryParam("FID_ORG_ADJ_PRC", "")
+                            .queryParam("FID_ETC_CLS_CODE", "")
+                            .build())
+                    .header("authorization", "Bearer " + token)
+                    .header("appkey", kisConfig.getAppKey())
+                    .header("appsecret", kisConfig.getAppSecret())
+                    .header("tr_id", "FHPTJ04160001")
+                    .header("tr_cont", continuation)
+                    .header("custtype", "P")
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve().toEntity(JsonNode.class);
+        } catch (RestClientException e) {
+            throw new IllegalStateException("KIS 투자자별 매매 동향 조회에 실패했습니다.", e);
+        }
     }
 
     private boolean isTokenValid() {

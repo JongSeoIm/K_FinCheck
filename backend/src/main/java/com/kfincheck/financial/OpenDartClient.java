@@ -24,21 +24,8 @@ public class OpenDartClient {
     }
 
     public JsonNode disclosurePage(String corpCode, String start, String end, String type, int page) {
-        if (config.getApiKey() == null || config.getApiKey().isBlank()) {
-            throw new FinancialException(HttpStatus.SERVICE_UNAVAILABLE, "KEY_NOT_CONFIGURED",
-                    "OpenDART API key is not configured.");
-        }
-        JsonNode body;
-        try {
-            body = client.get().uri(uri -> uri.path("/api/list.json")
-                    .queryParam("crtfc_key", config.getApiKey())
-                    .queryParam("corp_code", corpCode).queryParam("bgn_de", start).queryParam("end_de", end)
-                    .queryParam("pblntf_ty", type).queryParam("page_no", page).queryParam("page_count", 100)
-                    .build()).retrieve().body(JsonNode.class);
-        } catch (Exception ignored) {
-            throw new FinancialException(HttpStatus.BAD_GATEWAY, "DART_UNAVAILABLE",
-                    "Could not connect to OpenDART.");
-        }
+        requireKey();
+        JsonNode body = filingPage(corpCode, start, end, type, page);
         String status = body == null ? "" : body.path("status").asText();
         if ("013".equals(status)) return body;
         if (!"000".equals(status) || !body.path("list").isArray() || body.path("total_page").asInt() < 1) {
@@ -49,16 +36,17 @@ public class OpenDartClient {
     }
 
     public JsonNode annualReport(String corpCode, int year) {
-        if (config.getApiKey() == null || config.getApiKey().isBlank()) {
-            throw new FinancialException(HttpStatus.SERVICE_UNAVAILABLE, "KEY_NOT_CONFIGURED",
-                    "OpenDART 인증키 설정이 필요합니다.");
-        }
+        return financialReport(corpCode, year, "11011");
+    }
+
+    public JsonNode financialReport(String corpCode, int year, String reportCode) {
+        requireKey();
         JsonNode body;
         try {
             body = client.get().uri(uri -> uri.path("/api/fnlttSinglAcntAll.json")
                     .queryParam("crtfc_key", config.getApiKey())
                     .queryParam("corp_code", corpCode).queryParam("bsns_year", year)
-                    .queryParam("reprt_code", "11011").queryParam("fs_div", "CFS").build())
+                    .queryParam("reprt_code", reportCode).queryParam("fs_div", "CFS").build())
                     .retrieve().body(JsonNode.class);
         } catch (Exception ignored) {
             // 원본 예외에는 인증키가 담긴 요청 URL이 포함될 수 있으므로 전달하거나 기록하지 않는다.
@@ -68,40 +56,37 @@ public class OpenDartClient {
         String status = body == null ? "" : body.path("status").asText();
         if ("013".equals(status)) {
             throw new FinancialException(HttpStatus.NOT_FOUND, "NO_REPORT",
-                    "해당 연도의 연결 사업보고서가 없습니다.");
+                    "11011".equals(reportCode) ? "해당 연도의 연결 사업보고서가 없습니다."
+                            : "해당 분기의 연결 실적 공시가 없습니다.");
         }
-        if (!"000".equals(status)) {
-            String message = switch (status) {
-                case "010", "011", "012", "901" -> "OpenDART 인증키 또는 접근 설정을 확인해 주세요.";
-                case "020" -> "공시 조회 한도를 초과했습니다. 나중에 다시 시도해 주세요.";
-                default -> "공시 데이터를 조회하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-            };
-            throw new FinancialException(HttpStatus.BAD_GATEWAY, "DART_REJECTED", message);
-        }
+        if (!"000".equals(status)) throw rejected(status);
         if (!body.path("list").isArray() || body.path("list").isEmpty()) {
             throw new FinancialException(HttpStatus.NOT_FOUND, "NO_REPORT", "조회할 실적 자료가 없습니다.");
         }
         return body.path("list");
     }
-
-    /** 기간 안의 모든 종류 공시 목록 한 페이지(100건). 공시가 없으면 status 013 응답을 그대로 돌려준다. */
     public JsonNode disclosureList(String corpCode, String start, String end, int page) {
         requireKey();
-        JsonNode body;
-        try {
-            body = client.get().uri(uri -> uri.path("/api/list.json")
-                    .queryParam("crtfc_key", config.getApiKey())
-                    .queryParam("corp_code", corpCode).queryParam("bgn_de", start).queryParam("end_de", end)
-                    .queryParam("page_no", page).queryParam("page_count", 100).build())
-                    .retrieve().body(JsonNode.class);
-        } catch (Exception ignored) {
-            // 원본 예외에는 인증키가 담긴 요청 URL이 포함될 수 있으므로 전달하거나 기록하지 않는다.
-            throw new FinancialException(HttpStatus.BAD_GATEWAY, "DART_UNAVAILABLE", "공시 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
-        }
+        JsonNode body = filingPage(corpCode, start, end, null, page);
         String status = body == null ? "" : body.path("status").asText();
         if ("013".equals(status)) return body;
         if (!"000".equals(status) || !body.path("list").isArray()) throw rejected(status);
         return body;
+    }
+
+    private JsonNode filingPage(String corpCode, String start, String end, String type, int page) {
+        try {
+            return client.get().uri(uri -> {
+                var query = uri.path("/api/list.json").queryParam("crtfc_key", config.getApiKey())
+                        .queryParam("corp_code", corpCode).queryParam("bgn_de", start).queryParam("end_de", end)
+                        .queryParam("page_no", page).queryParam("page_count", 100);
+                if (type != null) query.queryParam("pblntf_ty", type);
+                return query.build();
+            }).retrieve().body(JsonNode.class);
+        } catch (org.springframework.web.client.RestClientException ignored) {
+            throw new FinancialException(HttpStatus.BAD_GATEWAY, "DART_UNAVAILABLE",
+                    "공시 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        }
     }
 
     /** 사업보고서(pblntf_detail_ty=A001) 최종본 목록. 최신 접수순. */

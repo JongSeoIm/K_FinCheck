@@ -1,4 +1,10 @@
 import unittest
+from datetime import datetime
+from app.market_date import KST
+
+
+def market_clock():
+    return datetime(2026, 11, 13, 10, 0, tzinfo=KST)
 from datetime import datetime, timezone
 
 import httpx
@@ -34,7 +40,7 @@ class QuoteToolTest(unittest.IsolatedAsyncioTestCase):
     async def test_failure_does_not_ask_llm_to_guess(self):
         provider = RecordingProvider()
         tool = StockQuoteTool("http://spring", httpx.MockTransport(lambda req: httpx.Response(503)))
-        result = await ChatService(provider, quote_tool=tool).ask(request("삼성전자 현재가 알려줘"))
+        result = await ChatService(provider, clock=market_clock, quote_tool=tool).ask(request("삼성전자 현재가 알려줘"))
         self.assertIn("확인할 수 없습니다", result.answer)
         self.assertEqual([], provider.histories)
         self.assertEqual([], result.sources)
@@ -46,7 +52,7 @@ class QuoteToolTest(unittest.IsolatedAsyncioTestCase):
                 return httpx.Response(404)
             return httpx.Response(200, json={"stockCode": "000660", "price": 120000})
         tool = StockQuoteTool("http://spring", httpx.MockTransport(handler))
-        result = await ChatService(provider, quote_tool=tool).ask(request("SK하이닉스 현재가 알려줘"))
+        result = await ChatService(provider, clock=market_clock, quote_tool=tool).ask(request("SK하이닉스 현재가 알려줘"))
         self.assertEqual("KIS", result.sources[0].provider)
         self.assertIn("120000", provider.histories[0][-1].content)
         self.assertIn("SK하이닉스", result.sources[0].label)

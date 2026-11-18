@@ -12,7 +12,7 @@ from app.quote_tool import COMPANIES, ALIASES, named_codes, resolve_stock
 
 class QuestionInterpretation(BaseModel):
     company: Literal["삼성전자", "SK하이닉스", "NAVER", "카카오", "현대차", "기아", "LG화학", "삼성SDI", "selected", "unknown"]
-    intent: Literal["quote", "financial", "news", "composite", "report", "concept", "unrelated", "clarify"]
+    intent: Literal["quote", "financial", "policy", "disclosure", "composite", "report", "concept", "unrelated", "clarify"]
     needs_clarification: bool
     period: Literal["current", "historical", "unspecified"]
     criteria: Literal["annual_consolidated", "unsupported", "unspecified"]
@@ -20,14 +20,14 @@ class QuestionInterpretation(BaseModel):
 
 def normalize_question(message: str) -> str:
     message = re.sub(r"\s+", " ", message).strip()
-    for typo, corrected in {"주까": "주가", "현제가": "현재가", "현재까": "현재가", "실쩍": "실적", "뉴수": "뉴스", "영업이익율": "영업이익률"}.items():
+    for typo, corrected in {"주까": "주가", "현제가": "현재가", "현재까": "현재가", "실쩍": "실적", "영업이익율": "영업이익률"}.items():
         message = message.replace(typo, corrected)
     return message
 
 
 def validated_question(result: QuestionInterpretation, original: str, selected):
     if result.needs_clarification or result.company == "unknown" or result.intent == "clarify":
-        raise ValueError("기업이나 질문의 의미를 정확히 확인하지 못했습니다. 기업명과 현재가·실적·뉴스 중 원하는 정보를 알려 주세요.")
+        raise ValueError("기업이나 질문의 의미를 정확히 확인하지 못했습니다. 기업명과 현재가·실적·공시·산업 정책 중 원하는 정보를 알려 주세요.")
     names = {name: code for code, name in COMPANIES.items()}
     code = selected.symbol if result.company == "selected" else names[result.company]
     if result.company == "selected":
@@ -48,10 +48,10 @@ def validated_question(result: QuestionInterpretation, original: str, selected):
     if result.intent == "concept":
         return original
     if result.criteria == "unsupported":
-        raise ValueError("해당 조회 조건은 아직 지원하지 않습니다. 연결 연간 실적 또는 현재 시세·관련 뉴스로 질문해 주세요.")
+        raise ValueError("해당 조회 조건은 아직 지원하지 않습니다. 연결 연간 실적 또는 현재 시세·공시·산업 정책로 질문해 주세요.")
     if re.search(r"작년|지난\s*(?:달|해)|최근\s*\d+|\d+\s*(일|주|개월)\s*(간|전)", original):
-        raise ValueError("기간을 정확히 지정해 주세요. 오늘·특정 날짜·지난주 시세, 최신 뉴스, 사업연도를 지정한 연간 실적을 지원합니다.")
-    if result.intent != "financial" and (result.period == "historical" or has_date_expression(original)):
+        raise ValueError("기간을 정확히 지정해 주세요. 오늘·특정 날짜·지난주 시세, 공시, 사업연도를 지정한 연간 실적을 지원합니다.")
+    if result.intent in {"quote", "composite", "disclosure"} and (result.period == "historical" or has_date_expression(original)):
         if not has_date_expression(original):
             raise ValueError("날짜를 정확히 알려 주세요. 예: 어제, 11월 6일, 지난주")
         basis = resolve_basis(original)  # 미래·너무 오래된 날짜는 여기서 거부된다.
@@ -59,7 +59,7 @@ def validated_question(result: QuestionInterpretation, original: str, selected):
             raise ValueError("기간 전체의 시세는 아직 지원하지 않습니다. 날짜 하나로 질문해 주세요.")
     if result.intent == "financial" and re.search(r"분기|반기|별도", original):
         raise ValueError("현재 실적 조회는 연결 기준 연간 사업보고서만 지원합니다.")
-    intent = {"quote": "현재가", "financial": "실적", "news": "관련 뉴스", "composite": "주가 변동 이유와 관련 뉴스",
+    intent = {"quote": "현재가", "financial": "실적", "policy": "산업 정책", "disclosure": "공시", "composite": "주가 변동 이유와 관련 산업 정책",
               "report": "사업보고서"}[result.intent]
     years = " ".join(re.findall(r"(?<!\d)20\d{2}(?!\d)", original))
     return f"{COMPANIES.get(code, selected.name)} {code} {years} {intent}"

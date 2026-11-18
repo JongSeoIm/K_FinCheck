@@ -67,6 +67,21 @@ class DisclosureQuestionTest(unittest.TestCase):
 
 
 class DisclosureAnswerTest(unittest.IsolatedAsyncioTestCase):
+    async def test_recent_disclosure_summary_uses_only_preview_and_preserves_full_list(self):
+        calls = []
+        items = [item(f"20261106000{index:03}", "2026-11-06", f"공시 제목 {index}") for index in range(12)]
+        provider = RecordingProvider()
+        service = ChatService(provider, disclosure_tool=CompanyDisclosureTool("http://spring", spring(items, calls)),
+                              clock=MONDAY_MORNING)
+
+        result = await service.ask(request("삼성전자 최근 공시 알려줘"))
+
+        self.assertEqual(["/api/stocks/005930/disclosures?from=2026-10-11&to=2026-11-09"], calls)
+        self.assertEqual(12, len(result.presentation.data["items"]))
+        sent = json.loads(provider.histories[0][-1].content.split("\n", 1)[1])
+        self.assertEqual([entry["reportName"] for entry in items[:5]], [entry["title"] for entry in sent["items"]])
+        self.assertTrue(sent["truncated"])
+
     async def test_date_question_reads_db_api_and_answers_from_titles(self):
         calls = []
         items = [item("20261106000111", "2026-11-06", "현금ㆍ현물배당결정"),
@@ -93,12 +108,24 @@ class DisclosureAnswerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([], provider.histories)
 
     async def test_numbers_not_in_titles_are_replaced(self):
-        items = [item("20261106000111", "2026-11-06", "현금ㆍ현물배당결정")]
+        items = [item("20261106000111", "2026-11-06", "현금ㆍ현물배당결정 14,440원")]
         service = ChatService(NumberProvider(), disclosure_tool=CompanyDisclosureTool("http://spring", spring(items)),
                               clock=MONDAY_MORNING)
         result = await service.ask(request("11월 6일 삼성전자 공시"))
         self.assertNotIn("1,444", result.answer)
         self.assertIn("원문 링크", result.answer)
+
+    async def test_explicit_disclosure_date_stays_on_sunday_in_combined_query(self):
+        calls = []
+        transport = spring([item("20261108000111", "2026-11-08", "휴일 공시")], calls,
+                           prices={"2026-11-06": (51000, 50000)})
+        service = ChatService(RecordingProvider(), quote_tool=StockQuoteTool("http://spring", transport),
+                              disclosure_tool=CompanyDisclosureTool("http://spring", transport),
+                              clock=MONDAY_MORNING)
+        result = await service.ask(request("2026년 11월 8일 삼성전자 주가와 공시"))
+        self.assertIn("/api/stocks/005930/daily-price?date=2026-11-06", calls)
+        self.assertIn("/api/stocks/005930/disclosures?from=2026-11-08&to=2026-11-08", calls)
+        self.assertEqual(["quote", "disclosure"], [section["type"] for section in result.presentation.data["sections"]])
 
     async def test_failure_is_reported_not_guessed(self):
         provider = RecordingProvider()

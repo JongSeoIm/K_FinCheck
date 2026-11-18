@@ -5,15 +5,16 @@ import java.util.List;
 
 @ConfigurationProperties(prefix = "stream")
 public class StreamProperties {
-    private List<String> symbols = List.of("005930", "000660");
+    private List<String> symbols = List.of("005930", "000660", "035420", "035720",
+            "005380", "000270", "051910", "006400");
     private String topic = "stock-quotes-v1";
     private boolean relayEnabled = true;
 
     public List<String> getSymbols() { return symbols; }
     public void setSymbols(List<String> symbols) {
-        if (symbols == null || symbols.isEmpty() || symbols.size() > 2
+        if (symbols == null || symbols.isEmpty() || symbols.size() > 8
                 || symbols.stream().anyMatch(s -> !s.matches("[0-9]{6}"))) {
-            throw new IllegalArgumentException("실시간 종목은 6자리 코드 1~2개로 설정하세요.");
+            throw new IllegalArgumentException("실시간 종목은 6자리 코드 1~8개로 설정하세요.");
         }
         this.symbols = symbols.stream().distinct().toList();
     }

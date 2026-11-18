@@ -1,11 +1,9 @@
 'use client'
 
-import { FaRegStar, FaStar } from 'react-icons/fa'
-import useHydrated from '@/app/hooks/useHydrated'
 import useStockData from '@/app/hooks/useStockData'
-import useStockStore from '@/app/store/useStockStore'
+import { changeRateClass } from '../lib/market'
 import QuoteStatus from './QuoteStatus'
-import useAuthStore from '../store/useAuthStore'
+import WatchStar from './WatchStar'
 
 function formatNumber(value, digits = 0) {
   if (value == null) return '—'
@@ -16,25 +14,15 @@ function formatNumber(value, digits = 0) {
 }
 
 export default function StockInfo({ stock, liveQuote }) {
-  const hydrated = useHydrated()
   const { data: restData, loading: restLoading, error: restError } = useStockData(stock.symbol)
   const data = liveQuote ? { ...restData, ...liveQuote, source: 'KIS WebSocket' } : restData
   const loading = restLoading && !liveQuote
   const error = liveQuote ? null : restError
-  const watchlist = useStockStore((state) => state.watchlist)
-  const addToWatchlist = useStockStore((state) => state.addToWatchlist)
-  const removeFromWatchlist = useStockStore((state) => state.removeFromWatchlist)
-  const saving = useStockStore((state) => state.saving)
-  const user = useAuthStore(state => state.user)
-
-  const isSaved = hydrated && watchlist.includes(stock.symbol)
   const displayName = data?.stockName || stock.name || stock.symbol
   const displayMarket = data?.marketName || stock.market || 'KOSPI'
   const displayPrice = data?.price ?? null
   const displayChangeRate = data?.changeRate ?? null
   const priceChange = data?.priceChange ?? null
-  const isRising = displayChangeRate >= 0
-  const isZero = displayChangeRate === 0
 
   const metrics = [
     ['시가', data?.open != null ? `${formatNumber(data.open)}원` : null],
@@ -50,19 +38,7 @@ export default function StockInfo({ stock, liveQuote }) {
           <h2>{displayName}</h2>
           <p>{stock.symbol} · {displayMarket} · 보통주</p>
         </div>
-        <button
-          className={`watch-toggle ${isSaved ? 'saved' : ''}`}
-          type='button'
-          onClick={() => {
-            if (!user) { window.location.assign(`/login?next=${encodeURIComponent(`/?symbol=${stock.symbol}`)}`); return }
-            if (isSaved) removeFromWatchlist(stock.symbol)
-            else addToWatchlist(stock.symbol)
-          }}
-          disabled={!hydrated || saving}
-        >
-          {isSaved ? <FaStar aria-hidden='true' /> : <FaRegStar aria-hidden='true' />}
-          {isSaved ? '관심 종목 해제' : '관심 종목 추가'}
-        </button>
+        <WatchStar symbol={stock.symbol} name={displayName} returnTo={`/?symbol=${stock.symbol}`} />
       </div>
 
       <div className='quote-body'>
@@ -73,9 +49,9 @@ export default function StockInfo({ stock, liveQuote }) {
           ) : (
             <strong>{displayPrice == null ? '—' : `${formatNumber(displayPrice)}원`}</strong>
           )}
-          <p className={displayChangeRate == null || isZero ? '' : isRising ? 'positive' : 'negative'}>
+          <p>
             {priceChange == null ? '—' : `${priceChange > 0 ? '+' : ''}${formatNumber(priceChange)}원`}
-            {displayChangeRate != null && <span>({displayChangeRate > 0 ? '+' : ''}{formatNumber(displayChangeRate, 2)}%)</span>}
+            {displayChangeRate != null && <span className={changeRateClass(displayChangeRate)}>({displayChangeRate > 0 ? '+' : ''}{formatNumber(displayChangeRate, 2)}%)</span>}
           </p>
           {error && <small className='inline-warning'>{error}</small>}
         </div>

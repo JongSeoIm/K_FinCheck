@@ -1,5 +1,7 @@
 import './globals.css'
 import './chat-drawer.css'
+import './theme-clean.css'
+import './theme-toss.css'
 
 export const metadata = {
   title: '실시간 주식 대시보드',

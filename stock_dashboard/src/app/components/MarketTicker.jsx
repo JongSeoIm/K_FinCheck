@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FaStar } from 'react-icons/fa'
 import useHydrated from '../hooks/useHydrated'
-import { marketStocks } from '../lib/market'
+import { changeRateClass, marketStocks } from '../lib/market'
 import useStockStore from '../store/useStockStore'
 
 const tickerStocks = marketStocks.slice(0, 8)
@@ -78,7 +78,7 @@ export default function MarketTicker({ activeSymbol, onSelectStock, trades }) {
             ) : (
               <small>{stock.symbol}</small>
             )}
-            <small className={displayChange == null ? '' : displayChange >= 0 ? 'positive' : 'negative'}>
+            <small className={changeRateClass(displayChange)}>
               {displayChange == null ? '—' : `${displayChange >= 0 ? '+' : ''}${displayChange.toFixed(2)}%`}
             </small>
           </button>
