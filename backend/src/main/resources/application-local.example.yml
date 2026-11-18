@@ -1,0 +1,23 @@
+# 로컬 개발 환경용 KIS 설정 예시
+# 이 파일을 application-local.yml로 복사한 후 실제 발급받은 키를 입력하세요.
+# application-local.yml 파일은 .gitignore에 등록되어 Git에 포함되지 않습니다.
+
+kis:
+  base-url: https://openapi.koreainvestment.com:9443
+  app-key: YOUR_KIS_APP_KEY_HERE
+  app-secret: YOUR_KIS_APP_SECRET_HERE
+
+
+# OpenDART 인증키는 백엔드 로컬 설정에만 입력합니다.
+opendart:
+  api-key: YOUR_OPENDART_API_KEY_HERE
+
+# 프로젝트 전용 DB 계정. 실제 비밀번호는 application-local.yml에만 입력합니다.
+spring:
+  datasource:
+    username: k_fincheck_app
+    password: YOUR_DB_PASSWORD
+
+# Python FastAPI 서버. 기본값을 사용할 때는 생략할 수 있습니다.
+ai-server:
+  base-url: http://127.0.0.1:8000

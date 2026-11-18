@@ -1,0 +1,40 @@
+.calendar { min-width: 0; }
+.panel { border: 1px solid var(--line); background: #fff; }
+.monthBar { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 16px; }
+.monthBar h2 { min-width: 122px; margin: 0; text-align: center; font-size: 19px; }
+.monthBar button { width: 34px; height: 34px; border: 1px solid var(--line); background: #fff; color: var(--text); font-size: 24px; line-height: 1; cursor: pointer; }
+.monthBar button:hover { background: #f4f4f4; }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.grid > * { border-top: 1px solid var(--line); border-right: 1px solid var(--line); min-width: 0; }
+.grid > :nth-child(7n) { border-right: 0; }
+.weekday { background: #f4f4f4; padding: 9px 0; text-align: center; font-size: 13px; font-weight: 600; }
+.day, .emptyCell { min-height: 100px; padding: 8px; }
+.selectedDay { background: #f5f7fa; }
+.emptyCell { background: #fafafa; }
+.day time { display: block; margin-bottom: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.event { position: relative; margin-bottom: 3px; }
+.eventButton { display: flex; align-items: baseline; gap: 5px; width: 100%; padding: 4px 5px; border: 1px solid transparent; background: var(--event-background, #f2f2f2); color: var(--text); text-align: left; font-size: 12px; cursor: pointer; }
+.earnings { --event-background: #e8eff8; }
+.buyback { --event-background: #e8f1ec; }
+.dividend { --event-background: #f4eddf; }
+.meeting { --event-background: #eee8f6; }
+.eventButton span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.eventButton span:last-child { flex-shrink: 0; color: var(--muted); }
+.eventButton:hover, .eventButton[aria-expanded='true'] { border-color: var(--line); }
+.more { border: 0; padding: 2px 4px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.popup { position: absolute; z-index: 5; top: 100%; left: 0; width: 230px; border: 1px solid var(--line); background: #fff; padding: 10px 12px; box-shadow: 0 3px 10px #0002; }
+.day:nth-last-child(-n + 14) .popup { top: auto; bottom: 100%; }
+.day:nth-child(7n) .popup, .day:nth-child(7n - 1) .popup { right: 0; left: auto; }
+.popupItem { display: grid; gap: 5px; font-size: 12px; }
+.popupItem + .popupItem { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.popupItem span { color: var(--muted); }
+.popupItem a { width: fit-content; text-underline-offset: 2px; }
+.empty { border-top: 1px solid var(--line); margin: 0; padding: 14px; color: var(--muted); font-size: 13px; text-align: center; }
+@media (max-width: 760px) {
+  .panel { position: relative; }
+  .day, .emptyCell { min-height: 90px; padding: 4px; }
+  .eventButton { display: grid; gap: 0; padding: 3px 2px; font-size: 10px; }
+  .eventButton span:last-child { white-space: normal; }
+  .event { position: static; }
+  .day .popup { position: absolute; top: 58px; bottom: auto; left: auto; right: 8px; max-width: calc(100% - 16px); }
+}

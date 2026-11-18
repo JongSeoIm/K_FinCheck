@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfincheck.auth.AccountMapper">
+    <select id="findByLoginId" resultType="com.kfincheck.auth.AccountMapper$Account">
+        SELECT user_id AS userId, login_id AS loginId, password_hash AS passwordHash, nickname
+        FROM app_user WHERE login_id = #{loginId}
+    </select>
+    <insert id="insertAccount">
+        INSERT INTO app_user (login_id, password_hash, nickname)
+        VALUES (#{loginId}, #{passwordHash}, #{nickname})
+    </insert>
+    <select id="findWatchlist" resultType="string">
+        SELECT stock_code FROM watchlist WHERE user_id = #{userId} ORDER BY created_at, stock_code
+    </select>
+    <insert id="insertCompany">
+        INSERT INTO company (stock_code, company_name, market_type) VALUES (#{code}, #{name}, #{market})
+        ON DUPLICATE KEY UPDATE stock_code = VALUES(stock_code)
+    </insert>
+    <insert id="addWatchlist">
+        INSERT INTO watchlist (user_id, stock_code) VALUES (#{userId}, #{code})
+        ON DUPLICATE KEY UPDATE stock_code = VALUES(stock_code)
+    </insert>
+    <delete id="removeWatchlist">
+        DELETE FROM watchlist WHERE user_id = #{userId} AND stock_code = #{code}
+    </delete>
+</mapper>
