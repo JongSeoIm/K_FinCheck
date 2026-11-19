@@ -45,7 +45,6 @@ export default function PolicyFeed({ symbol }) {
 
   return (
     <>
-      <div className='policy-toolbar'><span>산업통상부·정책브리핑 · 관련도 기준 통과</span></div>
       <div className='policy-scroll' tabIndex={0} aria-label='산업·정책 동향 목록'>
         <ul className='stock-news-list policy-copy'>
           {policies.map(policy => (
@@ -63,6 +62,7 @@ export default function PolicyFeed({ symbol }) {
           ))}
         </ul>
       </div>
+      <p className='feed-source'>산업통상부·정책브리핑 · 관련도 기준 통과</p>
     </>
   )
 }

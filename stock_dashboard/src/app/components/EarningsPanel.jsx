@@ -28,16 +28,18 @@ function EstimateTable({ feed }) {
   const metrics = [['revenue', '매출액'], ['operatingProfit', '영업이익'], ['netIncome', '당기순이익']]
   return <>
     <p className='financial-meta'>연간 추정치 · 억 원</p>
-    <table className='financial-table'>
-      <caption className='financial-caption'>KIS 결산월별 연간 예상 실적</caption>
-      <thead><tr><th scope='col'>항목</th>
-        {estimates.map(({ closingMonth }) => <th key={closingMonth} scope='col'>{closingMonth} 추정</th>)}
-      </tr></thead>
-      <tbody>{metrics.map(([key, label]) => <tr key={key}>
-        <th scope='row'>{label}</th>
-        {estimates.map(row => <td key={row.closingMonth}>{row[key] == null ? '—' : amounts.format(row[key])}</td>)}
-      </tr>)}</tbody>
-    </table>
+    <div className='financial-table-scroll'>
+      <table className='financial-table'>
+        <caption className='financial-caption'>KIS 결산월별 연간 예상 실적</caption>
+        <thead><tr><th scope='col'>항목</th>
+          {estimates.map(({ closingMonth }) => <th key={closingMonth} scope='col'>{closingMonth} 추정</th>)}
+        </tr></thead>
+        <tbody>{metrics.map(([key, label]) => <tr key={key}>
+          <th scope='row'>{label}</th>
+          {estimates.map(row => <td key={row.closingMonth}>{row[key] == null ? '—' : amounts.format(row[key])}</td>)}
+        </tr>)}</tbody>
+      </table>
+    </div>
     <div className='financial-source'>
       <span>KIS · {estimateDate ? `추정 기준일 ${estimateDate}` : '추정 기준일 미제공'}</span>
       <span>— 자료 없음</span>
@@ -133,6 +135,7 @@ function EarningsReport({ symbol, estimated }) {
 function ActualTable({ report, quarter }) {
   const period = quarter ? ` ${quarter}분기` : ''
   return <>
+    <div className='financial-table-scroll'>
       <table className='financial-table'>
         <caption className='financial-caption'>{report.businessYear}년{period} 연결 실적 및 전년 대비 증감률</caption>
         <thead><tr>
@@ -150,6 +153,7 @@ function ActualTable({ report, quarter }) {
           </tr>
         ))}</tbody>
       </table>
+    </div>
       <div className='financial-source'>
         {report.sourceUrl && <a href={report.sourceUrl} target='_blank' rel='noopener noreferrer'>DART {quarter === 2 ? '반기보고서' : quarter ? '분기보고서' : '사업보고서'} ↗</a>}
         <span>— 자료 없음·비교 불가</span>

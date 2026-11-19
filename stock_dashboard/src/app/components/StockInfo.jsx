@@ -34,25 +34,27 @@ export default function StockInfo({ stock, liveQuote }) {
   return (
     <section className='panel quote-overview'>
       <div className='quote-heading'>
-        <div>
+        <div className='quote-identity'>
           <h2>{displayName}</h2>
+          <WatchStar symbol={stock.symbol} name={displayName} returnTo={`/?symbol=${stock.symbol}`} />
           <p>{stock.symbol} · {displayMarket} · 보통주</p>
         </div>
-        <WatchStar symbol={stock.symbol} name={displayName} returnTo={`/?symbol=${stock.symbol}`} />
+        <QuoteStatus compact quote={liveQuote} fetchedAt={restData?.fetchedAt}
+          source={data?.source === 'KIS WebSocket' ? 'KIS 실시간' : data?.source ? `${data.source} 시세` : null} />
       </div>
 
       <div className='quote-body'>
         <div className='headline-price'>
-          <span>현재가</span>
+          <span className='sr-only'>현재가</span>
           {loading ? (
             <span className='price-skeleton' />
           ) : (
             <strong>{displayPrice == null ? '—' : `${formatNumber(displayPrice)}원`}</strong>
           )}
-          <p>
+          <p><span className={changeRateClass(displayChangeRate)}>
             {priceChange == null ? '—' : `${priceChange > 0 ? '+' : ''}${formatNumber(priceChange)}원`}
-            {displayChangeRate != null && <span className={changeRateClass(displayChangeRate)}>({displayChangeRate > 0 ? '+' : ''}{formatNumber(displayChangeRate, 2)}%)</span>}
-          </p>
+            {displayChangeRate != null && ` (${displayChangeRate > 0 ? '+' : ''}${formatNumber(displayChangeRate, 2)}%)`}
+          </span></p>
           {error && <small className='inline-warning'>{error}</small>}
         </div>
 
@@ -65,7 +67,6 @@ export default function StockInfo({ stock, liveQuote }) {
           ))}
         </dl>
       </div>
-      <QuoteStatus quote={liveQuote} fetchedAt={restData?.fetchedAt} source={data?.source === 'KIS WebSocket' ? 'KIS 실시간' : data?.source ? `${data.source} 시세` : null} />
     </section>
   )
 }

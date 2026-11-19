@@ -13,6 +13,17 @@ const quantity = new Intl.NumberFormat('ko-KR', { signDisplay: 'exceptZero' })
 const units = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 })
 const shortDate = date => date.slice(5).replace('-', '.')
 const shares = value => value == null ? '—' : `${quantity.format(value)}주`
+const netClass = value => value > 0 ? 'positive' : value < 0 ? 'negative' : undefined
+
+function InvestorTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return <div className='chart-tooltip'>
+    <time dateTime={label}>{label}</time>
+    {payload.map(entry => <div className='investor-tooltip-row' key={entry.dataKey}>
+      <span>{entry.name}</span><strong className={netClass(entry.value)}>{shares(entry.value)}</strong>
+    </div>)}
+  </div>
+}
 
 export default function InvestorTradesPanel({ symbol }) {
   const [attempt, setAttempt] = useState(0)
@@ -51,27 +62,30 @@ export default function InvestorTradesPanel({ symbol }) {
         {investors.map(({ key, name, color }) => <li key={key}><span style={{ background: color }} aria-hidden='true' />{name}</li>)}
       </ul>
     </div>
-    <div className='investor-trades-chart'>
-      <ResponsiveContainer width='100%' height='100%'>
-        <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
-          <CartesianGrid vertical={false} stroke='var(--line-light)' />
-          <XAxis dataKey='date' tickFormatter={shortDate} tick={{ fontSize: 12 }} />
-          <YAxis orientation='right' width={58} tickFormatter={value => units.format(value)} tick={{ fontSize: 11 }} />
-          <ReferenceLine y={0} stroke='var(--muted)' ifOverflow='extendDomain' />
-          <Tooltip formatter={value => shares(value)} />
-          {investors.map(({ key, name, color }) => <Line key={key} dataKey={key} name={name} stroke={color}
-            strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />)}
-        </LineChart>
-      </ResponsiveContainer>
+    <div className='investor-trades-content'>
+      <div className='investor-trades-chart'>
+        <ResponsiveContainer width='100%' height='100%'>
+          <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+            <CartesianGrid vertical={false} stroke='var(--line-light)' />
+            <XAxis dataKey='date' tickFormatter={shortDate} tick={{ fontSize: 12, fontWeight: 400 }} />
+            <YAxis orientation='right' width={72} tickFormatter={value => units.format(value)} tick={{ fontSize: 12, fontWeight: 400 }} />
+            <ReferenceLine y={0} stroke='var(--muted)' ifOverflow='extendDomain' />
+            <Tooltip content={<InvestorTooltip />} />
+            {investors.map(({ key, name, color }) => <Line key={key} dataKey={key} name={name} stroke={color}
+              strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />)}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className='investor-trades-table'>
+        <table className='financial-table'>
+          <caption className='financial-caption'>거래일별 순매수 수량</caption>
+          <thead><tr><th scope='col'>거래일</th>{investors.map(({ key, name }) => <th key={key} scope='col'>{name}</th>)}</tr></thead>
+          <tbody>{rows.toReversed().map(row => <tr key={row.date}>
+            <th scope='row'><time dateTime={row.date}>{shortDate(row.date)}</time></th>
+            {investors.map(({ key }) => <td key={key}>{shares(row[key])}</td>)}
+          </tr>)}</tbody>
+        </table>
+      </div>
     </div>
-    <table className='financial-table'>
-      <caption className='financial-caption'>거래일별 순매수 수량</caption>
-      <thead><tr><th scope='col'>거래일</th>{investors.map(({ key, name }) => <th key={key} scope='col'>{name}</th>)}</tr></thead>
-      <tbody>{rows.toReversed().map(row => <tr key={row.date}>
-        <th scope='row'><time dateTime={row.date}>{shortDate(row.date)}</time></th>
-        {investors.map(({ key }) => <td key={key} className={row[key] > 0 ? 'investor-net-buy' : row[key] < 0 ? 'negative' : undefined}>{shares(row[key])}</td>)}
-      </tr>)}</tbody>
-    </table>
-    <p className='opinion-footnote'>당일 수치는 집계에 따라 바뀔 수 있습니다.</p>
   </div>
 }

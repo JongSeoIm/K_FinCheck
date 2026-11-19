@@ -7,6 +7,7 @@ import useStockData from '@/app/hooks/useStockData'
 import QuoteStatus from './QuoteStatus'
 import useAuthStore from '../store/useAuthStore'
 import WatchStar from './WatchStar'
+import StockIcon from './StockIcon'
 
 function WatchlistRow({ stock, active, liveQuote, onSelect }) {
   const { data, error } = useStockData(stock.symbol, !liveQuote)
@@ -16,7 +17,7 @@ function WatchlistRow({ stock, active, liveQuote, onSelect }) {
   const name = data?.stockName || stock.name
   return <li className={active ? 'active' : ''}>
     <button className='watchlist-select' type='button' onClick={() => onSelect(stock)}>
-      <span className='watch-name'><strong>{name}</strong><small>{stock.symbol}</small></span>
+      <span className='watch-name'><StockIcon symbol={stock.symbol} /><strong>{name}</strong><small>{stock.symbol}</small></span>
       <span className='watch-price' title={error && !liveQuote ? error : undefined}>
         <strong>{price == null ? '—' : `${price.toLocaleString('ko-KR')}원`}</strong>
         <small className={changeRateClass(rate)}>
@@ -38,7 +39,6 @@ export default function WatchlistPanel({ activeSymbol, onSelectStock, trades = {
     <section className='panel watchlist-panel'>
       <div className='panel-heading'>
         <h2>관심 종목</h2>
-        <span className='count-badge'>{hydrated ? watchlist.length : 0}</span>
       </div>
 
       {!hydrated ? (

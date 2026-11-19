@@ -15,9 +15,11 @@ import StockInfo from './StockInfo'
 import StockNewsFeed from './StockNewsFeed'
 import StockSearch from './StockSearch'
 import WatchlistPanel from './WatchlistPanel'
+import UpcomingEventsPanel from './UpcomingEventsPanel'
 import AuthNav from './AuthNav'
 import useRealtimeQuotes from '../hooks/useRealtimeQuotes'
 import useRecentStock from '../hooks/useRecentStock'
+import useCompanyCalendar from '../hooks/useCompanyCalendar'
 import { marketStocks } from '../lib/market'
 
 const LazyPolicyFeed = lazy(() => import('./PolicyFeed'))
@@ -45,6 +47,7 @@ export default function Dashboard({ initialStock }) {
   const [policyTab, setPolicyTab] = useState('trends')
   const stream = useRealtimeQuotes(intervalSeconds)
   const chatStock = recentStock || selectedStock
+  const calendar = useCompanyCalendar(isCalendar)
 
   const handleSelectStock = (stock) => {
     const normalizedStock = {
@@ -72,7 +75,7 @@ export default function Dashboard({ initialStock }) {
     <main className='app-shell'>
       <header className='topbar'>
         {isDetail && <h1 className='sr-only'>종목 상세 정보</h1>}
-        <div className='topbar-navigation'>
+        <nav className='topbar-navigation' aria-label='주 메뉴'>
           <Link className={`market-nav-link${isList ? ' active' : ''}`} href='/' aria-current={isList ? 'page' : undefined}>국내 주식</Link>
           {recentStock
             ? <Link className={`market-nav-link recent-stock-link${isDetail ? ' active' : ''}`}
@@ -80,7 +83,7 @@ export default function Dashboard({ initialStock }) {
             : <span className='market-nav-link recent-stock-link unavailable' title='종목을 선택하면 다시 열 수 있습니다.'>최근 본 종목</span>}
           <Link className={`market-nav-link calendar-nav-link${isCalendar ? ' active' : ''}`}
             href='/?view=calendar' aria-current={isCalendar ? 'page' : undefined}>기업 일정</Link>
-        </div>
+        </nav>
         <div className='topbar-actions'>
           <StockSearch onSelectStock={handleSelectStock} />
           <AuthNav symbol={selectedStock.symbol} returnTo={isCalendar ? '/?view=calendar' : isList ? '/' : undefined} />
@@ -88,10 +91,11 @@ export default function Dashboard({ initialStock }) {
       </header>
 
       {isCalendar || isList ? <div className='dashboard-layout market-layout'>
-        {isCalendar ? <CompanyCalendar /> : <DomesticStocks trades={stream.trades} onSelectStock={handleSelectStock} />}
-        <aside className='insight-column' aria-label='관심 종목'>
+        {isCalendar ? <CompanyCalendar data={calendar} /> : <DomesticStocks trades={stream.trades} onSelectStock={handleSelectStock} />}
+        <aside className='insight-column' aria-label={isCalendar ? '관심 종목' : '관심 종목 및 기업 일정'}>
           <StockChatDrawer stock={chatStock} />
           <WatchlistPanel onSelectStock={handleSelectStock} trades={stream.trades} />
+          {isList && <UpcomingEventsPanel />}
         </aside>
       </div> : (
       <div className='dashboard-layout'>
@@ -136,19 +140,21 @@ export default function Dashboard({ initialStock }) {
                 <div className='panel-heading'><h2>증권사 목표주가</h2></div>
                 <RecommendationChart key={selectedStock.symbol} symbol={selectedStock.symbol} liveQuote={stream.trades[selectedStock.symbol]} />
               </section>
-              <section className='panel compact-panel'>
-                <div className='panel-heading'><h2>기업 실적</h2></div>
-                <EarningsPanel symbol={selectedStock.symbol} />
-              </section>
-              <section className='panel compact-panel'>
-                <div className='panel-heading'><h2>배당 내역</h2></div>
-                <DividendPanel key={selectedStock.symbol} symbol={selectedStock.symbol} />
-              </section>
+              <div className='company-financial-grid'>
+                <section className='panel compact-panel'>
+                  <div className='panel-heading'><h2>기업 실적</h2></div>
+                  <EarningsPanel symbol={selectedStock.symbol} />
+                </section>
+                <section className='panel compact-panel'>
+                  <div className='panel-heading'><h2>배당 내역</h2></div>
+                  <DividendPanel key={selectedStock.symbol} symbol={selectedStock.symbol} />
+                </section>
+              </div>
           </section>}
 
           {detailTab === 'policy' && <section id='detail-panel-policy' className='detail-info-grid detail-tab-panel'
             role='tabpanel' aria-labelledby='detail-tab-policy'>
-              <div className='detail-tabs' role='tablist' aria-label='공시·정책 자료 구분'>
+              <div className='detail-tabs policy-subtabs' role='tablist' aria-label='공시·정책 자료 구분'>
                 {policyTabs.map((tab, index) => <button
                   key={tab.id}
                   id={`policy-tab-${tab.id}`}

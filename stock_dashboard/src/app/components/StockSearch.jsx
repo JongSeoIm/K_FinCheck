@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { FiSearch } from 'react-icons/fi'
 import { marketStocks } from '../lib/market'
 
 export default function StockSearch({ onSelectStock }) {
@@ -83,6 +84,7 @@ export default function StockSearch({ onSelectStock }) {
     <div className='global-search' ref={searchAreaRef}>
       <form className='search-form' onSubmit={handleSubmit}>
         <label className='sr-only' htmlFor='stock-search'>종목 검색</label>
+        <FiSearch aria-hidden='true' />
         <input
           id='stock-search'
           type='search'

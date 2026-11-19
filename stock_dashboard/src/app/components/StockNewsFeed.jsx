@@ -39,8 +39,7 @@ export default function StockNewsFeed({ symbol }) {
   if (!articles.length) return <div className='financial-state' role='status'>최근 조선비즈 RSS에 제목이 일치하는 기사가 없습니다.</div>
 
   return <>
-    <div className='policy-toolbar'><span>{source} · 제목 키워드 기준</span></div>
-    <ul className='stock-news-list policy-copy'>
+    <ul className='stock-news-list policy-copy policy-scroll' tabIndex={0} aria-label='최신 기사 목록'>
       {articles.map(article => <li key={article.link}>
         <div className='policy-tags'>
           <span className='policy-tag'>{article.relation === 'DIRECT' ? '직접 관련' : '산업 관련'}</span>
@@ -49,5 +48,6 @@ export default function StockNewsFeed({ symbol }) {
         <small>{source} · <time dateTime={article.publishedAt}>{dateFormat.format(new Date(article.publishedAt))}</time></small>
       </li>)}
     </ul>
+    <p className='feed-source'>{source} · 제목 키워드 기준</p>
   </>
 }

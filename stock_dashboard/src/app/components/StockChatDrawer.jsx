@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
+import { FiClock, FiMessageSquare, FiPlus, FiX } from 'react-icons/fi'
 import { accountApi } from '../lib/accountApi'
 import useAuthStore from '../store/useAuthStore'
 import ChatAnswerData, { formatChatTime } from './ChatAnswerData'
@@ -35,9 +36,12 @@ export default function StockChatDrawer({ stock }) {
   const [sending, setSending] = useState(false)
   const { user, ready } = useAuthStore()
   const dialogRef = useRef(null)
+  const launcherRef = useRef(null)
+  const motionRef = useRef(null)
+  const titleRef = useRef(null)
   const inputRef = useRef(null)
   const endRef = useRef(null)
-  const closeTimer = useRef(null)
+  const historyId = useId()
   const sendLock = useRef(false)
   const pendingRequest = useRef(null)
   const viewKey = useRef('')
@@ -51,8 +55,6 @@ export default function StockChatDrawer({ stock }) {
     ? [...new Set([...(followUpsByType[lastMessage.presentation?.type] ?? []), ...suggestions])].filter(question =>
         question !== lastQuestion && `${context.name} ${question}` !== lastQuestion).slice(0, 3)
     : []
-
-  useEffect(() => () => clearTimeout(closeTimer.current), [])
 
   useEffect(() => {
     if (!open || !user) return
@@ -120,11 +122,41 @@ export default function StockChatDrawer({ stock }) {
     if (!mounted || !open) return
     const dialog = dialogRef.current
     if (!dialog.open) dialog.showModal()
+    motionRef.current = dialog.animate([
+      { transform: 'translateX(100%)' },
+      { transform: 'translateX(0)' },
+    ], { duration: 300, easing: 'cubic-bezier(.22, 1, .36, 1)' })
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    inputRef.current?.focus({ preventScroll: true })
-    return () => { document.body.style.overflow = previousOverflow }
+    const focusTarget = window.matchMedia('(pointer: coarse)').matches ? titleRef.current : inputRef.current
+    focusTarget?.focus({ preventScroll: true })
+    return () => {
+      document.body.style.overflow = previousOverflow
+      motionRef.current?.cancel()
+    }
   }, [mounted, open])
+
+  useEffect(() => {
+    if (!closing) return
+    const dialog = dialogRef.current
+    const transform = getComputedStyle(dialog).transform
+    motionRef.current?.cancel()
+    const animation = dialog.animate([
+      { transform },
+      { transform: 'translateX(100%)' },
+    ], { duration: 220, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' })
+    motionRef.current = animation
+    let cancelled = false
+    Promise.allSettled([animation.finished]).then(() => {
+      if (cancelled) return
+      dialog.close()
+      animation.cancel()
+      setOpen(false)
+      setClosing(false)
+      launcherRef.current?.focus({ preventScroll: true })
+    })
+    return () => { cancelled = true; animation.cancel() }
+  }, [closing])
 
   useEffect(() => {
     if (open) {
@@ -138,7 +170,6 @@ export default function StockChatDrawer({ stock }) {
       window.location.href = `/login?next=${encodeURIComponent(`/?symbol=${stock.symbol}`)}`
       return
     }
-    clearTimeout(closeTimer.current)
     const nextKey = `${user?.userId}:${stock.symbol}`
     viewKey.current = nextKey
     setContext(stock)
@@ -156,14 +187,7 @@ export default function StockChatDrawer({ stock }) {
   }
 
   function close() {
-    if (closing) return
-    setClosing(true)
-    const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180
-    closeTimer.current = setTimeout(() => {
-      dialogRef.current?.close()
-      setOpen(false)
-      setClosing(false)
-    }, duration)
+    if (open && !closing) setClosing(true)
   }
 
   async function send(value = draft) {
@@ -226,11 +250,13 @@ export default function StockChatDrawer({ stock }) {
 
   return (
     <>
-      <button className='stock-ai-launcher' type='button' onClick={show} aria-haspopup='dialog' disabled={!ready}>
-        종목 AI 채팅
-      </button>
       {mounted && createPortal(
-        <dialog ref={dialogRef} className={`stock-chat-drawer${closing ? ' is-closing' : ''}`}
+        <button ref={launcherRef} className='stock-ai-launcher' type='button' onClick={show}
+          aria-label='종목 AI 채팅 열기' title='종목 AI 채팅' aria-haspopup='dialog' aria-expanded={open} disabled={!ready}>
+          <span className='stock-ai-symbol' aria-hidden='true'><FiMessageSquare /><FiMessageSquare /></span>
+        </button>, document.body)}
+      {mounted && createPortal(
+        <dialog ref={dialogRef} className='stock-chat-drawer'
           aria-labelledby='stock-chat-title'
           onCancel={event => { event.preventDefault(); close() }}
           onClick={event => {
@@ -239,21 +265,21 @@ export default function StockChatDrawer({ stock }) {
             if (event.clientX < rect.left || event.clientX > rect.right) close()
           }}>
           <div className='stock-chat-layout'>
-            <header className='stock-chat-header'>
-              <div>
-                <h2 id='stock-chat-title'>{context.name}<span>{context.symbol}</span></h2>
+            <header className='stock-chat-top'>
+              <div className='stock-chat-header'>
+                <h2 id='stock-chat-title' ref={titleRef} tabIndex={-1}>{context.name}<span>{context.symbol}</span></h2>
+                <button className='stock-chat-close' type='button' aria-label='대화 패널 닫기' onClick={close}><FiX aria-hidden='true' /></button>
               </div>
-              <button className='stock-chat-close' type='button' aria-label='대화 패널 닫기' onClick={close}>×</button>
+              {user && <nav className='stock-chat-actions' aria-label='대화 관리'>
+                <button type='button' onClick={newRoom} disabled={sending || loading}><FiPlus aria-hidden='true' />새 대화</button>
+                <button type='button' onClick={() => setHistoryOpen(value => !value)} disabled={sending || loading}
+                  aria-expanded={historyOpen} aria-controls={historyOpen ? historyId : undefined}><FiClock aria-hidden='true' />이전 대화</button>
+              </nav>}
             </header>
-            {user && <nav className='stock-chat-actions' aria-label='대화 관리'>
-              <button type='button' onClick={newRoom} disabled={sending || loading}>새 대화</button>
-              <span aria-hidden='true'>·</span>
-              <button type='button' onClick={() => setHistoryOpen(value => !value)} disabled={sending || loading} aria-expanded={historyOpen}>이전 대화</button>
-            </nav>}
             {user && notice && <p className='stock-chat-notice' role='alert'>{notice}</p>}
             {!user && ready && <p className='stock-chat-notice' role='alert'>로그인이 필요합니다. <a href={`/login?next=${encodeURIComponent(`/?symbol=${context.symbol}`)}`}>다시 로그인</a>해 주세요.</p>}
             {user && loading && <p className='stock-chat-notice' role='status'>대화를 불러오고 있습니다.</p>}
-            {historyOpen && user && <section className='stock-chat-history' aria-label='이전 대화 목록'>
+            {historyOpen && user && <section id={historyId} className='stock-chat-history' aria-label='이전 대화 목록'>
               {!rooms.length && <p>저장된 대화가 없습니다.</p>}
               {rooms.map(room => <div className='stock-chat-history-row' key={room.conversationId}>
                 <button type='button' className='stock-chat-room-title' onClick={() => selectRoom(room)} disabled={sending || loading} aria-current={room.conversationId === activeRoom?.conversationId ? 'true' : undefined}>{room.title}</button>

@@ -15,7 +15,7 @@ function TargetLabels({ targets }) {
   const scale = useYAxisScale()
   if (!plot || !scale) return null
 
-  const labelGap = 18
+  const labelGap = 24
   const edge = plot.x + plot.width
   let nextY = plot.y + 5
   const labels = []
@@ -26,7 +26,7 @@ function TargetLabels({ targets }) {
     nextY = y + labelGap
     labels.push(<g key={target.key} className='target-price-label'>
       {Math.abs(y - point) > 2 && <line x1={edge + 4} x2={edge + 12} y1={point} y2={y} stroke={target.color} />}
-      <text x={edge + 15} y={y} dominantBaseline='central' fontSize={11} fill={target.color}>
+      <text x={edge + 15} y={y} dominantBaseline='central' fontSize={14} fontWeight={600} fill={target.color}>
         {target.label} {prices.format(target.value)}원
       </text>
     </g>)
@@ -70,12 +70,12 @@ function TargetPriceSummary({ symbol, items, price, businessDate }) {
     <p className='opinion-basis'>최근 3개월 · 목표주가를 제시한 증권사 {values.length}곳</p>
     {price != null && <div className='target-price-chart' role='img' aria-label='비교 기준 주가와 증권사 목표주가 비교'>
       <ResponsiveContainer width='100%' height='100%'>
-        <LineChart data={chartData} margin={{ top: 12, right: 118, bottom: 0, left: 0 }}>
+        <LineChart data={chartData} margin={{ top: 12, right: 152, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke='var(--line-light)' />
           <XAxis type='number' dataKey='index' domain={[0, targetIndex]}
-            ticks={Object.keys(axisLabels).map(Number)} tickFormatter={value => axisLabels[value]} tick={{ fontSize: 11 }} />
-          <YAxis domain={['auto', 'auto']} width={60} tickLine={false} axisLine={false}
-            tickFormatter={value => prices.format(value)} tick={{ fontSize: 11 }} />
+            ticks={Object.keys(axisLabels).map(Number)} tickFormatter={value => axisLabels[value]} tick={{ fontSize: 14, fontWeight: 600 }} />
+          <YAxis domain={['auto', 'auto']} width={78} tickLine={false} axisLine={false}
+            tickFormatter={value => prices.format(value)} tick={{ fontSize: 14, fontWeight: 600 }} />
           <ReferenceArea x1={basisIndex} x2={targetIndex} fill='#e8edf4' fillOpacity={0.6} />
           <Tooltip content={<TargetPriceTooltip />} />
           <Line dataKey='close' stroke='#707783' strokeWidth={2} dot={false} isAnimationActive={false} />
@@ -197,10 +197,7 @@ export default function RecommendationChart({ symbol, liveQuote }) {
             {feed.partial
               ? <p className='opinion-message'>일부 자료만 조회되어 비율 집계를 표시하지 않습니다.</p>
               : feed.countedBrokers > 0
-                ? <>
-                  <OpinionDistribution distribution={feed.distribution} />
-                  <p className='opinion-footnote'>매수·중립·매도 분류 가능 {feed.countedBrokers}곳 기준</p>
-                </>
+                ? <OpinionDistribution distribution={feed.distribution} />
                 : <p className='opinion-message'>비율로 집계할 수 있는 의견이 없습니다.</p>}
             {(feed.excludedBrokers > 0 || feed.missingBrokerRows > 0) && <p className='opinion-footnote'>
               집계 제외: 의견 분류 불가 {feed.excludedBrokers}곳 · 증권사명 누락 {feed.missingBrokerRows}건

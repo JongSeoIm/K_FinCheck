@@ -8,6 +8,7 @@ import useStockListQuotes from '../hooks/useStockListQuotes'
 import useStockCandles from '../hooks/useStockCandles'
 import InvestorRanking from './InvestorRanking'
 import WatchStar from './WatchStar'
+import StockIcon from './StockIcon'
 
 const PAGE_SIZE = 10
 const RANKING_TAB = '투자자별 순위'
@@ -38,7 +39,7 @@ function StockRow({ stock, quote, error, loading, onSelect }) {
       <WatchStar symbol={stock.symbol} name={stock.name} />
     </td>
     <th scope='row'><button className='market-stock-name' type='button' onClick={() => onSelect(stock)}>
-      {stock.name}<small className='market-compact-code'>{stock.symbol}</small>
+      <StockIcon symbol={stock.symbol} /><span>{stock.name}<small className='market-compact-code'>{stock.symbol}</small></span>
     </button></th>
     <td className='market-code'>{stock.symbol}</td>
     <td className='market-trend'><PriceSparkline symbol={stock.symbol} /></td>

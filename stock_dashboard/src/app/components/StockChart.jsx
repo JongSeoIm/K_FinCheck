@@ -5,12 +5,14 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
+  DefaultZIndexes,
   Line,
   Rectangle,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
+  ZIndexLayer,
   useXAxisScale,
   useYAxisInverseScale,
   useYAxisScale,
@@ -30,8 +32,9 @@ const movingAverages = [
   { key: 'ma5', period: 5, color: '#966026' },
   { key: 'ma20', period: 20, color: '#7251a3' },
 ]
-const axisTick = { fill: '#666', fontSize: 12 }
-const axisWidth = 76
+const axisTick = { fill: 'var(--muted)', fontSize: 15, fontWeight: 600 }
+const axisLine = { stroke: 'var(--line)' }
+const axisWidth = 88
 const chartMargin = { top: 8, right: 6, bottom: 0, left: 0 }
 const volumeFormatter = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 })
 
@@ -125,25 +128,46 @@ function ChartTooltip({ active, payload, showAverages }) {
   )
 }
 
-function PriceGuide({ pointer, latestPrice }) {
-  const plot = usePlotArea()
-  const scale = useYAxisScale()
-  const invert = useYAxisInverseScale()
-  if (!plot || !scale || !invert) return null
+function priceGuidePosition(plot, scale, pointer, latestPrice) {
+  if (!plot || !scale) return null
   const right = plot.x + plot.width
   const bottom = plot.y + plot.height
   const hovering = pointer && pointer.x >= plot.x && pointer.x <= right && pointer.y >= plot.y && pointer.y <= bottom
   const y = hovering ? pointer.y : scale(latestPrice)
+  if (!Number.isFinite(y) || y < plot.y || y > bottom) return null
+  return { y, labelY: Math.max(plot.y + 9, Math.min(bottom - 9, y)), hovering }
+}
+
+function PriceAxisTick({ x, y, payload, pointer, latestPrice }) {
+  const plot = usePlotArea()
+  const scale = useYAxisScale()
+  const guide = priceGuidePosition(plot, scale, pointer, latestPrice)
+  // 24px price badge + 15px tick text, with a small gap between them.
+  if (guide && Math.abs(y - guide.labelY) < 24) return null
+  return <text x={x} y={y} dy='0.32em' textAnchor='start' {...axisTick}>
+    {Number(payload.value).toLocaleString('ko-KR')}
+  </text>
+}
+
+function PriceGuide({ pointer, latestPrice }) {
+  const plot = usePlotArea()
+  const scale = useYAxisScale()
+  const invert = useYAxisInverseScale()
+  const position = priceGuidePosition(plot, scale, pointer, latestPrice)
+  if (!position || !invert) return null
+  const { y, labelY, hovering } = position
+  const right = plot.x + plot.width
   const price = hovering ? invert(y) : latestPrice
-  if (!Number.isFinite(y) || !Number.isFinite(price) || y < plot.y || y > bottom) return null
+  if (!Number.isFinite(price)) return null
   const x = right + 2
-  const labelY = Math.max(plot.y + 9, Math.min(bottom - 9, y))
-  return <g className={hovering ? 'chart-cursor-price' : 'chart-latest-price'} pointerEvents='none'>
-    <line x1={plot.x} x2={right} y1={y} y2={y} stroke='#627084' strokeDasharray='3 3' />
-    <rect x={x} y={labelY - 9} width={axisWidth - 4} height={18} rx={2} fill='#354457' />
-    <text x={x + (axisWidth - 4) / 2} y={labelY} dominantBaseline='central' textAnchor='middle'
-      fill='#fff' fontSize={11}>{Math.round(price).toLocaleString('ko-KR')}</text>
-  </g>
+  return <ZIndexLayer zIndex={DefaultZIndexes.axis + 1}>
+    <g className={hovering ? 'chart-cursor-price' : 'chart-latest-price'} pointerEvents='none'>
+      <line x1={plot.x} x2={right} y1={y} y2={y} stroke='var(--muted)' strokeDasharray='3 3' />
+      <rect x={x} y={labelY - 12} width={axisWidth - 4} height={24} rx={3} fill='var(--text)' />
+      <text x={x + (axisWidth - 4) / 2} y={labelY} dominantBaseline='central' textAnchor='middle'
+        fill='var(--white)' fontSize={14} fontWeight={600}>{Math.round(price).toLocaleString('ko-KR')}</text>
+    </g>
+  </ZIndexLayer>
 }
 
 function VolumeBar({ payload, x, y, width, height }) {
@@ -486,10 +510,10 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
           ) : (
             <ResponsiveContainer width='100%' height='100%' onResize={width => setChartWidth(width)}>
               <ComposedChart data={chartCandles} margin={chartMargin} syncId={chartSyncId}>
-                <CartesianGrid vertical={false} stroke='#e6e6e6' />
-                <XAxis {...horizontalAxis} hide={hasVolume} tickFormatter={formatTimeTick} tick={axisTick} />
+                <CartesianGrid vertical={false} stroke='var(--line-light)' />
+                <XAxis {...horizontalAxis} hide={hasVolume} tickFormatter={formatTimeTick} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
                 <YAxis orientation='right' domain={[visiblePriceTicks[0], visiblePriceTicks.at(-1)]} ticks={visiblePriceTicks} allowDataOverflow
-                  tickFormatter={value => value.toLocaleString('ko-KR')} tick={axisTick} width={axisWidth} />
+                  tick={<PriceAxisTick pointer={pointer} latestPrice={latestPrice} />} width={axisWidth} axisLine={axisLine} tickLine={axisLine} />
                 <Tooltip cursor={!panning} content={<ChartTooltip showAverages={showAverages} />} />
                 {chartType === 'candle' ? (
                   <>
@@ -511,10 +535,10 @@ export default function StockChart({ symbol, liveQuote, liveCandles, streamInter
           <span className='chart-volume-label'>거래량</span>
           <ResponsiveContainer width='100%' height='100%'>
             <ComposedChart data={chartCandles} margin={chartMargin} syncId={chartSyncId}>
-              <CartesianGrid vertical={false} stroke='#eeeeee' />
-              <XAxis {...horizontalAxis} tickFormatter={formatTimeTick} tick={axisTick} />
+              <CartesianGrid vertical={false} stroke='var(--line-light)' />
+              <XAxis {...horizontalAxis} tickFormatter={formatTimeTick} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
               <YAxis orientation='right' domain={[0, 'auto']} tickCount={3} width={axisWidth}
-                tickFormatter={value => volumeFormatter.format(value)} tick={axisTick} />
+                tickFormatter={value => volumeFormatter.format(value)} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
               <Tooltip cursor={!panning} content={() => null} />
               <Bar dataKey='volume' shape={<VolumeBar />} maxBarSize={20} isAnimationActive={false} />
             </ComposedChart>

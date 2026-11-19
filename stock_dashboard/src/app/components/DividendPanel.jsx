@@ -50,7 +50,7 @@ export default function DividendPanel({ symbol }) {
           <span className='dividend-bar-date'>{entry.recordDate.slice(2).replaceAll('-', '.')}</span>
         </div>)}
       </div>
-      <div className='dividend-table-wrap' role='region' aria-label='배당 내역 표' tabIndex={dividends.length > 6 ? 0 : undefined}>
+      <div className='dividend-table-wrap' role='region' aria-label='배당 내역 표' tabIndex={dividends.length > 3 ? 0 : undefined}>
         <table className='financial-table'>
           <caption className='financial-caption'>보통주 현금배당 내역</caption>
           <thead><tr>
@@ -66,7 +66,7 @@ export default function DividendPanel({ symbol }) {
         </table>
       </div>
     </>}
-    <div className='financial-source'><span>KIS · 한국예탁결제원</span><span>— 자료 없음</span></div>
+    <div className='financial-source dividend-source'><span>KIS · 한국예탁결제원</span><span>— 자료 없음</span></div>
   </div>
 }
 

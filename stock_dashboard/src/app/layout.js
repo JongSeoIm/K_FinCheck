@@ -2,8 +2,8 @@ import './globals.css'
 import './chat-drawer.css'
 
 export const metadata = {
-  title: '실시간 주식 대시보드',
-  description: 'Finnhub와 WebSocket으로 확인하는 미국 주식 대시보드',
+  title: 'K-FinCheck | 국내 주식',
+  description: '국내 주식 시세, 기업 일정, 공시를 확인하는 K-FinCheck',
 }
 
 export default function RootLayout({ children }) {
