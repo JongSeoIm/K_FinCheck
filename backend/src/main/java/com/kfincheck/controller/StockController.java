@@ -1,0 +1,64 @@
+package com.kfincheck.controller;
+
+import com.kfincheck.dto.StockCandleDto;
+import com.kfincheck.dto.StockPriceDto;
+import com.kfincheck.service.StockService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/stocks")
+public class StockController {
+
+    private final StockService stockService;
+
+    public StockController(StockService stockService) {
+        this.stockService = stockService;
+    }
+
+    @GetMapping("/{stockCode}/price")
+    public ResponseEntity<StockPriceDto> getStockPrice(@PathVariable("stockCode") String stockCode) {
+        StockPriceDto price = stockService.getStockPrice(stockCode);
+        return ResponseEntity.ok(price);
+    }
+
+    @GetMapping("/{stockCode}/candles")
+    public ResponseEntity<List<StockCandleDto>> getDailyCandles(
+            @PathVariable("stockCode") String stockCode,
+            @RequestParam(value = "days", defaultValue = "40") int days,
+            @RequestParam(value = "period", defaultValue = "D") String period
+    ) {
+        List<StockCandleDto> candles = stockService.getDailyCandles(stockCode, days, period);
+        return ResponseEntity.ok(candles);
+    }
+
+    @GetMapping("/{stockCode}/investor-trades")
+    public List<StockService.InvestorTrade> getInvestorTrades(@PathVariable("stockCode") String stockCode) {
+        return stockService.getInvestorTrades(stockCode);
+    }
+
+    @GetMapping("/investor-ranking")
+    public StockService.InvestorRanking getInvestorRanking() {
+        return stockService.getInvestorRanking();
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> handleServiceError(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", "시세 자료를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."));
+    }
+}
